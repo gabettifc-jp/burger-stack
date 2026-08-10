@@ -78,6 +78,21 @@
   #multMeter.cel{animation:mcel .6s ease-out}
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.5); filter:brightness(1.7)}100%{transform:scale(1)}}
   .grid input.txtinp{width:140px}
+  /* 第1層：完成ごとの3択（回収直後にステージ上に出す。タップで即決・確認画面なし） */
+  #offer{position:absolute; inset:0; z-index:8; display:none; flex-direction:column; gap:8px;
+    align-items:stretch; justify-content:center; padding:10px; border-radius:12px; background:rgba(12,14,19,.86)}
+  #offer.show{display:flex}
+  .offer-title{font-size:.74rem; color:var(--muted); text-align:center; margin-bottom:2px}
+  .offer-cards{display:flex; gap:8px}
+  .offer-card{flex:1; min-width:0; background:#2b313a; border:1px solid var(--line); border-radius:10px;
+    padding:8px 4px; text-align:center; color:var(--text); cursor:pointer; touch-action:manipulation; user-select:none}
+  .offer-card:active{transform:translateY(1px); border-color:var(--accent)}
+  .offer-card .pl{font-size:.62rem; color:var(--muted)}
+  .offer-card .nm{font-weight:800; font-size:.9rem; margin:3px 0 2px}
+  .offer-card .bs{font-size:.64rem; color:var(--muted)}
+  .offer-skip{background:#20242b; border:1px dashed var(--line); border-radius:10px; padding:9px; color:var(--muted);
+    font-weight:700; font-size:.82rem; text-align:center; cursor:pointer; touch-action:manipulation; user-select:none}
+  .offer-skip:active{transform:translateY(1px)}
   @media (prefers-reduced-motion: reduce){
     .flowpop, .cfx, .milestone, #multMeter.bump, #baseMeter.bump, #multMeter.cel, #stage.shake { animation:none !important }
     #multMeter, .bandbg, #stageInner { transition:none !important }
@@ -170,6 +185,16 @@
     background:radial-gradient(circle at 30% 50%, var(--pickle2) 2px, transparent 3px) 0 0/16px 100%,
               radial-gradient(circle at 70% 50%, var(--pickle2) 2px, transparent 3px) 8px 0/16px 100%;
     opacity:.7}
+
+  /* 追加の定番具材（暫定の絵） */
+  .food[data-item="ベーコン"]{border-radius:10px;
+    background:repeating-linear-gradient(96deg,#9c3b28 0 9px,#e9c6a4 9px 14px,#8f3320 14px 23px)}
+  .food[data-item="たまご"]{border-radius:16px; background:linear-gradient(#ffffff,#fbf3e2)}
+  .food[data-item="たまご"]::before{content:""; position:absolute; left:38%; top:50%; transform:translate(-50%,-50%);
+    width:14px; height:12px; border-radius:50%; background:radial-gradient(circle at 40% 40%, #ffd85a, #f0a81e)}
+  .food[data-item="きゅうり"]{border-radius:9px; background:linear-gradient(#bcd98f,#98be5f)}
+  .food[data-item="きゅうり"]::before{content:""; position:absolute; inset:2px 6px; border-radius:8px;
+    background:radial-gradient(circle at 50% 50%, #eef4d6 26%, transparent 28%) 0 0/15px 100%; opacity:.65}
 
   .food[data-type="sauce"]{height:12px; border-radius:6px}
   .food[data-item="ケチャップ"]{background:var(--ketchup)}
@@ -289,6 +314,7 @@
         <div id="multMeter">×1.00</div>
       </div>
       <div id="comboFeed"></div>
+      <div id="offer"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
       <div id="stageInner"></div>
@@ -387,6 +413,10 @@ const DEFAULTS = {
     "トマト":            { pile:"ingredient", type:"veg",   base:8,  count:1, tier:null },
     "オニオン":          { pile:"ingredient", type:"veg",   base:6,  count:1, tier:null },
     "ピクルス":          { pile:"ingredient", type:"veg",   base:4,  count:1, tier:null },
+    // SHOKUZAI 第1段階（定番）の残り。初期デッキには入れず count:0（3択で足せる）。数値・系統は暫定。
+    "ベーコン":          { pile:"ingredient", type:"meat",  base:14, count:0, tier:null },
+    "たまご":            { pile:"ingredient", type:"dairy", base:12, count:0, tier:null },   // 系統は暫定（乳）
+    "きゅうり":          { pile:"ingredient", type:"veg",   base:6,  count:0, tier:null },
     "ケチャップ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
     "マスタード":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
     "マヨネーズ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
@@ -452,11 +482,14 @@ const DEFAULTS = {
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
     // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。
     sound: { on: false, volume: 0.4 },
+    // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
+    offer: { every: 1, skipReward: 10 },   // every=何個ごとに出すか（既定 毎回）/ skipReward=スキップ報酬（暫定・累計へ）
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
     bite: {
       "パティ":7, "チーズ":13, "レタス":20, "トマト":13, "オニオン":12, "ピクルス":12,
+      "ベーコン":12, "たまご":13, "きゅうり":13,
       "ケチャップ":9, "マスタード":9, "マヨネーズ":9,
       "ゴマバンズ":10, "イングリッシュマフィン":10, "メロンパン":10
     }
@@ -466,15 +499,17 @@ const DEFAULTS = {
 // 見た目の高さ(px)。断面ではなく横から見た絵の高さ。（調整対象外・定数）
 const VIS_H = {
   "パティ":30, "チーズ":16, "レタス":24, "トマト":18, "オニオン":16, "ピクルス":16,
+  "ベーコン":14, "たまご":18, "きゅうり":14,
   "ケチャップ":12, "マスタード":12, "マヨネーズ":12,
   "ゴマバンズ":30, "イングリッシュマフィン":28, "メロンパン":32
 };
 const TOP_BUN_EXTRA = 8; // 上バンズはドーム分だけ高い
 
-const ORDER = ["パティ","チーズ","レタス","トマト","オニオン","ピクルス",
+const ORDER = ["パティ","チーズ","レタス","トマト","オニオン","ピクルス","ベーコン","たまご","きゅうり",
                "ケチャップ","マスタード","マヨネーズ",
                "ゴマバンズ","イングリッシュマフィン","メロンパン"];
 const TYPE_JA = { meat:"肉", dairy:"乳", veg:"野菜", sauce:"ソース", bun:"バンズ" };
+const PILE_JA = { bun:"バンズ", ingredient:"具材", sauce:"ソース" };
 
 let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
@@ -648,7 +683,7 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
-const baseMeterEl = $("baseMeter"), cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed");
+const baseMeterEl = $("baseMeter"), cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed"), offerEl = $("offer");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
@@ -680,6 +715,8 @@ let awaitingCollect = false; // 完成して停止中（次のタップで回収
 let collectLocked = false;   // 完成直後の入力ロック中
 let cumTotalValue = 0;  // セッション累計点
 let cumToken = 0;       // 累計カウントアップ中断用
+let completedCount = 0; // 回収したバーガーの数（3択の頻度に使う）
+let offering = false;   // 3択の選択中
 
 function makeTier(name, i){
   const pos = posOf(i, stack.length);
@@ -697,6 +734,7 @@ function makeTier(name, i){
 
 function onTap(){
   Sound.unlock();                                // ユーザー操作の中で音を解錠（OFF時は何もしない）
+  if (offering) return;                          // 3択の選択中はボタンを無視（カードをタップして選ぶ）
   if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
   if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
   if (dropping){                                 // 落下中のクリック
@@ -975,8 +1013,47 @@ function collect(){
   animateCum(total);                                // 累計に加算される演出
   Sound.collect();                                  // 回収音（チャリン）
   awaitingCollect = false;
-  stack = null;                                     // 次を新規に
-  advance();                                        // 新しいバーガーの1段目を落とす
+  completedCount++;
+  const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
+  if (completedCount % every === 0){ showOffer(); } // 第1層：3択を出す（次バーガーはまだ始めない）
+  else { stack = null; advance(); }                 // 選択なしの回は即・次のバーガー
+}
+
+// 第1層：完成ごとの3択。いずれかの山に1枚足す／スキップ（小報酬）。タップで即決・確認画面なし。
+function sample(arr, n){
+  const a = arr.slice(), out = [];
+  for (let k = 0; k < n && a.length; k++){ out.push(a.splice(Math.floor(Math.random()*a.length), 1)[0]); }
+  return out;
+}
+function showOffer(){
+  offering = true;
+  const picks = sample(ORDER.slice(), 3);          // 候補は現在のカード（＝SHOKUZAI 第1段階/定番）
+  offerEl.innerHTML = "";
+  const title = document.createElement("div"); title.className = "offer-title";
+  title.textContent = "どれか1枚をデッキに足す（タップで即決）"; offerEl.appendChild(title);
+  const row = document.createElement("div"); row.className = "offer-cards";
+  for (const name of picks){
+    const it = CONFIG.items[name];
+    const card = document.createElement("div"); card.className = "offer-card";
+    const sysTag = (it.type !== "sauce" && it.type !== "bun") ? "・" + TYPE_JA[it.type] : "";
+    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}</div><div class="nm">${name}</div><div class="bs">基礎${it.base}${sysTag}</div>`;
+    card.addEventListener("click", () => chooseOffer(name));
+    row.appendChild(card);
+  }
+  offerEl.appendChild(row);
+  const skip = document.createElement("div"); skip.className = "offer-skip";
+  skip.textContent = `スキップ（+${CONFIG.params.offer.skipReward} 累計）`;
+  skip.addEventListener("click", () => chooseOffer(null));
+  offerEl.appendChild(skip);
+  offerEl.classList.add("show");
+  updateProgress();
+}
+function chooseOffer(name){
+  if (!offering) return;
+  if (name){ CONFIG.items[name].count += 1; renderPiles(); }   // 山に1枚足す（希釈が起きる層）
+  else { animateCum(Math.max(0, Math.round(CONFIG.params.offer.skipReward || 0))); Sound.collect(); } // スキップ報酬（暫定・累計へ）
+  offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
+  stack = null; advance();                          // 選んだら即座に次のバーガー
 }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
@@ -1011,6 +1088,7 @@ function countUp(target, token){                    // 点数は最後に数え�
 function updateProgress(){
   const el = $("progress");
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
+  if (offering){ el.textContent = "カードを1枚選ぶ（タップ）"; return; }
   if (awaitingCollect){ el.textContent = "完成！　押すと点数を回収して次へ"; return; }
   if (stack === null){ el.textContent = `押すと1段ずつ積み上がる（${total}回で1個）`; return; }
   const res = (mode === "reserve" && queued > 0) ? `　予約 ${queued}` : "";
@@ -1020,8 +1098,9 @@ function updateProgress(){
 function resetBurger(){
   clearTimers(); genToken++;
   stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
-  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false;
+  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false; offering = false;
   applyBandVisual(0);
+  offerEl.classList.remove("show"); offerEl.innerHTML = "";
   stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
@@ -1126,6 +1205,11 @@ function renderSettings(){
   gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
   gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
 
+  // 第1層：完成ごとの3択（デッキに足す）
+  g = group("完成ごとの3択（第1層・デッキに足す）");
+  gridRow(g, "何個ごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "スキップ報酬(累計+)", numInput(()=>CONFIG.params.offer.skipReward, v=>CONFIG.params.offer.skipReward=Math.max(0,Math.round(v)), 1));
+
   // 具材の隣に出る +N / ×N の残る時間、右上コンボ履歴の件数
   g = group("具材の隣の表示・右上のコンボ履歴");
   gridRow(g, "+N の残る時間(秒)", numInput(()=>CONFIG.params.flow.baseLife, v=>CONFIG.params.flow.baseLife=Math.max(0.05,v), 0.1));
@@ -1207,8 +1291,8 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   if (mode === "ignore") queued = 0;          // 無視に切替えたら予約は破棄
   updateProgress();
 }));
-$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; updateStats(); renderBars(); });
+$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; completedCount = 0; resetBurger(); renderPiles(); renderSettings(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; updateStats(); renderBars(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
