@@ -27,15 +27,17 @@
     background:var(--bg); color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
     -webkit-text-size-adjust:100%;
+    overflow-x:hidden;                 /* 演出のバッジ等がはみ出しても横スクロールさせない */
   }
-  .wrap{max-width:640px; margin:0 auto; padding:14px 14px 60px}
+  /* 下部固定の連打バーぶんの余白を確保（ボタンは画面下に固定） */
+  .wrap{max-width:640px; margin:0 auto; padding:14px 14px 150px}
   h1{font-size:1.15rem; margin:.2em 0 .1em}
   .sub{color:var(--muted); font-size:.8rem; margin:0 0 12px}
   section{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px}
   .lbl{font-size:.72rem; color:var(--muted); letter-spacing:.04em; margin:0 0 6px; text-transform:uppercase}
 
-  /* ===== 1. バーガー表示 ===== */
-  #stage{position:relative; width:100%; min-height:220px; margin:0 auto; display:block; overflow:visible}
+  /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
+  #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
   #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); width:230px; height:0}
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
@@ -52,7 +54,7 @@
   @keyframes pulse{0%{box-shadow:0 0 0 2px var(--accent),0 0 6px 2px rgba(255,207,90,.5)}
                    100%{box-shadow:0 0 0 3px var(--accent),0 0 18px 6px rgba(255,207,90,.85)}}
   .tier.hit.anim .food{animation:pulse .45s ease-in-out infinite alternate}
-  .badge{position:absolute; left:calc(50% + 118px); transform:translateY(50%);
+  .badge{position:absolute; left:calc(50% + 104px); transform:translateY(50%);
          background:var(--accent); color:#241a00; font-weight:700; font-size:.72rem;
          padding:2px 7px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.4)}
   .badge.add{background:var(--good); color:#06251a}
@@ -137,19 +139,25 @@
   #score{font-size:2.6rem; font-weight:800; line-height:1; color:var(--accent)}
   .formula{color:var(--muted); font-size:.86rem}
   .formula b{color:var(--text); font-weight:700}
-  #firedRules{margin-top:8px; display:flex; flex-wrap:wrap; gap:6px}
+  /* 発動ルールのチップは固定高さ（増減で得点表示部の高さを変えない） */
+  #firedRules{margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start;
+              height:52px; overflow-y:auto}
   .chip{font-size:.72rem; background:#2b313a; border:1px solid var(--line); border-radius:999px; padding:2px 8px; color:var(--muted)}
   .chip.mult{border-color:var(--accent); color:var(--accent)}
   .chip.add{border-color:var(--good); color:var(--good)}
 
-  /* ===== 3. ボタン ===== */
-  #tap{width:100%; padding:20px; font-size:1.3rem; font-weight:800; color:#241a00;
+  /* ===== 3. 連打ボタン（画面下に固定。演出では絶対に動かない） ===== */
+  .actionbar{position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--bg); border-top:1px solid var(--line);
+    padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px))}
+  .actionbar-in{max-width:640px; margin:0 auto}
+  #progress{margin:0 0 6px; color:var(--muted); font-size:.85rem; font-weight:600; min-height:1.1em; text-align:center}
+  #tap{width:100%; padding:18px; font-size:1.3rem; font-weight:800; color:#241a00;
     background:linear-gradient(var(--accent),#eab63c); border:none; border-radius:14px; cursor:pointer;
     touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none}
   #tap:active{transform:translateY(1px); filter:brightness(1.05)}
   #msg{color:var(--bad); font-size:.8rem; min-height:1.1em; margin-top:6px}
-  #progress{margin-top:8px; color:var(--muted); font-size:.85rem; font-weight:600}
-  .modes{margin-top:8px; font-size:.8rem; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  .modes{font-size:.8rem; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:center}
   .modes label{color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:4px}
   #score.building{opacity:.4}
 
@@ -214,10 +222,9 @@
     <div id="firedRules"></div>
   </section>
 
-  <!-- 3. ボタン -->
+  <!-- 3. 操作モード（連打ボタン本体は下部固定バーにある） -->
   <section>
-    <button id="tap">🍔 積む（1回に1段）</button>
-    <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+    <p class="lbl">操作</p>
     <div class="modes">
       落下中のクリック：
       <label><input type="radio" name="mode" value="reserve" checked> 次段を予約</label>
@@ -257,6 +264,14 @@
       <p class="barnote">※ 変更は次に作るバーガーから反映。保存はしない（リロードで初期化）。</p>
     </details>
   </section>
+</div>
+
+<!-- 連打ボタンは画面下に固定：演出でレイアウトが動いても位置は不変 -->
+<div class="actionbar">
+  <div class="actionbar-in">
+    <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+    <button id="tap">🍔 積む（1回に1段）</button>
+  </div>
 </div>
 
 <script>
@@ -472,8 +487,7 @@ function startBurger(){
   genToken++; clearTimers();
   hintEl.style.display = "none";
   stageInner.innerHTML = "";
-  stageInner.style.height = layout.total + "px";
-  $("stage").style.minHeight = Math.max(220, layout.total + 40) + "px";
+  // ステージ高は固定（CSS）。演出でレイアウトを動かさないため、ここで高さは変えない。
   scoreEl.textContent = "–"; scoreEl.classList.add("building");   // 得点は6段目まで伏せる
   fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–";
   firedRules.innerHTML = "";
