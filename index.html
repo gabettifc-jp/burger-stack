@@ -38,12 +38,20 @@
 
   /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
   #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
-  #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); transform-origin:50% 100%; width:230px; height:0}
+  #stage.shake{animation:bshake .13s ease-out}   /* 帯にいる間、段が落ちるたびに揺れる（強さは帯で変わる） */
+  @keyframes bshake{0%,100%{transform:translate(0,0)}30%{transform:translate(0,calc(var(--bshake,0)*1px))}70%{transform:translate(0,calc(var(--bshake,0)*-1px))}}
+  #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); transform-origin:50% 100%; width:230px; height:0;
+    filter:drop-shadow(0 0 var(--bedge,0px) var(--bcol,transparent)); transition:filter .3s ease}  /* 帯：バーガーのふちの光り */
+  /* 帯：背景の明るさ（帯にいる間ずっと。帯の色で明るくなる） */
+  .bandbg{position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:12px;
+    background:radial-gradient(120% 95% at 50% 62%, var(--bcol,#fff), transparent 70%);
+    opacity:var(--bbg,0); mix-blend-mode:screen; transition:opacity .4s ease, background .4s ease}
   /* 上部の計器：基礎点(左)・乗算の積(右)。常時表示で積み上げ中に増えていく */
   .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:space-between; pointer-events:none}
   #baseMeter,#multMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px}
   #baseMeter{color:#cfe4ff}
-  #multMeter{color:var(--accent)}
+  /* 帯：乗算表示の色と大きさ（帯にいる間ずっと持続） */
+  #multMeter{color:var(--bc,var(--accent)); font-size:calc(1.05rem * var(--bsize,1)); transition:color .3s ease, font-size .3s ease}
   #baseMeter.bump,#multMeter.bump{animation:mbump .18s ease-out}
   @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
   /* 具材の隣に出る + と ×（バッジなし・ただの値）。積むたびに、その具材の高さに一瞬出て消える。
@@ -70,7 +78,10 @@
   #multMeter.cel{animation:mcel .6s ease-out}
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.5); filter:brightness(1.7)}100%{transform:scale(1)}}
   .grid input.txtinp{width:140px}
-  @media (prefers-reduced-motion: reduce){ .flowpop, .cfx, .milestone, #multMeter.bump, #baseMeter.bump, #multMeter.cel { animation:none !important } }
+  @media (prefers-reduced-motion: reduce){
+    .flowpop, .cfx, .milestone, #multMeter.bump, #baseMeter.bump, #multMeter.cel, #stage.shake { animation:none !important }
+    #multMeter, .bandbg, #stageInner { transition:none !important }
+  }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -272,6 +283,7 @@
   <section>
     <p class="lbl">バーガー</p>
     <div id="stage">
+      <div class="bandbg"></div>
       <div class="meters">
         <div id="baseMeter">基礎 0</div>
         <div id="multMeter">×1.00</div>
@@ -404,8 +416,20 @@ const DEFAULTS = {
     // C：コンボ数ボーナス。1バーガーでコンボが threshold 件以上成立したら、全体にさらに倍率。
     //   追加倍率 = 1 + perCombo × (成立件数 − (threshold−1))。既定 perCombo:0 ＝ 無効（得点不変）。
     comboBonus: { threshold: 2, perCombo: 0 },
-    // 累計マイルストーン：乗算の積（×N.NN）がこの値を跨いだ瞬間に大演出。積み上げ中に効く。
-    milestones: [3, 5, 8, 12, 20],
+    // 帯（band）演出：乗算の積(×N.NN)が等比のしきい値を上がるごとに帯が一段変わる。
+    //   しきい値 = start, start*ratio, start*ratio^2 …（手で列挙しない・自動生成）。
+    //   帯にいる間ずっと持続。見た目は stages 段階を循環し、一巡ごとに全体が一段派手に。
+    //   各チャンネルは個別にON/OFF。跨いだ瞬間のバーストは別途出す。
+    band: {
+      start: 3,     // 最初のしきい値（×3）
+      ratio: 1.6,   // 等比の倍率（1段ごと×1.6）
+      stages: 4,    // 見た目の段階数（循環）
+      color: true,  // 倍率表示の色
+      size:  true,  // 倍率表示の大きさ
+      bg:    true,  // 背景の明るさ
+      shake: true,  // 段が落ちるときの揺れ
+      edge:  true   // バーガーのふちの光り
+    },
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
@@ -593,7 +617,7 @@ let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
 let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
-let milestoneFired = 0; // 累計マイルストーンをどこまで越えたか
+let bandLevelCur = 0;   // 現在の帯レベル（乗算の積で決まる）
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
@@ -638,7 +662,8 @@ function startBurger(){
   $("msg").textContent = "";
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
   revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
-  runMult = 1; runBase = 0; milestoneFired = 0; awaitingCollect = false; hitMeta = computeGrades();
+  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; hitMeta = computeGrades();
+  applyBandVisual(0);                               // 帯の見た目をリセット
   genToken++; clearTimers();
   hintEl.style.display = "none";
   stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
@@ -741,6 +766,10 @@ function landed(r){
   runBase += base;
   baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
   popFlow("base", tierY(r), "+" + base);            // 置いた具材の左隣に +N（バッジなし）
+  if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる
+    const stg = $("stage"); stg.classList.remove("shake"); void stg.offsetWidth; stg.classList.add("shake");
+    animTimers.push(setTimeout(() => stg.classList.remove("shake"), 150));
+  }
   if (r > 0 && tierEls[r-1]){                       // 着地で下段が一瞬縮む（重さの表現）
     const below = tierEls[r-1];
     below.classList.add("squash");
@@ -760,12 +789,45 @@ function revealHits(r){
 function tierY(r){ return layout.bottoms[r] + layout.effs[r]/2; }
 function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
 
-// 累計マイルストーン：乗算の積がしきい値を跨いだ瞬間に大演出（越えた最上位ひとつを祝う）。
-function checkMilestones(){
-  const ms = CONFIG.params.milestones || [];
-  let hit = -1;
-  while (milestoneFired < ms.length && runMult >= ms[milestoneFired]){ hit = milestoneFired; milestoneFired++; }
-  if (hit >= 0) celebration(ms[hit], hit);
+// 帯（band）：乗算の積で決まる帯レベル。start と等比 ratio で自動生成（手で列挙しない）。
+function bandLevel(){
+  const b = CONFIG.params.band;
+  if (!b || !(b.start > 0) || runMult < b.start) return 0;
+  return 1 + Math.floor(Math.log(runMult / b.start) / Math.log(Math.max(1.0001, b.ratio || 1.6)));
+}
+// 帯の色。stages 段階を循環（stageで色相）、一巡ごと（cycle）に明るく＝全体が一段派手に。
+const BAND_HUES = [45, 28, 330, 190, 265, 130];
+function bandColor(stage, cycle){
+  const h = BAND_HUES[stage % BAND_HUES.length];
+  const l = Math.min(88, 62 + cycle * 9);
+  return `hsl(${h} 95% ${l}%)`;
+}
+// 帯の見た目を適用（帯にいる間ずっと持続する状態）。各チャンネルは調整欄で個別ON/OFF。
+function applyBandVisual(L){
+  const b = CONFIG.params.band, s = $("stage").style;
+  const stageCount = Math.max(1, Math.round(b.stages || 4));
+  const st    = L > 0 ? (L - 1) % stageCount : 0;
+  const cycle = L > 0 ? Math.floor((L - 1) / stageCount) : 0;
+  const col   = bandColor(st, cycle);
+  if (L > 0) s.setProperty("--bcol", col); else s.removeProperty("--bcol");   // 背景・ふち用（色チャンネルと独立）
+  if (b.color !== false && L > 0) s.setProperty("--bc", col); else s.removeProperty("--bc"); // 倍率の色
+  s.setProperty("--bsize",  (b.size  !== false && L > 0) ? (1 + Math.min(L,8)*0.07).toFixed(3) : "1");
+  s.setProperty("--bbg",    (b.bg    !== false && L > 0) ? Math.min(0.5, L*0.06).toFixed(3) : "0");
+  s.setProperty("--bedge",  (b.edge  !== false && L > 0) ? Math.min(16, L*2.2).toFixed(1) + "px" : "0px");
+  s.setProperty("--bshake", (b.shake !== false && L > 0) ? Math.min(7, L*0.9).toFixed(2) : "0");
+}
+// 乗算が変わったら帯を更新。上がった瞬間だけバースト（越えた帯のしきい値を表示）。
+function updateBand(){
+  const L = bandLevel();
+  if (L === bandLevelCur) return;
+  const rising = L > bandLevelCur;
+  bandLevelCur = L;
+  applyBandVisual(L);
+  if (rising && L > 0){
+    const b = CONFIG.params.band;
+    const threshold = (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), L - 1);
+    celebration(Math.round(threshold), L - 1);      // 跨いだ瞬間のバーストは残す
+  }
 }
 function celebration(value, index){
   multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");
@@ -793,7 +855,7 @@ function pushCombo(h){
 //  ×N は「具材の隣（右）」にただの値として一瞬出す（バッジなし）。大きい発動だけ画面も反応。
 function present(i){
   const h = sc.hits[i], m = hitMeta[i] || { grade:0 };
-  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); checkMilestones(); }
+  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); updateBand(); }
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
   popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
   pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
@@ -895,7 +957,8 @@ function updateProgress(){
 function resetBurger(){
   clearTimers(); genToken++;
   stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
-  runMult = 1; runBase = 0; awaitingCollect = false; collectLocked = false;
+  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false;
+  applyBandVisual(0);
   stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
@@ -1006,11 +1069,16 @@ function renderSettings(){
   gridRow(g, "×N の残る時間(秒)", numInput(()=>CONFIG.params.flow.comboLife, v=>CONFIG.params.flow.comboLife=Math.max(0.05,v), 0.1));
   gridRow(g, "右上コンボ履歴 件数", numInput(()=>CONFIG.params.flow.feedCap, v=>CONFIG.params.flow.feedCap=Math.max(1,Math.round(v)), 1));
 
-  // 累計マイルストーン（乗算の積がこの値を跨いだ瞬間に大演出）
-  g = group("累計マイルストーン（×の積がこの値を超えたら大演出）");
-  gridRow(g, "しきい値(×・カンマ区切り)", textInput(
-    ()=>CONFIG.params.milestones.join(", "),
-    v=>{ CONFIG.params.milestones = v.split(",").map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x)&&x>0).sort((a,b)=>a-b); }));
+  // 帯（band）演出：等比しきい値・段階数・各チャンネルON/OFF
+  g = group("帯の演出（×の積が上がるほど持続的に派手に）");
+  gridRow(g, "開始しきい値(×)", numInput(()=>CONFIG.params.band.start, v=>CONFIG.params.band.start=Math.max(1.05,v), 0.1));
+  gridRow(g, "等比の倍率", numInput(()=>CONFIG.params.band.ratio, v=>CONFIG.params.band.ratio=Math.max(1.05,v), 0.05));
+  gridRow(g, "見た目の段階数(循環)", numInput(()=>CONFIG.params.band.stages, v=>CONFIG.params.band.stages=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "倍率の色", boolInput(()=>CONFIG.params.band.color, v=>CONFIG.params.band.color=v));
+  gridRow(g, "倍率の大きさ", boolInput(()=>CONFIG.params.band.size, v=>CONFIG.params.band.size=v));
+  gridRow(g, "背景の明るさ", boolInput(()=>CONFIG.params.band.bg, v=>CONFIG.params.band.bg=v));
+  gridRow(g, "落下の揺れ", boolInput(()=>CONFIG.params.band.shake, v=>CONFIG.params.band.shake=v));
+  gridRow(g, "ふちの光り", boolInput(()=>CONFIG.params.band.edge, v=>CONFIG.params.band.edge=v));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。大で画面反応・発光の強さに使う。
   g = group("演出の等級（相対しきい値・大で画面反応）");
