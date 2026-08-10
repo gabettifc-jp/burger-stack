@@ -54,7 +54,13 @@
   .flowpop.combo{left:calc(50% + 96px); color:var(--accent)}
   .flowpop.combo.add{color:var(--good)}
   @keyframes flowfloat{0%{opacity:0; transform:translateY(7px)}18%{opacity:1}100%{opacity:0; transform:translateY(-16px)}}
-  @media (prefers-reduced-motion: reduce){ .flowpop, #multMeter.bump, #baseMeter.bump { animation:none !important } }
+  /* 右上のコンボ履歴（乗算メーターの下）。最新数件を出し、いっぱいになったら古いものと入れ替える。 */
+  #comboFeed{position:absolute; right:8px; top:34px; z-index:6; display:flex; flex-direction:column; gap:4px; align-items:flex-end; pointer-events:none}
+  .cfx{background:var(--accent); color:#241a00; font-weight:800; font-size:.74rem; padding:2px 8px; border-radius:999px;
+       box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out}
+  .cfx.add{background:var(--good); color:#06251a}
+  @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
+  @media (prefers-reduced-motion: reduce){ .flowpop, .cfx, #multMeter.bump, #baseMeter.bump { animation:none !important } }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -260,6 +266,7 @@
         <div id="baseMeter">基礎 0</div>
         <div id="multMeter">×1.00</div>
       </div>
+      <div id="comboFeed"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
       <div id="stageInner"></div>
@@ -396,9 +403,11 @@ const DEFAULTS = {
       recentWindow: 20   // 中央値を取る直近バーガー数
     },
     // 具材の隣に出る +N（基礎点）と ×N（コンボ）の残る時間。位置は具材ごと（列にはしない）。
+    // feedCap：右上のコンボ履歴の表示件数（超えたら古いものと入れ替え）。
     flow: {
       baseLife:  0.6,   // +N の残る時間(秒)
-      comboLife: 1.2    // ×N の残る時間(秒)
+      comboLife: 1.2,   // ×N の残る時間(秒)
+      feedCap:   3      // 右上コンボ履歴の件数
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
@@ -546,7 +555,7 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
-const baseMeterEl = $("baseMeter"), cumTotalEl = $("cumTotal");
+const baseMeterEl = $("baseMeter"), cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
@@ -619,7 +628,7 @@ function startBurger(){
   runMult = 1; runBase = 0; awaitingCollect = false; hitMeta = computeGrades();
   genToken++; clearTimers();
   hintEl.style.display = "none";
-  stageInner.innerHTML = "";
+  stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
   // ステージ高は固定（CSS）。段数が多くて背が高いバーガーは、はみ出さないよう縮小して収める。
   const avail = 250 - 14 - 8;
   const s = layout.total > avail ? avail / layout.total : 1;
@@ -736,6 +745,17 @@ function revealHits(r){
 }
 
 function tierY(r){ return layout.bottoms[r] + layout.effs[r]/2; }
+function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
+
+// 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
+function pushCombo(h){
+  const cap = Math.max(1, Math.round(CONFIG.params.flow.feedCap || 3));
+  const chip = document.createElement("div");
+  chip.className = "cfx" + (h.kind === "add" ? " add" : "");
+  chip.textContent = ruleShortName(h.label) + " " + h.effect;
+  comboFeedEl.prepend(chip);
+  while (comboFeedEl.children.length > cap) comboFeedEl.lastChild.remove();
+}
 
 // 発動（コンボ）の演出。SHIYOU §5：接触面が光り、その場に倍率が出る。
 //  ×N は「具材の隣（右）」にただの値として一瞬出す（バッジなし）。大きい発動だけ画面も反応。
@@ -744,6 +764,7 @@ function present(i){
   if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); }
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
   popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
+  pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
   if (reduced) return;                              // reduced-motion：発光・画面反応は省く
   const glowMs = CONFIG.params.grade.glowMs * 1000; // 接触面が一瞬光る（大は強く）
   for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
@@ -843,7 +864,7 @@ function resetBurger(){
   clearTimers(); genToken++;
   stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; awaitingCollect = false; collectLocked = false;
-  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)";
+  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
   firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
@@ -941,10 +962,11 @@ function renderSettings(){
   gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
   gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
 
-  // 具材の隣に出る +N / ×N の残る時間
-  g = group("具材の隣の表示（+N と ×N の残る時間）");
+  // 具材の隣に出る +N / ×N の残る時間、右上コンボ履歴の件数
+  g = group("具材の隣の表示・右上のコンボ履歴");
   gridRow(g, "+N の残る時間(秒)", numInput(()=>CONFIG.params.flow.baseLife, v=>CONFIG.params.flow.baseLife=Math.max(0.05,v), 0.1));
   gridRow(g, "×N の残る時間(秒)", numInput(()=>CONFIG.params.flow.comboLife, v=>CONFIG.params.flow.comboLife=Math.max(0.05,v), 0.1));
+  gridRow(g, "右上コンボ履歴 件数", numInput(()=>CONFIG.params.flow.feedCap, v=>CONFIG.params.flow.feedCap=Math.max(1,Math.round(v)), 1));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。大で画面反応・発光の強さに使う。
   g = group("演出の等級（相対しきい値・大で画面反応）");
