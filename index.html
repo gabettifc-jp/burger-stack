@@ -53,10 +53,12 @@
   .cfx.add{background:var(--good); color:#06251a}
   .cfx.big{font-size:.92rem; padding:3px 11px; box-shadow:0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,.5)}
   @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
-  /* 1段ごとの基礎点ポップ（食材のその場に出て、すっと消える） */
-  .basepop{position:absolute; left:calc(50% - 130px); z-index:6; color:#cfe4ff; font-weight:800; font-size:.82rem;
-    text-shadow:0 1px 3px #000; transition:opacity .35s ease, transform .35s ease; opacity:1; pointer-events:none}
-  .basepop.out{opacity:0; transform:translateY(-10px)}
+  /* 1段ごとの基礎点ポップ：置いた食材の位置（中央）にふわっと出て、上に浮きながらすぐ消える。
+     コンボ表示（右の枠）とは別。溜めない・入れ替えない。 */
+  .basepop{position:absolute; left:50%; z-index:7; color:#eaf4ff; font-weight:800; font-size:.92rem;
+    text-shadow:0 1px 3px #000, 0 0 7px rgba(0,0,0,.7); pointer-events:none; white-space:nowrap;
+    animation:basefloat .55s ease-out forwards}
+  @keyframes basefloat{0%{opacity:0; transform:translate(-50%,8px)}20%{opacity:1}100%{opacity:0; transform:translate(-50%,-18px)}}
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -733,10 +735,9 @@ function popBase(r, base){
   const y = layout.bottoms[r] + layout.effs[r]/2;
   const el = document.createElement("div");
   el.className = "basepop"; el.textContent = "+" + base;
-  el.style.bottom = y + "px";
+  el.style.bottom = y + "px";                       // 置いた食材の高さで、中央からふわっと浮き出す
   stageInner.appendChild(el);
-  animTimers.push(setTimeout(() => el.classList.add("out"), 240));
-  animTimers.push(setTimeout(() => el.remove(), 640));
+  animTimers.push(setTimeout(() => el.remove(), 620));
 }
 
 function revealHits(r){
