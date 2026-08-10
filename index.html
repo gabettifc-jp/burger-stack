@@ -39,12 +39,24 @@
   /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
   #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
   #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); transform-origin:50% 100%; width:230px; height:0}
-  /* 乗算の積の現在値（固定位置・常時表示・溜まっていく数字） */
-  #multMeter{position:absolute; left:8px; top:8px; z-index:6;
-    font-weight:800; font-size:1.1rem; color:var(--accent);
-    background:rgba(0,0,0,.35); padding:2px 8px; border-radius:8px}
-  #multMeter.bump{animation:mbump .18s ease-out}
+  /* 上部の計器：基礎点(左)・乗算の積(右)。常時表示で積み上げ中に増えていく */
+  .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:space-between; pointer-events:none}
+  #baseMeter,#multMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px}
+  #baseMeter{color:#cfe4ff}
+  #multMeter{color:var(--accent)}
+  #baseMeter.bump,#multMeter.bump{animation:mbump .18s ease-out}
   @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
+  /* コンボの入れ替え表示（最新数件のみ。溜め続けず、新しいものが古いものと入れ替わる） */
+  #comboFeed{position:absolute; right:8px; top:34px; z-index:6; display:flex; flex-direction:column; gap:4px; align-items:flex-end; pointer-events:none}
+  .cfx{background:var(--accent); color:#241a00; font-weight:800; font-size:.74rem; padding:2px 8px; border-radius:999px;
+       box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out}
+  .cfx.add{background:var(--good); color:#06251a}
+  .cfx.big{font-size:.92rem; padding:3px 11px; box-shadow:0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,.5)}
+  @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
+  /* 1段ごとの基礎点ポップ（食材のその場に出て、すっと消える） */
+  .basepop{position:absolute; left:calc(50% - 130px); z-index:6; color:#cfe4ff; font-weight:800; font-size:.82rem;
+    text-shadow:0 1px 3px #000; transition:opacity .35s ease, transform .35s ease; opacity:1; pointer-events:none}
+  .basepop.out{opacity:0; transform:translateY(-10px)}
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -144,9 +156,15 @@
     -webkit-mask-size:12px 6px; mask-size:12px 6px}
 
   /* ===== 2. 得点と内訳（4行固定表示。コンボ一覧は畳んでおく） ===== */
-  .scorehead{display:flex; align-items:baseline; gap:4px}
-  #score{font-size:2.6rem; font-weight:800; line-height:1; color:var(--accent)}
+  .scorehead{position:relative; display:flex; align-items:baseline; gap:4px}
+  #score{font-size:2.6rem; font-weight:800; line-height:1; color:var(--accent); transition:transform .12s ease, color .15s ease}
+  #score.done{color:#fff; text-shadow:0 0 18px rgba(255,207,90,.85); transform:scale(1.12); transform-origin:left center}
   .scorehead .unit{color:var(--muted); font-size:.9rem}
+  .scorehead .cum{margin-left:auto; color:var(--muted); font-size:.85rem; align-self:center}
+  .scorehead .cum b{color:var(--text); font-weight:800}
+  .cumpop{position:absolute; right:6px; top:0; color:var(--good); font-weight:800; font-size:.95rem;
+    pointer-events:none; animation:cumfly .5s ease-out forwards}
+  @keyframes cumfly{0%{opacity:0; transform:translateY(8px)}25%{opacity:1}100%{opacity:0; transform:translateY(-16px)}}
   .breakdown4{display:grid; grid-template-columns:1fr 1fr; gap:2px 14px; margin:8px 0 2px}
   .breakdown4 > div{display:flex; justify-content:space-between; align-items:baseline;
     font-size:.86rem; color:var(--muted); border-bottom:1px dashed #2c333d; padding:3px 0}
@@ -234,13 +252,17 @@
 <body>
 <div class="wrap">
   <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span></h1>
-  <p class="sub">ボタンを押すと1段ずつ積み上がる。<b>段の数だけ押すと1個</b>が完成し、最後の1回で得点が出る（段数は調整欄で変更可）。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。発動（コンボ）の強さは直近との比で等級が決まり、強いものだけバッジが出る。</p>
+  <p class="sub">ボタンを押すと1段ずつ積み上がり、基礎点がその場で増えていく。<b>段の数だけ押すと完成して停止</b>し、合計点が大きく出る。<b>次の1回で回収</b>して累計に加算、新しいバーガーが始まる（段数は調整欄で変更可）。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
 
   <!-- 1. バーガー表示 -->
   <section>
     <p class="lbl">バーガー</p>
     <div id="stage">
-      <div id="multMeter">×1.00</div>
+      <div class="meters">
+        <div id="baseMeter">基礎 0</div>
+        <div id="multMeter">×1.00</div>
+      </div>
+      <div id="comboFeed"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
       <div id="stageInner"></div>
@@ -250,7 +272,8 @@
   <!-- 2. 得点と内訳（4行固定。個々のコンボ一覧は畳んでおく） -->
   <section>
     <p class="lbl">今回の得点</p>
-    <div class="scorehead"><span id="score">0</span><span class="unit">点</span></div>
+    <div class="scorehead"><span id="score">0</span><span class="unit">点</span>
+      <span class="cum">累計 <b id="cumTotal">0</b></span></div>
     <div class="breakdown4">
       <div><span>基礎点</span><b id="fBase">0</b></div>
       <div><span>加算</span><b id="fAdd">0</b></div>
@@ -380,6 +403,8 @@ const DEFAULTS = {
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
     landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
+    completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
+    collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
@@ -521,6 +546,7 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
+const baseMeterEl = $("baseMeter"), comboFeedEl = $("comboFeed"), cumTotalEl = $("cumTotal");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
@@ -545,7 +571,12 @@ let queued = 0;         // 予約数（reserve時）
 let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
+let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
+let awaitingCollect = false; // 完成して停止中（次のタップで回収）
+let collectLocked = false;   // 完成直後の入力ロック中
+let cumTotalValue = 0;  // セッション累計点
+let cumToken = 0;       // 累計カウントアップ中断用
 
 function makeTier(name, i){
   const pos = posOf(i, stack.length);
@@ -561,9 +592,9 @@ function makeTier(name, i){
   return tier;
 }
 
-function needNew(){ return stack === null || revealed >= stack.length; }
-
 function onTap(){
+  if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
+  if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
   if (dropping){                                 // 落下中のクリック
     if (mode === "reserve" && stack && revealed + queued < stack.length){ queued++; updateProgress(); }
     return;                                       // ignore時・満杯時は無視（演出を上書きしない）
@@ -572,7 +603,7 @@ function onTap(){
 }
 
 function advance(){
-  if (needNew()){ if (!startBurger()) return; }   // 完成後/未開始なら新しいバーガー
+  if (stack === null){ if (!startBurger()) return; }   // 未開始なら新しいバーガー
   const r = revealed;
   revealed++;
   updateProgress();
@@ -585,19 +616,19 @@ function startBurger(){
   $("msg").textContent = "";
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
   revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
-  runMult = 1; hitMeta = computeGrades();
+  runMult = 1; runBase = 0; awaitingCollect = false; hitMeta = computeGrades();
   genToken++; clearTimers();
   hintEl.style.display = "none";
-  stageInner.innerHTML = "";
+  stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
   // ステージ高は固定（CSS）。段数が多くて背が高いバーガーは、はみ出さないよう縮小して収める。
   const avail = 250 - 14 - 8;
   const s = layout.total > avail ? avail / layout.total : 1;
   stageInner.style.transform = `translateX(-50%) scale(${s})`;
-  // 得点は最終段まで伏せる。乗算の積の現在値だけ×1.00から表示。
-  scoreEl.textContent = "–"; scoreEl.classList.add("building");
+  // 得点（合計）は完成まで伏せる。基礎点と乗算の積は1段ごとに増える計器で見せる。
+  scoreEl.textContent = "–"; scoreEl.classList.remove("done"); scoreEl.classList.add("building");
   fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–"; fTotal.textContent = "–";
   firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
-  multMeterEl.textContent = "×1.00";
+  multMeterEl.textContent = "×1.00"; baseMeterEl.textContent = "基礎 0";
   return true;
 }
 
@@ -625,12 +656,9 @@ function computeGrades(){
       const tt = CONFIG.items[stack[k]] && CONFIG.items[stack[k]].tier;
       if (tt != null) grade = Math.max(grade, tt);
     }
-    return { f, rel, grade, badge:false };
+    return { f, rel, grade };
   });
-  // バッジ上限：grade>=1 の中から rel の上位 maxBadges 件だけバッジ許可（残りは光るだけ）
-  meta.map((m,i)=>[i,m]).filter(([,m])=>m.grade>=1).sort((a,b)=>b[1].rel-a[1].rel)
-      .slice(0, gp.maxBadges).forEach(([i])=>{ meta[i].badge = true; });
-  return meta;
+  return meta;                                      // 表示件数はコンボ表示（入れ替え式）側で制限する
 }
 
 const GRADE_JA = ["小","中","大"];
@@ -684,13 +712,31 @@ function dropTier(r){
 }
 
 function landed(r){
+  // 1クリックごとのフィードバック：その食材の基礎点をその場に出し、累計基礎点を更新
+  const base = CONFIG.items[stack[r]].base;
+  runBase += base;
+  baseMeterEl.textContent = "基礎 " + runBase;
+  if (!reduced){
+    baseMeterEl.classList.remove("bump"); void baseMeterEl.offsetWidth; baseMeterEl.classList.add("bump");
+    popBase(r, base);
+  }
   if (r > 0 && tierEls[r-1]){                       // 着地で下段が一瞬縮む（重さの表現）
     const below = tierEls[r-1];
     below.classList.add("squash");
     animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
   revealHits(r);                                    // 接触面が揃ったコンボをその場で演出
-  if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成
+  if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成→停止
+}
+
+function popBase(r, base){
+  const y = layout.bottoms[r] + layout.effs[r]/2;
+  const el = document.createElement("div");
+  el.className = "basepop"; el.textContent = "+" + base;
+  el.style.bottom = y + "px";
+  stageInner.appendChild(el);
+  animTimers.push(setTimeout(() => el.classList.add("out"), 240));
+  animTimers.push(setTimeout(() => el.remove(), 640));
 }
 
 function revealHits(r){
@@ -702,32 +748,33 @@ function revealHits(r){
 
 // 発動（コンボ）の演出。等級で出し方を変える。演出は絶対配置の重ねのみ・レイアウトは動かさない。
 function present(i){
-  const h = sc.hits[i], m = hitMeta[i] || { grade:0, badge:false };
-  // 乗算は「溜まる数字」を更新（バッジが消えてもこの数字は残る）
+  const h = sc.hits[i], m = hitMeta[i] || { grade:0 };
+  // 乗算は「溜まる数字」を更新（コンボ表示が消えてもこの数字は残る）
   if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2);
     if (!reduced){ multMeterEl.classList.remove("bump"); void multMeterEl.offsetWidth; multMeterEl.classList.add("bump"); } }
-  if (reduced) return;                              // reduced-motion：光・バッジ・画面反応は省く
+  // 中／大：コンボ表示（入れ替え式）に名前＋倍率を流す。小はコンボ表示に出さない。
+  if (m.grade >= 1) pushCombo(h, m.grade);
+  if (reduced) return;                              // reduced-motion：発光・画面反応は省く
   // 小：接触面が光るだけ（大は強く光る）。一瞬で消す。
   const glowMs = CONFIG.params.grade.glowMs * 1000;
   for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
     el.classList.add(m.grade >= 2 ? "hitbig" : "hit");
     animTimers.push(setTimeout(() => el.classList.remove("hit","hitbig"), glowMs));
   }
-  // 中／大：許可されたものだけバッジ。大は画面全体も反応。
-  if (m.grade >= 1 && m.badge){ popBadge(h, m.grade); if (m.grade >= 2) screenFlash(); }
+  if (m.grade >= 2) screenFlash();                  // 大：画面全体も反応
 }
 
-function popBadge(h, grade){
-  const ys = h.idx.map(k => layout.bottoms[k] + layout.effs[k]/2);
-  const y = ys.reduce((a,c)=>a+c,0) / ys.length;
-  const b = document.createElement("div");
-  b.className = "badge" + (h.kind === "add" ? " add" : "") + (grade >= 2 ? " big" : "");
-  b.textContent = h.effect;
-  b.style.bottom = y + "px";
-  stageInner.appendChild(b);
-  const ms = CONFIG.params.grade.badgeMs * 1000;
-  animTimers.push(setTimeout(() => b.classList.add("out"), Math.max(0, ms - 160)));
-  animTimers.push(setTimeout(() => b.remove(), ms + 220));
+// コンボ名（ラベルの「：」より前）
+function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
+
+// コンボ表示（入れ替え式）：新しいものを上に足し、上限を超えたら古いものを消す
+function pushCombo(h, grade){
+  const cap = Math.max(1, Math.round(CONFIG.params.grade.maxBadges || 3));
+  const chip = document.createElement("div");
+  chip.className = "cfx" + (h.kind === "add" ? " add" : "") + (grade >= 2 ? " big" : "");
+  chip.textContent = ruleShortName(h.label) + " " + h.effect;   // 名前 ＋ 倍率
+  comboFeedEl.prepend(chip);
+  while (comboFeedEl.children.length > cap) comboFeedEl.lastChild.remove();
 }
 
 function screenFlash(){
@@ -735,18 +782,50 @@ function screenFlash(){
   el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
 }
 
+// 完成：ここで停止して合計点を大きく見せる。まだ銀行には入れない（回収は次のタップ）。
 function complete(){
-  showBreakdown(sc);                                // 内訳・コンボ一覧
-  history.push(sc.total);
-  recentProducts.push(sc.mult);                     // 次回以降の相対しきい値の基準
-  const w = CONFIG.params.grade.recentWindow || 20;
-  if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
+  showBreakdown(sc);                                // 4行と一覧を確定表示
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
-  updateStats(); renderBars(); updateProgress();
+  baseMeterEl.textContent = "基礎 " + sc.base;
+  queued = 0;                                       // 予約された入力はここで破棄
+  awaitingCollect = true;
+  collectLocked = true;                             // 完成後しばらく入力を受け付けない（点数を必ず見せる）
+  animTimers.push(setTimeout(() => { collectLocked = false; }, (CONFIG.params.completeLock || 0.30) * 1000));
+  updateProgress();
   const my = genToken;
-  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); countUp(sc.total, my); };
+  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); scoreEl.classList.add("done"); countUp(sc.total, my); };
   if (reduced || CONFIG.params.landPause <= 0) run();
   else animTimers.push(setTimeout(run, CONFIG.params.landPause * 1000));
+}
+
+// 回収：完成した点を銀行に入れ（統計・グラフ更新）、累計に加算する演出を出して次を始める。
+function collect(){
+  const total = sc.total, prod = sc.mult;
+  history.push(total);
+  recentProducts.push(prod);                        // 次回以降の相対しきい値の基準
+  const w = CONFIG.params.grade.recentWindow || 20;
+  if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
+  updateStats(); renderBars();
+  animateCum(total);                                // 累計に加算される演出
+  awaitingCollect = false;
+  stack = null;                                     // 次を新規に
+  advance();                                        // 新しいバーガーの1段目を落とす
+}
+
+// 累計への加算演出（数字が増える＋「+N」がふわっと出る）
+function animateCum(delta){
+  const from = cumTotalValue, to = cumTotalValue + delta; cumTotalValue = to;
+  const pop = document.createElement("div"); pop.className = "cumpop"; pop.textContent = "+" + delta;
+  document.querySelector(".scorehead").appendChild(pop);
+  setTimeout(() => pop.remove(), 520);
+  if (reduced){ cumTotalEl.textContent = to; return; }
+  const tok = ++cumToken, dur = (CONFIG.params.collectPop || 0.35) * 1000, s0 = performance.now();
+  function step(now){ if (tok !== cumToken) return;
+    const t = Math.min(1, (now - s0) / dur);
+    cumTotalEl.textContent = Math.round(from + (to - from) * t);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 function countUp(target, token){                    // 点数は最後に数え上がる
@@ -765,19 +844,21 @@ function countUp(target, token){                    // 点数は最後に数え�
 function updateProgress(){
   const el = $("progress");
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
+  if (awaitingCollect){ el.textContent = "完成！　押すと点数を回収して次へ"; return; }
   if (stack === null){ el.textContent = `押すと1段ずつ積み上がる（${total}回で1個）`; return; }
-  if (revealed >= stack.length){ el.textContent = "完成！　もう一度押すと次のバーガー"; return; }
   const res = (mode === "reserve" && queued > 0) ? `　予約 ${queued}` : "";
   el.textContent = `${revealed} / ${stack.length} 段${res}`;
 }
 
 function resetBurger(){
   clearTimers(); genToken++;
-  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = []; runMult = 1;
-  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)";
-  scoreEl.classList.remove("building"); scoreEl.textContent = "0";
+  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
+  runMult = 1; runBase = 0; awaitingCollect = false; collectLocked = false;
+  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
+  scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
-  firedRules.innerHTML = ""; comboCount.textContent = "（0件）"; multMeterEl.textContent = "×1.00";
+  firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
+  multMeterEl.textContent = "×1.00"; baseMeterEl.textContent = "基礎 0";
   hintEl.style.display = "";
   updateProgress();
 }
@@ -872,12 +953,11 @@ function renderSettings(){
   gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）
-  g = group("演出の等級（相対しきい値・バッジ上限）");
+  g = group("演出の等級（相対しきい値・コンボ表示の枚数）");
   gridRow(g, "基準の床(floor)", numInput(()=>CONFIG.params.grade.floor, v=>CONFIG.params.grade.floor=v, 0.05));
   gridRow(g, "中のしきい値", numInput(()=>CONFIG.params.grade.mid, v=>CONFIG.params.grade.mid=v, 0.1));
   gridRow(g, "大のしきい値", numInput(()=>CONFIG.params.grade.big, v=>CONFIG.params.grade.big=v, 0.1));
-  gridRow(g, "バッジ上限(件/個)", numInput(()=>CONFIG.params.grade.maxBadges, v=>CONFIG.params.grade.maxBadges=Math.max(0,Math.round(v)), 1));
-  gridRow(g, "バッジ表示(秒)", numInput(()=>CONFIG.params.grade.badgeMs, v=>CONFIG.params.grade.badgeMs=v, 0.05));
+  gridRow(g, "コンボ表示の枚数", numInput(()=>CONFIG.params.grade.maxBadges, v=>CONFIG.params.grade.maxBadges=Math.max(1,Math.round(v)), 1));
   gridRow(g, "発光(秒)", numInput(()=>CONFIG.params.grade.glowMs, v=>CONFIG.params.grade.glowMs=v, 0.05));
 
   // 基礎点
@@ -921,6 +1001,7 @@ function renderSettings(){
   gridRow(g, "完成〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
   gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
   gridRow(g, "着地の縮み時間", numInput(()=>CONFIG.params.squash,      v=>CONFIG.params.squash=v,      0.01));
+  gridRow(g, "完成後の入力ロック", numInput(()=>CONFIG.params.completeLock, v=>CONFIG.params.completeLock=v, 0.05));
 }
 
 /* ===== 起動・イベント ===== */
@@ -932,7 +1013,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; updateStats(); renderBars(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; updateStats(); renderBars(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
