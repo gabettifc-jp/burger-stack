@@ -120,6 +120,16 @@
   .offer-skip{background:#20242b; border:1px dashed var(--line); border-radius:10px; padding:9px; color:var(--muted);
     font-weight:700; font-size:.82rem; text-align:center; cursor:pointer; touch-action:manipulation; user-select:none}
   .offer-skip:active{transform:translateY(1px)}
+  /* スキップ＝デッキから1枚取り除く：デッキ一覧 */
+  .remove-list{display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; padding:2px}
+  .remove-row{display:flex; align-items:center; gap:6px; background:#2b313a; border:1px solid var(--line);
+    border-radius:8px; padding:5px 8px; cursor:pointer; touch-action:manipulation; user-select:none}
+  .remove-row:active{transform:translateY(1px); border-color:#e06a6a}
+  .remove-row .nm{flex:1; font-size:.86rem; font-weight:700}
+  .remove-row .pl{font-size:.64rem; color:var(--muted)}
+  .remove-row .ct2{font-size:.72rem; color:var(--accent); font-weight:800}
+  .remove-row.off{opacity:.4; cursor:default}       /* その山の最後の1枚（取り除けない） */
+  .remove-row.off:active{transform:none}
   @media (prefers-reduced-motion: reduce){
     .flowpop, .cfx, .milestone, .missnote, #multMeter.bump, #baseMeter.bump, #multMeter.cel,
     #stage.shake, #stage.bigshake, #stage.tense, #reach.show { animation:none !important }
@@ -596,7 +606,8 @@ const DEFAULTS = {
     // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。scheme=音のパターン番号（0=標準/現行）。
     sound: { on: false, volume: 0.4, scheme: 0 },
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
-    offer: { every: 1, skipReward: 10 },   // every=何個ごとに出すか（既定 毎回）/ skipReward=スキップ報酬（暫定・累計へ）
+    offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。スキップは「デッキから1枚取り除く」に変更。
+    tierBonus: { every: 10 }, // 段数ボーナス：N個作るごとに「具材枠+1／ソース枠+1」を選ぶ（区切り＝ノルマは未実装の暫定）。既定10。
     // デバッグ：3択の候補に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込み用。
     offerCuisines: { none:true, wa:true, chuka:true, kaisen:true, kokyu:true, agemono:true },
     countUp:     0.18,  // 点数の数え上げ時間(秒)
@@ -1448,10 +1459,31 @@ function collect(){
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（もちの成長／除外を反映）
   awaitingCollect = false;
   completedCount++;
+  // 完成の区切りで出す選択を順に積む：段数ボーナス（N個ごと）→ 3択（every個ごと）。
+  const q = [];
+  const tb = CONFIG.params.tierBonus;
+  if (tb && completedCount % Math.max(1, Math.round(tb.every || 10)) === 0) q.push("tier");
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
-  if (completedCount % every === 0){ showOffer(); } // 第1層：3択を出す（次バーガーはまだ始めない）
+  if (completedCount % every === 0) q.push("card");
+  if (q.length){ startOfferQueue(q); }              // 選択を出す（次バーガーはまだ始めない）
   else { beginNext(); }                             // 選択なしの回は即・次のバーガー
 }
+
+// 完成の区切りで出す選択（段数ボーナス／3択）を1つずつ順に処理する。
+let offerQueue = [];
+function startOfferQueue(q){
+  offerQueue = q.slice();
+  wantDrop = revealed;                              // 予約を破棄（選択後に勝手に次が始まらないように）
+  showNextOffer();
+}
+function showNextOffer(){
+  if (!offerQueue.length){ offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = ""; resetBurger(); return; }
+  offering = true;
+  const kind = offerQueue[0];
+  if (kind === "tier") showTierBonus();
+  else showOffer();
+}
+function advanceOffer(){ offerQueue.shift(); showNextOffer(); }   // 現在の選択を消化して次へ（無ければ待機）
 
 // 第1層：完成ごとの3択。いずれかの山に1枚足す／スキップ（小報酬）。タップで即決・確認画面なし。
 function sample(arr, n){
@@ -1464,11 +1496,10 @@ function offerPool(){
   const oc = CONFIG.params.offerCuisines || {};
   return catalogNames().filter(n => { const c = CONFIG.items[n].cuisine || "none"; return oc[c] !== false; });
 }
+const pileTotal = key => catalogNames().reduce((s,n)=> s + (CONFIG.items[n].pile===key ? CONFIG.items[n].count : 0), 0);
 function showOffer(){
-  offering = true;
-  wantDrop = revealed;                             // 3択が出た時点で予約を破棄（選択後に勝手に次が始まらないように）
   const pool = offerPool();
-  if (pool.length === 0){ offering = false; resetBurger(); return; }  // 全軸OFFなら3択を出さずに待機へ
+  if (pool.length === 0){ advanceOffer(); return; }  // 全軸OFFなら3択は飛ばす
   const picks = sample(pool, 3);                   // 有効な軸のカードから抽選（軸ごとにON/OFF可）
   offerEl.innerHTML = "";
   const title = document.createElement("div"); title.className = "offer-title";
@@ -1488,19 +1519,66 @@ function showOffer(){
   }
   offerEl.appendChild(row);
   const skip = document.createElement("div"); skip.className = "offer-skip";
-  skip.textContent = `スキップ（+${CONFIG.params.offer.skipReward} 累計）`;
-  skip.addEventListener("click", () => chooseOffer(null));
+  skip.textContent = "足さずに、デッキから1枚取り除く →";   // スキップ＝削る手段（希釈を戻す）
+  skip.addEventListener("click", showRemove);
   offerEl.appendChild(skip);
   offerEl.classList.add("show");
   updateProgress();
 }
 function chooseOffer(name){
   if (!offering) return;
-  if (name){ CONFIG.items[name].count += 1; renderPiles(); }   // 山に1枚足す（希釈が起きる層）
-  else { animateCum(Math.max(0, Math.round(CONFIG.params.offer.skipReward || 0))); Sound.collect(); } // スキップ報酬（暫定・累計へ）
-  offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
-  resetBurger();                                    // 待機状態へ戻す。次のバーガーは「次のクリック」で始まる（勝手に始めない）
+  CONFIG.items[name].count += 1; renderPiles(); renderAxisTally();   // 山に1枚足す（希釈が起きる層）
+  advanceOffer();
 }
+
+// スキップ＝デッキから1枚取り除く。デッキの中身を出し、任意の1枚を選んで −1。取り除かない選択肢も残す。
+function showRemove(){
+  offerEl.innerHTML = "";
+  const title = document.createElement("div"); title.className = "offer-title";
+  title.textContent = "デッキから1枚取り除く（タップで即決／最後の1枚は残す）"; offerEl.appendChild(title);
+  const list = document.createElement("div"); list.className = "remove-list";
+  const names = catalogNames().filter(n => CONFIG.items[n].count > 0);
+  for (const name of names){
+    const it = CONFIG.items[name];
+    const last = pileTotal(it.pile) <= 1;          // その山の最後の1枚は取り除けない（作れなくなるため）
+    const rowEl = document.createElement("div"); rowEl.className = "remove-row" + (last ? " off" : "");
+    const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="tag cui">${CUISINE_JA[it.cuisine]}</span>` : "";
+    const sysTag = (it.type!=="sauce"&&it.type!=="bun") ? `<span class="tag">${TYPE_JA[it.type]}</span>` : "";
+    rowEl.innerHTML = `<span class="nm">${name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}<span class="ct2">×${it.count}</span>`;
+    if (!last) rowEl.addEventListener("click", () => removeCard(name));
+    list.appendChild(rowEl);
+  }
+  offerEl.appendChild(list);
+  const keep = document.createElement("div"); keep.className = "offer-skip";
+  keep.textContent = "取り除かない（何もしない）";
+  keep.addEventListener("click", advanceOffer);
+  offerEl.appendChild(keep);
+  offerEl.classList.add("show");
+}
+function removeCard(name){
+  if (!offering) return;
+  if (CONFIG.items[name] && CONFIG.items[name].count > 0){ CONFIG.items[name].count -= 1; renderPiles(); renderAxisTally(); Sound.collect(); }
+  advanceOffer();
+}
+
+// 段数ボーナス：N個ごとに「具材枠+1／ソース枠+1」を選ぶ（区切り＝ノルマは未実装の暫定）。
+function showTierBonus(){
+  offerEl.innerHTML = "";
+  const t = CONFIG.params.tiers;
+  const ing = Math.round(t.ingredients), sau = Math.round(t.sauces);
+  const title = document.createElement("div"); title.className = "offer-title";
+  title.textContent = "段数ボーナス：どちらかを選ぶ（枠が1つ増える）"; offerEl.appendChild(title);
+  const row = document.createElement("div"); row.className = "offer-cards";
+  const mk = (label, sub, fn) => { const c=document.createElement("div"); c.className="offer-card";
+    c.innerHTML = `<div class="nm">${label}</div><div class="bs">${sub}</div>`; c.addEventListener("click", fn); return c; };
+  row.appendChild(mk("具材枠 +1", `${ing} → ${ing+1} 枚`, () => { CONFIG.params.tiers.ingredients = ing + 1; afterTierBonus(); }));
+  row.appendChild(mk("ソース枠 +1", `${sau} → ${sau+1} 枚`, () => { CONFIG.params.tiers.sauces = sau + 1; afterTierBonus(); }));
+  offerEl.appendChild(row);
+  offerEl.classList.add("show");
+  updateProgress();
+}
+function afterTierBonus(){ updateProgress(); if (tuningOpen()) renderSettings(); advanceOffer(); }
+function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
 function animateCum(delta){
@@ -1534,7 +1612,7 @@ function countUp(target, token){                    // 点数は最後に数え�
 function updateProgress(){
   const el = $("progress");
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
-  if (offering){ el.textContent = "カードを1枚選ぶ（タップ）"; return; }
+  if (offering){ el.textContent = "選択肢から1つ選ぶ（タップ）"; return; }
   if (awaitingCollect){ el.textContent = "完成！　押すと点数を回収して次へ"; return; }
   if (stack === null){
     const per = tiersPerClick();                    // 0=全段のときは total になる
@@ -1686,8 +1764,9 @@ function renderSettings(){
   let g = group("段構成（上下バンズは常に各1枚）");
   gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
   gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
-  // 段数を増やすボーナス（区切り＝ノルマは未実装。当面はデバッグ用にここで枠を増やす）。2種：具材枠+1／ソース枠+1。
-  {
+  // 段数ボーナス：N個作るごとに「具材枠+1／ソース枠+1」を選ぶ（ゲーム内機構）。区切り＝ノルマは未実装のため個数で代用。
+  gridRow(g, "段数ボーナス：何個ごと", numInput(()=>CONFIG.params.tierBonus.every, v=>CONFIG.params.tierBonus.every=Math.max(1,Math.round(v)), 1));
+  { // 手動デバッグ用の即時＋1ボタン（機構とは別に、その場で枠を増やせる）
     const rowb = document.createElement("div"); rowb.className = "btnrow";
     const bi = document.createElement("button"); bi.textContent = "具材枠 +1";
     bi.onclick = () => { CONFIG.params.tiers.ingredients = Math.max(0, Math.round(CONFIG.params.tiers.ingredients) + 1); updateProgress(); renderSettings(); };
@@ -1695,14 +1774,13 @@ function renderSettings(){
     bs.onclick = () => { CONFIG.params.tiers.sauces = Math.max(0, Math.round(CONFIG.params.tiers.sauces) + 1); updateProgress(); renderSettings(); };
     g.parentElement.appendChild(rowb); rowb.append(bi, bs);
     const note = document.createElement("p"); note.className = "barnote";
-    note.textContent = "※ 区切り（ノルマ）で選ぶ段数ボーナスの暫定版。将来は完成の区切りで「具材枠+1／ソース枠+1」から選ぶ。";
+    note.textContent = "※ 段数ボーナスは N個作るごとに完成の区切りで自動的に選択が出る（既定10個）。上のボタンはその場で試す用。";
     g.parentElement.appendChild(note);
   }
 
-  // 第1層：完成ごとの3択（デッキに足す）
-  g = group("完成ごとの3択（第1層・デッキに足す）");
+  // 第1層：完成ごとの3択（デッキに足す／スキップで1枚取り除く）
+  g = group("完成ごとの3択（第1層・足す／取り除く）");
   gridRow(g, "何個ごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
-  gridRow(g, "スキップ報酬(累計+)", numInput(()=>CONFIG.params.offer.skipReward, v=>CONFIG.params.offer.skipReward=Math.max(0,Math.round(v)), 1));
 
   // デバッグ：3択に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込みができる。
   g = group("3択に出す軸（デバッグ・既定 全ON）");
