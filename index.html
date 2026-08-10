@@ -450,6 +450,8 @@ const DEFAULTS = {
     landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
     completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
+    // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。
+    sound: { on: false, volume: 0.4 },
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
@@ -477,6 +479,61 @@ const TYPE_JA = { meat:"肉", dairy:"乳", veg:"野菜", sauce:"ソース", bun:
 let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
 window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れるように公開（リセット時に貼り替え）
+
+/* =========================================================================
+   効果音（Web Audio API・コード生成。音声ファイルは使わない＝素材権利を持ち込まない）
+   既定OFF。ON時、最初のタップ（ユーザー操作）で AudioContext を解錠する。
+   ========================================================================= */
+const Sound = (() => {
+  let ctx = null, master = null;
+  function on(){ return CONFIG.params.sound && CONFIG.params.sound.on; }
+  function unlock(){                                   // タップ内で呼ぶ（自動再生制限の解錠）
+    if (!on()) return;
+    try {
+      if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+        ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination); }
+      if (ctx.state === "suspended") ctx.resume().catch(()=>{});
+    } catch(e){ ctx = null; }
+  }
+  function ready(){ if (!on() || !ctx) return false; master.gain.value = CONFIG.params.sound.volume; return true; }
+  function tone(freq, o){
+    o = o || {}; if (!ready()) return;
+    try {
+      const t = ctx.currentTime + (o.delay || 0);
+      const osc = ctx.createOscillator(); osc.type = o.type || "sine"; osc.frequency.value = freq;
+      if (o.detune) osc.detune.value = o.detune;
+      const g = ctx.createGain(); const peak = (o.gain == null ? 0.25 : o.gain), dur = o.dur || 0.12;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + (o.attack || 0.005));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t + dur + 0.03);
+    } catch(e){}
+  }
+  function chord(freqs, o){ freqs.forEach(f => tone(f, o)); }
+  const WAVES = ["sine", "triangle", "square", "sawtooth"];
+  function bandType(){ const L = bandLevelCur || 0; return L <= 0 ? "sine" : WAVES[(L - 1) % WAVES.length]; }   // 帯で音色が変わる
+  function bandDetune(){ const L = bandLevelCur || 0; return L <= 0 ? 0 : Math.floor((L - 1) / WAVES.length) * 7; }
+  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+  function scaleFreq(i){ return 196 * Math.pow(2, PENTA[Math.min(i, PENTA.length - 1)] / 12); } // 段が上がると音程が上がる
+  return {
+    unlock,
+    setVolume(){ if (ctx && master) master.gain.value = CONFIG.params.sound.volume; },
+    land(i){ tone(scaleFreq(i), { type: bandType(), detune: bandDetune(), dur: 0.10, gain: 0.22, attack: 0.003 }); },
+    combo(grade){                                     // コンボは等級で変える
+      const type = bandType(), d = bandDetune();
+      if (grade >= 2)      chord([523, 659, 784], { type, detune: d, dur: 0.28, gain: 0.26, attack: 0.004 });
+      else if (grade >= 1) chord([523, 784], { type, detune: d, dur: 0.16, gain: 0.22 });
+      else                 tone(880, { type, detune: d, dur: 0.09, gain: 0.13 });
+    },
+    bandUp(){                                         // 帯が上がった合図（上昇アルペジオ）
+      const type = bandType(), d = bandDetune();
+      [0, 1, 2].forEach(k => tone(392 * Math.pow(2, (4 + k * 3) / 12), { type, detune: d, dur: 0.14, gain: 0.20, delay: k * 0.05 }));
+    },
+    complete(){ chord([392, 494, 587], { type: "triangle", dur: 0.42, gain: 0.22, attack: 0.006 }); }, // 解決和音
+    collect(){ tone(784, { type: "square", dur: 0.09, gain: 0.20 }); tone(1175, { type: "square", dur: 0.14, gain: 0.20, delay: 0.06 }); } // チャリン
+  };
+})();
 
 /* =========================================================================
    ロジック（生成・得点）
@@ -639,6 +696,7 @@ function makeTier(name, i){
 }
 
 function onTap(){
+  Sound.unlock();                                // ユーザー操作の中で音を解錠（OFF時は何もしない）
   if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
   if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
   if (dropping){                                 // 落下中のクリック
@@ -765,6 +823,7 @@ function landed(r){
   const base = CONFIG.items[stack[r]].base;
   runBase += base;
   baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
+  Sound.land(r);                                    // 着地音（段が上がると音程が上がる・帯で音色が変わる）
   popFlow("base", tierY(r), "+" + base);            // 置いた具材の左隣に +N（バッジなし）
   if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる
     const stg = $("stage"); stg.classList.remove("shake"); void stg.offsetWidth; stg.classList.add("shake");
@@ -827,6 +886,7 @@ function updateBand(){
     const b = CONFIG.params.band;
     const threshold = (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), L - 1);
     celebration(Math.round(threshold), L - 1);      // 跨いだ瞬間のバーストは残す
+    Sound.bandUp(L);                                // 帯が上がった音
   }
 }
 function celebration(value, index){
@@ -859,6 +919,7 @@ function present(i){
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
   popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
   pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
+  Sound.combo(m.grade);                             // コンボ音（等級で変える）
   if (reduced) return;                              // reduced-motion：発光・画面反応は省く
   const glowMs = CONFIG.params.grade.glowMs * 1000; // 接触面が一瞬光る（大は強く）
   for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
@@ -892,6 +953,7 @@ function complete(){
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   baseMeterEl.textContent = "基礎 " + sc.base;
   queued = 0;                                       // 予約された入力はここで破棄
+  Sound.complete();                                 // 完成音
   awaitingCollect = true;
   collectLocked = true;                             // 完成後しばらく入力を受け付けない（点数を必ず見せる）
   animTimers.push(setTimeout(() => { collectLocked = false; }, (CONFIG.params.completeLock || 0.30) * 1000));
@@ -911,6 +973,7 @@ function collect(){
   if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
   updateStats(); renderBars();
   animateCum(total);                                // 累計に加算される演出
+  Sound.collect();                                  // 回収音（チャリン）
   awaitingCollect = false;
   stack = null;                                     // 次を新規に
   advance();                                        // 新しいバーガーの1段目を落とす
@@ -1129,6 +1192,11 @@ function renderSettings(){
   gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
   gridRow(g, "着地の縮み時間", numInput(()=>CONFIG.params.squash,      v=>CONFIG.params.squash=v,      0.01));
   gridRow(g, "完成後の入力ロック", numInput(()=>CONFIG.params.completeLock, v=>CONFIG.params.completeLock=v, 0.05));
+
+  // 効果音（Web Audio・コード生成。既定OFF）
+  g = group("効果音（既定OFF）");
+  gridRow(g, "音を鳴らす", boolInput(()=>CONFIG.params.sound.on, v=>{ CONFIG.params.sound.on=v; if(v) Sound.unlock(); }));
+  gridRow(g, "音量", numInput(()=>CONFIG.params.sound.volume, v=>{ CONFIG.params.sound.volume=Math.max(0,Math.min(1,v)); Sound.setVolume(); }, 0.05));
 }
 
 /* ===== 起動・イベント ===== */
