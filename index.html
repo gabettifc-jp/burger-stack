@@ -46,19 +46,28 @@
   #multMeter{color:var(--accent)}
   #baseMeter.bump,#multMeter.bump{animation:mbump .18s ease-out}
   @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
-  /* コンボの入れ替え表示（最新数件のみ。溜め続けず、新しいものが古いものと入れ替わる） */
-  #comboFeed{position:absolute; right:8px; top:34px; z-index:6; display:flex; flex-direction:column; gap:4px; align-items:flex-end; pointer-events:none}
-  .cfx{background:var(--accent); color:#241a00; font-weight:800; font-size:.74rem; padding:2px 8px; border-radius:999px;
-       box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out}
-  .cfx.add{background:var(--good); color:#06251a}
-  .cfx.big{font-size:.92rem; padding:3px 11px; box-shadow:0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,.5)}
-  @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
-  /* 1段ごとの基礎点ポップ：置いた食材の位置（中央）にふわっと出て、上に浮きながらすぐ消える。
-     コンボ表示（右の枠）とは別。溜めない・入れ替えない。 */
-  .basepop{position:absolute; left:50%; z-index:7; color:#eaf4ff; font-weight:800; font-size:.92rem;
-    text-shadow:0 1px 3px #000, 0 0 7px rgba(0,0,0,.7); pointer-events:none; white-space:nowrap;
-    animation:basefloat .55s ease-out forwards}
-  @keyframes basefloat{0%{opacity:0; transform:translate(-50%,8px)}20%{opacity:1}100%{opacity:0; transform:translate(-50%,-18px)}}
+  /* 左側の「流れ」：今何が起きたか。基礎点 +N とコンボ ×N を同じ列に同じ大きさで出す。
+     + と × で「残る時間」「表示件数」を別々に設定（+ は短命・× は長寿命）。 */
+  #flow{position:absolute; left:8px; top:34px; z-index:6; display:flex; flex-direction:column; gap:3px; align-items:flex-start; pointer-events:none}
+  .fx{font-weight:800; font-size:.8rem; padding:2px 8px; border-radius:999px; white-space:nowrap;
+      background:rgba(0,0,0,.45); box-shadow:0 1px 3px rgba(0,0,0,.4); animation:fxin .14s ease-out}
+  .fx.base{color:#eaf4ff}
+  .fx.combo{color:var(--accent)}
+  .fx.combo.add{color:var(--good)}
+  .fx .nm{font-weight:600; font-size:.68rem; opacity:.75; margin-left:3px}
+  .fx.out{opacity:0; transition:opacity .3s ease}
+  @keyframes fxin{0%{opacity:0; transform:translateX(-8px)}100%{opacity:1; transform:none}}
+  /* 右上の「状態」寄り：中・大の等級バッジは、乗算メーター（右上）の位置に出す */
+  .gradebadge{position:absolute; right:8px; top:32px; z-index:7; background:var(--accent); color:#241a00;
+    font-weight:800; font-size:.86rem; padding:3px 10px; border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,.45);
+    white-space:nowrap; pointer-events:none; animation:gbin .16s ease-out}
+  .gradebadge.add{background:var(--good); color:#06251a}
+  .gradebadge.big{font-size:1.05rem; padding:5px 13px; box-shadow:0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,.5)}
+  .gradebadge.out{opacity:0; transform:translateY(-8px); transition:opacity .2s ease, transform .2s ease}
+  @keyframes gbin{0%{opacity:0; transform:translateY(8px) scale(.9)}100%{opacity:1; transform:none}}
+  @media (prefers-reduced-motion: reduce){
+    .fx, .gradebadge, #multMeter.bump, #baseMeter.bump { animation:none !important }
+  }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -264,7 +273,7 @@
         <div id="baseMeter">基礎 0</div>
         <div id="multMeter">×1.00</div>
       </div>
-      <div id="comboFeed"></div>
+      <div id="flow"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
       <div id="stageInner"></div>
@@ -395,12 +404,15 @@ const DEFAULTS = {
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
-      mid:        0.80,  // これ以上で「中」（バッジを出す）
+      mid:        0.80,  // これ以上で「中」（右上にバッジ）
       big:        2.20,  // これ以上で「大」（大きく出す＋画面反応）
-      maxBadges:  3,     // 1バーガーで出すバッジの上限（残りは光るだけ）
-      badgeMs:    0.30,  // バッジの表示時間(秒)。約0.3秒で消す
       glowMs:     0.40,  // 発光の表示時間(秒)
       recentWindow: 20   // 中央値を取る直近バーガー数
+    },
+    // 左側の「流れ」：+N と ×N を同じ列に出す。残る時間と件数を + と × で別々に。
+    flow: {
+      baseLife: 0.6,  baseCap: 2,   // 基礎点 +N：短命・少数
+      comboLife: 3.0, comboCap: 3   // コンボ ×N：長寿命・数件は残す
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
@@ -548,7 +560,7 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
-const baseMeterEl = $("baseMeter"), comboFeedEl = $("comboFeed"), cumTotalEl = $("cumTotal");
+const baseMeterEl = $("baseMeter"), flowEl = $("flow"), cumTotalEl = $("cumTotal");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
@@ -621,7 +633,7 @@ function startBurger(){
   runMult = 1; runBase = 0; awaitingCollect = false; hitMeta = computeGrades();
   genToken++; clearTimers();
   hintEl.style.display = "none";
-  stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
+  stageInner.innerHTML = ""; flowEl.innerHTML = "";
   // ステージ高は固定（CSS）。段数が多くて背が高いバーガーは、はみ出さないよう縮小して収める。
   const avail = 250 - 14 - 8;
   const s = layout.total > avail ? avail / layout.total : 1;
@@ -713,15 +725,14 @@ function dropTier(r){
   }, CONFIG.params.fallDur * 1000 + 30));
 }
 
+function bump(el){ if (reduced) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+
 function landed(r){
-  // 1クリックごとのフィードバック：その食材の基礎点をその場に出し、累計基礎点を更新
+  // 1クリックごとのフィードバック：基礎点を左の「流れ」に +N として出す（短命）＋累計基礎点を更新
   const base = CONFIG.items[stack[r]].base;
   runBase += base;
-  baseMeterEl.textContent = "基礎 " + runBase;
-  if (!reduced){
-    baseMeterEl.classList.remove("bump"); void baseMeterEl.offsetWidth; baseMeterEl.classList.add("bump");
-    popBase(r, base);
-  }
+  baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
+  addFlow("base", { baseVal: base });
   if (r > 0 && tierEls[r-1]){                       // 着地で下段が一瞬縮む（重さの表現）
     const below = tierEls[r-1];
     below.classList.add("squash");
@@ -731,15 +742,6 @@ function landed(r){
   if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成→停止
 }
 
-function popBase(r, base){
-  const y = layout.bottoms[r] + layout.effs[r]/2;
-  const el = document.createElement("div");
-  el.className = "basepop"; el.textContent = "+" + base;
-  el.style.bottom = y + "px";                       // 置いた食材の高さで、中央からふわっと浮き出す
-  stageInner.appendChild(el);
-  animTimers.push(setTimeout(() => el.remove(), 620));
-}
-
 function revealHits(r){
   sc.hits.forEach((h, i) => {
     if (shown.has(i)) return;
@@ -747,17 +749,18 @@ function revealHits(r){
   });
 }
 
-// 発動（コンボ）の演出。等級で出し方を変える。演出は絶対配置の重ねのみ・レイアウトは動かさない。
+// コンボ名（ラベルの「：」より前）
+function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
+
+// 発動（コンボ）の演出。
+//  左（流れ）：×N を +N と同じ列・同じ大きさで出す（長寿命）。右上（状態）：中/大の等級バッジ。
 function present(i){
   const h = sc.hits[i], m = hitMeta[i] || { grade:0 };
-  // 乗算は「溜まる数字」を更新（コンボ表示が消えてもこの数字は残る）
-  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2);
-    if (!reduced){ multMeterEl.classList.remove("bump"); void multMeterEl.offsetWidth; multMeterEl.classList.add("bump"); } }
-  // 中／大：コンボ表示（入れ替え式）に名前＋倍率を流す。小はコンボ表示に出さない。
-  if (m.grade >= 1) pushCombo(h, m.grade);
+  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); }
+  addFlow("combo", h);                              // 左の流れに ×N（全コンボ）
+  if (m.grade >= 1) gradeBadge(h, m.grade);         // 右上に 中/大 の等級バッジ
   if (reduced) return;                              // reduced-motion：発光・画面反応は省く
-  // 小：接触面が光るだけ（大は強く光る）。一瞬で消す。
-  const glowMs = CONFIG.params.grade.glowMs * 1000;
+  const glowMs = CONFIG.params.grade.glowMs * 1000; // 接触面が一瞬光る（全コンボ）
   for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
     el.classList.add(m.grade >= 2 ? "hitbig" : "hit");
     animTimers.push(setTimeout(() => el.classList.remove("hit","hitbig"), glowMs));
@@ -765,17 +768,37 @@ function present(i){
   if (m.grade >= 2) screenFlash();                  // 大：画面全体も反応
 }
 
-// コンボ名（ラベルの「：」より前）
-function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
-
-// コンボ表示（入れ替え式）：新しいものを上に足し、上限を超えたら古いものを消す
-function pushCombo(h, grade){
-  const cap = Math.max(1, Math.round(CONFIG.params.grade.maxBadges || 3));
+// 左の「流れ」：+N（基礎点）と ×N（コンボ）を同じ列に同じ大きさで。件数上限と残る時間は種類ごと。
+function addFlow(kind, data){
+  const f = CONFIG.params.flow;
   const chip = document.createElement("div");
-  chip.className = "cfx" + (h.kind === "add" ? " add" : "") + (grade >= 2 ? " big" : "");
-  chip.textContent = ruleShortName(h.label) + " " + h.effect;   // 名前 ＋ 倍率
-  comboFeedEl.prepend(chip);
-  while (comboFeedEl.children.length > cap) comboFeedEl.lastChild.remove();
+  if (kind === "base"){
+    chip.className = "fx base"; chip.textContent = "+" + data.baseVal;
+  } else {
+    chip.className = "fx combo" + (data.kind === "add" ? " add" : "");
+    const eff = document.createElement("b"); eff.textContent = data.effect;          // ×1.8（+と同じ大きさ）
+    const nm  = document.createElement("span"); nm.className = "nm"; nm.textContent = ruleShortName(data.label);
+    chip.append(eff, nm);
+  }
+  flowEl.prepend(chip);
+  const cap  = kind === "base" ? f.baseCap  : f.comboCap;
+  const life = (kind === "base" ? f.baseLife : f.comboLife) * 1000;
+  const same = [...flowEl.querySelectorAll(kind === "base" ? ".fx.base" : ".fx.combo")];
+  while (same.length > Math.max(1, cap)) same.pop().remove();   // 種類ごとの件数上限（古い順に消す）
+  animTimers.push(setTimeout(() => chip.classList.add("out"), Math.max(0, life - 300)));
+  animTimers.push(setTimeout(() => chip.remove(), life + 60));  // 種類ごとの寿命で消える
+}
+
+// 右上（乗算メーターの位置）に出す等級バッジ。中=通常、大=大きく＋画面反応。ひとつだけ残す。
+function gradeBadge(h, grade){
+  const prev = $("stage").querySelector(".gradebadge"); if (prev) prev.remove();
+  const b = document.createElement("div");
+  b.className = "gradebadge" + (h.kind === "add" ? " add" : "") + (grade >= 2 ? " big" : "");
+  b.textContent = h.effect;
+  $("stage").appendChild(b);
+  const life = grade >= 2 ? 760 : 560;
+  animTimers.push(setTimeout(() => b.classList.add("out"), life - 200));
+  animTimers.push(setTimeout(() => b.remove(), life));
 }
 
 function screenFlash(){
@@ -855,7 +878,7 @@ function resetBurger(){
   clearTimers(); genToken++;
   stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; awaitingCollect = false; collectLocked = false;
-  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
+  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; flowEl.innerHTML = "";
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
   firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
@@ -953,12 +976,18 @@ function renderSettings(){
   gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
   gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
 
-  // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）
-  g = group("演出の等級（相対しきい値・コンボ表示の枚数）");
+  // 左の「流れ」：+N と ×N の残る時間・件数（別々に）
+  g = group("左の流れ（+N と ×N の残り時間・件数）");
+  gridRow(g, "+N の残る時間(秒)", numInput(()=>CONFIG.params.flow.baseLife, v=>CONFIG.params.flow.baseLife=Math.max(0,v), 0.1));
+  gridRow(g, "+N の表示件数", numInput(()=>CONFIG.params.flow.baseCap, v=>CONFIG.params.flow.baseCap=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "×N の残る時間(秒)", numInput(()=>CONFIG.params.flow.comboLife, v=>CONFIG.params.flow.comboLife=Math.max(0,v), 0.1));
+  gridRow(g, "×N の表示件数", numInput(()=>CONFIG.params.flow.comboCap, v=>CONFIG.params.flow.comboCap=Math.max(1,Math.round(v)), 1));
+
+  // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。中/大は右上にバッジ。
+  g = group("演出の等級（相対しきい値・右上の中/大バッジ）");
   gridRow(g, "基準の床(floor)", numInput(()=>CONFIG.params.grade.floor, v=>CONFIG.params.grade.floor=v, 0.05));
   gridRow(g, "中のしきい値", numInput(()=>CONFIG.params.grade.mid, v=>CONFIG.params.grade.mid=v, 0.1));
   gridRow(g, "大のしきい値", numInput(()=>CONFIG.params.grade.big, v=>CONFIG.params.grade.big=v, 0.1));
-  gridRow(g, "コンボ表示の枚数", numInput(()=>CONFIG.params.grade.maxBadges, v=>CONFIG.params.grade.maxBadges=Math.max(1,Math.round(v)), 1));
   gridRow(g, "発光(秒)", numInput(()=>CONFIG.params.grade.glowMs, v=>CONFIG.params.grade.glowMs=v, 0.05));
 
   // 基礎点
