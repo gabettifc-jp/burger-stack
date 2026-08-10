@@ -148,6 +148,10 @@
     touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none}
   #tap:active{transform:translateY(1px); filter:brightness(1.05)}
   #msg{color:var(--bad); font-size:.8rem; min-height:1.1em; margin-top:6px}
+  #progress{margin-top:8px; color:var(--muted); font-size:.85rem; font-weight:600}
+  .modes{margin-top:8px; font-size:.8rem; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  .modes label{color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:4px}
+  #score.building{opacity:.4}
 
   /* ===== 4. 棒グラフ・統計 ===== */
   .stats{display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap}
@@ -186,7 +190,7 @@
 <body>
 <div class="wrap">
   <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span></h1>
-  <p class="sub">ボタンを連打してバーガーを積む。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
+  <p class="sub">ボタンを押すと1段ずつ積み上がる。<b>6回で1個</b>が完成し、6回目で得点が出る。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
 
   <!-- 1. バーガー表示 -->
   <section>
@@ -212,7 +216,13 @@
 
   <!-- 3. ボタン -->
   <section>
-    <button id="tap">🍔 作る（連打）</button>
+    <button id="tap">🍔 積む（1回に1段）</button>
+    <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+    <div class="modes">
+      落下中のクリック：
+      <label><input type="radio" name="mode" value="reserve" checked> 次段を予約</label>
+      <label><input type="radio" name="mode" value="ignore"> 無視</label>
+    </div>
     <div id="msg"></div>
   </section>
 
@@ -284,9 +294,9 @@ const DEFAULTS = {
   ],
   // 演出速度と食い込み量（食材ごと）
   params: {
-    fallPerTier: 0.08,  // 1段が落ちる間隔(秒)
+    fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
-    landPause:   0.10,  // 最終段着地から数え上げまでの間(秒)
+    landPause:   0.10,  // 6段目の完成から数え上げまでの間(秒)
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
@@ -409,8 +419,18 @@ reduceMQ.addEventListener?.("change", e => { reduced = e.matches; });
 
 let history = [];
 let animTimers = [];
-let animToken = 0;
 function clearTimers(){ animTimers.forEach(clearTimeout); animTimers = []; }
+
+/* 進行の状態（1クリック=1段。6回で1個・6回目で得点） */
+let mode = "reserve";   // "reserve"=落下中クリックは次段の予約 / "ignore"=無視
+let stack = null;       // 進行中のバーガー（6要素）。未開始はnull
+let layout = null, sc = null;
+let revealed = 0;       // 置いた段数(0..6)
+let tierEls = [];
+let shown = new Set();  // 表示済みヒットのindex
+let dropping = false;   // 段が落下中か
+let queued = 0;         // 予約数（reserve時）
+let genToken = 0;       // 数え上げ中断用（バーガー世代）
 
 function makeTier(name, i){
   const tier = document.createElement("div");
@@ -425,18 +445,39 @@ function makeTier(name, i){
   return tier;
 }
 
-function roll(){
+function needNew(){ return stack === null || revealed >= 6; }
+
+function onTap(){
+  if (dropping){                                 // 落下中のクリック
+    if (mode === "reserve" && revealed + queued < 6){ queued++; updateProgress(); }
+    return;                                       // ignore時・満杯時は無視（演出を上書きしない）
+  }
+  advance();
+}
+
+function advance(){
+  if (needNew()){ if (!startBurger()) return; }   // 完成後/未開始なら新しいバーガー
+  const r = revealed;
+  revealed++;
+  updateProgress();
+  dropTier(r);                                    // 1クリック=1段
+}
+
+function startBurger(){
   const b = buildBurger();
-  if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return; }
+  if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
   $("msg").textContent = "";
-  const sc = evaluate(b.stack);
-
-  history.push(sc.total);           // 得点は即記録（連打で取りこぼさない）
-  updateStats(); renderBars();
-  showBreakdown(sc);
-
-  animToken++; clearTimers();
-  play(b, sc, animToken);
+  stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
+  revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(6);
+  genToken++; clearTimers();
+  hintEl.style.display = "none";
+  stageInner.innerHTML = "";
+  stageInner.style.height = layout.total + "px";
+  $("stage").style.minHeight = Math.max(220, layout.total + 40) + "px";
+  scoreEl.textContent = "–"; scoreEl.classList.add("building");   // 得点は6段目まで伏せる
+  fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–";
+  firedRules.innerHTML = "";
+  return true;
 }
 
 function showBreakdown(sc){
@@ -457,78 +498,96 @@ function showBreakdown(sc){
   }
 }
 
-function play(b, sc, token){
-  const stack = b.stack;
-  const layout = computeLayout(stack);
-  hintEl.style.display = "none";
-  stageInner.innerHTML = "";
-  stageInner.style.height = layout.total + "px";
-  $("stage").style.minHeight = Math.max(220, layout.total + 40) + "px";
+function dropTier(r){
+  const el = makeTier(stack[r], r);
+  el.style.bottom = layout.bottoms[r] + "px";
+  el.style.zIndex = r;                              // 上の段ほど手前
+  el.style.setProperty("--fall", CONFIG.params.fallDur + "s");
+  el.style.setProperty("--squash", CONFIG.params.squash + "s");
+  tierEls[r] = el;
+  stageInner.appendChild(el);
 
-  const p = CONFIG.params;
-  const tiers = stack.map((name, i) => {
-    const t = makeTier(name, i);
-    t.style.bottom = layout.bottoms[i] + "px";
-    t.style.zIndex = i;                      // 上の段ほど手前
-    t.style.setProperty("--fall", p.fallDur + "s");
-    t.style.setProperty("--squash", p.squash + "s");
-    stageInner.appendChild(t);
-    return t;
-  });
-
-  const finish = () => { showGlow(stack, sc, layout, tiers); countUp(sc.total, token); };
-
-  if (reduced){                              // アニメ省略
-    tiers.forEach(t => t.classList.add("land"));
-    finish();
-    return;
-  }
-
-  tiers.forEach(t => t.classList.add("drop"));
-  // 強制リフロー後に段階的に落とす
-  void stageInner.offsetHeight;
-  stack.forEach((name, i) => {
-    const id = setTimeout(() => {
-      tiers[i].classList.remove("drop");
-      tiers[i].classList.add("land");
-      if (i > 0){                            // 着地で下段が一瞬縮む
-        const below = tiers[i-1];
-        below.classList.add("squash");
-        animTimers.push(setTimeout(() => below.classList.remove("squash"), p.squash*1000 + 20));
-      }
-    }, i * p.fallPerTier * 1000);
-    animTimers.push(id);
-  });
-
-  const landDone = stack.length * p.fallPerTier * 1000 + p.landPause * 1000;
-  animTimers.push(setTimeout(finish, landDone));
+  if (reduced){ el.classList.add("land"); landed(r); return; }   // アニメ省略：即着地
+  dropping = true;
+  el.classList.add("drop");
+  void el.offsetHeight;                             // 強制リフロー
+  el.classList.remove("drop");
+  el.classList.add("land");
+  animTimers.push(setTimeout(() => {
+    landed(r);
+    dropping = false;
+    // reserve：落下が終わったら予約を1つ消化して次段へ（演出の速さは1段ぶんのまま）
+    if (mode === "reserve" && r < 5 && queued > 0){ queued--; updateProgress(); advance(); }
+  }, CONFIG.params.fallDur * 1000 + 30));
 }
 
-function showGlow(stack, sc, layout, tiers){
-  for (const h of sc.hits){
-    for (const k of h.idx) if (tiers[k]){ tiers[k].classList.add("hit"); if (!reduced) tiers[k].classList.add("anim"); }
-    // 接触面にバッジ（倍率/加算）を表示
-    const ys = h.idx.map(k => layout.bottoms[k] + layout.effs[k]/2);
-    const y = ys.reduce((a,c)=>a+c,0) / ys.length;
-    const badge = document.createElement("div");
-    badge.className = "badge " + (h.kind === "add" ? "add" : "");
-    badge.textContent = h.effect;
-    badge.style.bottom = y + "px";
-    stageInner.appendChild(badge);
+function landed(r){
+  if (r > 0 && tierEls[r-1]){                       // 着地で下段が一瞬縮む（重さの表現）
+    const below = tierEls[r-1];
+    below.classList.add("squash");
+    animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
+  revealHits(r);                                    // 接触面が揃ったルールをその場で光らせる
+  if (r === 5){ queued = 0; complete(); }           // 6段目で完成
 }
 
-function countUp(target, token){
+function revealHits(r){
+  sc.hits.forEach((h, i) => {
+    if (shown.has(i)) return;
+    if (Math.max(...h.idx) <= r){ shown.add(i); glowHit(h); }   // 両側の段が揃ったヒットのみ
+  });
+}
+function glowHit(h){
+  for (const k of h.idx) if (tierEls[k]){ tierEls[k].classList.add("hit"); if (!reduced) tierEls[k].classList.add("anim"); }
+  const ys = h.idx.map(k => layout.bottoms[k] + layout.effs[k]/2);
+  const y = ys.reduce((a,c)=>a+c,0) / ys.length;
+  const badge = document.createElement("div");
+  badge.className = "badge " + (h.kind === "add" ? "add" : "");
+  badge.textContent = h.effect;
+  badge.style.bottom = y + "px";
+  stageInner.appendChild(badge);
+}
+
+function complete(){
+  showBreakdown(sc);                                // 内訳・発動ルール
+  history.push(sc.total);
+  updateStats(); renderBars(); updateProgress();
+  const my = genToken;
+  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); countUp(sc.total, my); };
+  if (reduced || CONFIG.params.landPause <= 0) run();
+  else animTimers.push(setTimeout(run, CONFIG.params.landPause * 1000));
+}
+
+function countUp(target, token){                    // 点数は最後に数え上がる
   const dur = CONFIG.params.countUp * 1000;
   if (reduced || dur <= 0){ scoreEl.textContent = target; return; }
   const start = performance.now();
   function step(now){
-    if (token !== animToken) return;         // 連打で上書きされたら中断
+    if (token !== genToken) return;                 // 次のバーガー開始で中断
     const t = Math.min(1, (now - start) / dur);
     scoreEl.textContent = Math.round(target * t);
     if (t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
+}
+
+function updateProgress(){
+  const el = $("progress");
+  if (stack === null){ el.textContent = "押すと1段ずつ積み上がる（6回で1個）"; return; }
+  if (revealed >= 6){ el.textContent = "完成！　もう一度押すと次のバーガー"; return; }
+  const res = (mode === "reserve" && queued > 0) ? `　予約 ${queued}` : "";
+  el.textContent = `${revealed} / 6 段${res}`;
+}
+
+function resetBurger(){
+  clearTimers(); genToken++;
+  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
+  stageInner.innerHTML = "";
+  scoreEl.classList.remove("building"); scoreEl.textContent = "0";
+  fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "1.00";
+  firedRules.innerHTML = "";
+  hintEl.style.display = "";
+  updateProgress();
 }
 
 /* ===== 統計・棒グラフ ===== */
@@ -620,25 +679,30 @@ function renderSettings(){
   gridRow(g, "既定値", numInput(()=>CONFIG.params.biteDefault, v=>CONFIG.params.biteDefault=v, 1));
   for (const n of ORDER) gridRow(g, n, numInput(()=>biteOf(n), v=>CONFIG.params.bite[n]=v, 1));
 
-  // 演出速度
-  g = group("演出の速さ（秒。合計0.8秒以内が目安）");
-  gridRow(g, "1段の落下間隔", numInput(()=>CONFIG.params.fallPerTier, v=>CONFIG.params.fallPerTier=v, 0.01));
+  // 演出速度（1クリック=1段なので、1段あたりの時間）
+  g = group("演出の速さ（秒・1段あたり）");
   gridRow(g, "1段の落下時間", numInput(()=>CONFIG.params.fallDur,     v=>CONFIG.params.fallDur=v,     0.01));
-  gridRow(g, "着地〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
+  gridRow(g, "完成〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
   gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
   gridRow(g, "着地の縮み時間", numInput(()=>CONFIG.params.squash,      v=>CONFIG.params.squash=v,      0.01));
 }
 
 /* ===== 起動・イベント ===== */
-$("tap").addEventListener("click", roll);
-window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); roll(); } });
-$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; animToken++; clearTimers(); updateStats(); renderBars(); });
+$("tap").addEventListener("click", onTap);
+window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); onTap(); } });
+document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventListener("change", () => {
+  mode = document.querySelector('input[name="mode"]:checked').value;
+  if (mode === "ignore") queued = 0;          // 無視に切替えたら予約は破棄
+  updateProgress();
+}));
+$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); resetBurger(); renderPiles(); renderSettings(); });
+$("clearHist").addEventListener("click", () => { history = []; updateStats(); renderBars(); });
 
 renderPiles();
 renderSettings();
 updateStats();
 renderBars();
+updateProgress();
 </script>
 </body>
 </html>
