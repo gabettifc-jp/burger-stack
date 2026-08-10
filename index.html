@@ -38,7 +38,13 @@
 
   /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
   #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
-  #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); width:230px; height:0}
+  #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); transform-origin:50% 100%; width:230px; height:0}
+  /* 乗算の積の現在値（固定位置・常時表示・溜まっていく数字） */
+  #multMeter{position:absolute; left:8px; top:8px; z-index:6;
+    font-weight:800; font-size:1.1rem; color:var(--accent);
+    background:rgba(0,0,0,.35); padding:2px 8px; border-radius:8px}
+  #multMeter.bump{animation:mbump .18s ease-out}
+  @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -47,17 +53,20 @@
   .food{position:relative; width:200px; height:20px; border-radius:8px}
   .tier.drop .food{transform:translateY(-260px); opacity:0}
   .tier.land .food{transform:translateY(0); opacity:1}
-  .tier .food{transition:transform var(--fall,.14s) cubic-bezier(.3,1.3,.5,1), opacity .1s linear}
+  .tier .food{transition:transform var(--fall,.14s) cubic-bezier(.3,1.3,.5,1), opacity .1s linear, box-shadow .2s ease}
   @keyframes squash{40%{transform:scaleY(.82) scaleX(1.05)}100%{transform:none}}
   .tier.squash .food{animation:squash var(--squash,.12s) ease-out}
+  /* 発光（小の演出）。等級で強さを変える。すべて一瞬で消える（演出はレイアウトを動かさない） */
   .tier.hit .food{box-shadow:0 0 0 3px var(--accent), 0 0 16px 5px rgba(255,207,90,.75)}
-  @keyframes pulse{0%{box-shadow:0 0 0 2px var(--accent),0 0 6px 2px rgba(255,207,90,.5)}
-                   100%{box-shadow:0 0 0 3px var(--accent),0 0 18px 6px rgba(255,207,90,.85)}}
-  .tier.hit.anim .food{animation:pulse .45s ease-in-out infinite alternate}
-  .badge{position:absolute; left:calc(50% + 104px); transform:translateY(50%);
-         background:var(--accent); color:#241a00; font-weight:700; font-size:.72rem;
-         padding:2px 7px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .tier.hitbig .food{box-shadow:0 0 0 4px #fff, 0 0 28px 11px rgba(255,207,90,.95)}
+  /* バッジ（中／大の演出）。接触面の右に浮き出し、約0.3秒で消える。本体は隠さない */
+  .badge{position:absolute; left:calc(50% + 104px); transform:translate(0,50%);
+         background:var(--accent); color:#241a00; font-weight:800; font-size:.74rem;
+         padding:2px 8px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.4);
+         opacity:1; pointer-events:none; transition:opacity .18s ease, transform .18s ease}
   .badge.add{background:var(--good); color:#06251a}
+  .badge.big{font-size:1rem; padding:4px 12px; left:calc(50% + 96px); box-shadow:0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,.5)}
+  .badge.out{opacity:0; transform:translate(0,-8px)}
 
   /* ---- 食材の絵（横から見た形） ---- */
   .food[data-type="bun"][data-pos="bottom"]{
@@ -134,17 +143,26 @@
     -webkit-mask:radial-gradient(circle at 6px 6px, #000 5px, transparent 6px) repeat-x; mask:radial-gradient(circle at 6px 6px,#000 5px,transparent 6px) repeat-x;
     -webkit-mask-size:12px 6px; mask-size:12px 6px}
 
-  /* ===== 2. 得点と内訳 ===== */
-  .scorewrap{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  /* ===== 2. 得点と内訳（4行固定表示。コンボ一覧は畳んでおく） ===== */
+  .scorehead{display:flex; align-items:baseline; gap:4px}
   #score{font-size:2.6rem; font-weight:800; line-height:1; color:var(--accent)}
-  .formula{color:var(--muted); font-size:.86rem}
-  .formula b{color:var(--text); font-weight:700}
-  /* 発動ルールのチップは固定高さ（増減で得点表示部の高さを変えない） */
-  #firedRules{margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start;
-              height:52px; overflow-y:auto}
+  .scorehead .unit{color:var(--muted); font-size:.9rem}
+  .breakdown4{display:grid; grid-template-columns:1fr 1fr; gap:2px 14px; margin:8px 0 2px}
+  .breakdown4 > div{display:flex; justify-content:space-between; align-items:baseline;
+    font-size:.86rem; color:var(--muted); border-bottom:1px dashed #2c333d; padding:3px 0}
+  .breakdown4 b{color:var(--text); font-weight:700}
+  #comboList{margin-top:8px}
+  #comboList > summary{font-size:.82rem; color:var(--muted); font-weight:600}
+  #firedRules{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
   .chip{font-size:.72rem; background:#2b313a; border:1px solid var(--line); border-radius:999px; padding:2px 8px; color:var(--muted)}
   .chip.mult{border-color:var(--accent); color:var(--accent)}
   .chip.add{border-color:var(--good); color:var(--good)}
+  .chip .g{opacity:.7; font-size:.66rem; margin-left:4px}
+  /* 大の演出：画面全体が一瞬反応する（固定オーバーレイ・レイアウトに影響しない） */
+  #screenFlash{position:fixed; inset:0; pointer-events:none; z-index:40; opacity:0;
+    background:radial-gradient(circle at 50% 42%, rgba(255,207,90,.42), rgba(255,207,90,0) 68%)}
+  #screenFlash.go{animation:sflash .28s ease-out}
+  @keyframes sflash{0%{opacity:0}28%{opacity:1}100%{opacity:0}}
 
   /* ===== 3. 連打ボタン（画面下に固定。演出では絶対に動かない） ===== */
   .actionbar{position:fixed; left:0; right:0; bottom:0; z-index:50;
@@ -198,28 +216,33 @@
 <body>
 <div class="wrap">
   <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span></h1>
-  <p class="sub">ボタンを押すと1段ずつ積み上がる。<b>6回で1個</b>が完成し、6回目で得点が出る。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
+  <p class="sub">ボタンを押すと1段ずつ積み上がる。<b>段の数だけ押すと1個</b>が完成し、最後の1回で得点が出る（段数は調整欄で変更可）。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。発動（コンボ）の強さは直近との比で等級が決まり、強いものだけバッジが出る。</p>
 
   <!-- 1. バーガー表示 -->
   <section>
     <p class="lbl">バーガー</p>
     <div id="stage">
+      <div id="multMeter">×1.00</div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
       <div id="stageInner"></div>
     </div>
   </section>
 
-  <!-- 2. 得点と内訳 -->
+  <!-- 2. 得点と内訳（4行固定。個々のコンボ一覧は畳んでおく） -->
   <section>
     <p class="lbl">今回の得点</p>
-    <div class="scorewrap">
-      <div id="score">0</div>
-      <div class="formula">
-        （基礎 <b id="fBase">0</b> ＋ 加算 <b id="fAdd">0</b>）× 乗算 <b id="fMult">1.00</b>
-      </div>
+    <div class="scorehead"><span id="score">0</span><span class="unit">点</span></div>
+    <div class="breakdown4">
+      <div><span>基礎点</span><b id="fBase">0</b></div>
+      <div><span>加算</span><b id="fAdd">0</b></div>
+      <div><span>乗算の積</span><b id="fMult">×1.00</b></div>
+      <div><span>合計</span><b id="fTotal">0</b></div>
     </div>
-    <div id="firedRules"></div>
+    <details id="comboList">
+      <summary>コンボ内訳 <span id="comboCount">（0件）</span></summary>
+      <div id="firedRules"></div>
+    </details>
   </section>
 
   <!-- 3. 操作モード（連打ボタン本体は下部固定バーにある） -->
@@ -266,6 +289,9 @@
   </section>
 </div>
 
+<!-- 大の演出：画面全体が一瞬反応する固定オーバーレイ -->
+<div id="screenFlash"></div>
+
 <!-- 連打ボタンは画面下に固定：演出でレイアウトが動いても位置は不変 -->
 <div class="actionbar">
   <div class="actionbar-in">
@@ -281,20 +307,21 @@
    - 数値だけ触れば調整できる。ルールは1件=1オブジェクトで追加可能。
    ========================================================================= */
 const DEFAULTS = {
-  // 食材カタログ：基礎点・系統・初期枚数・所属する山・効果欄(バンズ用、今は空)
+  // 食材カタログ：基礎点・系統・初期枚数・所属する山・効果欄(バンズ用、今は空)・固定等級tier(今は空)
+  //   tier: 発動時の演出の固定等級（0=小/1=中/2=大）。null は自動判定に任せる。今は全て null。
   items: {
-    "パティ":            { pile:"ingredient", type:"meat",  base:20, count:2 },
-    "チーズ":            { pile:"ingredient", type:"dairy", base:10, count:2 },
-    "レタス":            { pile:"ingredient", type:"veg",   base:8,  count:2 },
-    "トマト":            { pile:"ingredient", type:"veg",   base:8,  count:1 },
-    "オニオン":          { pile:"ingredient", type:"veg",   base:6,  count:1 },
-    "ピクルス":          { pile:"ingredient", type:"veg",   base:4,  count:1 },
-    "ケチャップ":        { pile:"sauce", type:"sauce", base:2, count:1 },
-    "マスタード":        { pile:"sauce", type:"sauce", base:2, count:1 },
-    "マヨネーズ":        { pile:"sauce", type:"sauce", base:2, count:1 },
-    "ゴマバンズ":            { pile:"bun", type:"bun", base:5,  count:2, effect:null },
-    "イングリッシュマフィン": { pile:"bun", type:"bun", base:5,  count:1, effect:null },
-    "メロンパン":            { pile:"bun", type:"bun", base:12, count:1, effect:null }
+    "パティ":            { pile:"ingredient", type:"meat",  base:20, count:2, tier:null },
+    "チーズ":            { pile:"ingredient", type:"dairy", base:10, count:2, tier:null },
+    "レタス":            { pile:"ingredient", type:"veg",   base:8,  count:2, tier:null },
+    "トマト":            { pile:"ingredient", type:"veg",   base:8,  count:1, tier:null },
+    "オニオン":          { pile:"ingredient", type:"veg",   base:6,  count:1, tier:null },
+    "ピクルス":          { pile:"ingredient", type:"veg",   base:4,  count:1, tier:null },
+    "ケチャップ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
+    "マスタード":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
+    "マヨネーズ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
+    "ゴマバンズ":            { pile:"bun", type:"bun", base:5,  count:2, effect:null, tier:null },
+    "イングリッシュマフィン": { pile:"bun", type:"bun", base:5,  count:1, effect:null, tier:null },
+    "メロンパン":            { pile:"bun", type:"bun", base:12, count:1, effect:null, tier:null }
   },
   // ルール（データとして定義。1行足せば1ルール追加）
   rules: [
@@ -309,9 +336,21 @@ const DEFAULTS = {
   ],
   // 演出速度と食い込み量（食材ごと）
   params: {
+    // 段構成（テスト用に段数を変えられる）。総段数 = 2(上下バンズ) + 具材 + ソース。
+    tiers: { ingredients: 3, sauces: 1 },
+    // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
+    grade: {
+      floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
+      mid:        0.80,  // これ以上で「中」（バッジを出す）
+      big:        2.20,  // これ以上で「大」（大きく出す＋画面反応）
+      maxBadges:  3,     // 1バーガーで出すバッジの上限（残りは光るだけ）
+      badgeMs:    0.30,  // バッジの表示時間(秒)。約0.3秒で消す
+      glowMs:     0.40,  // 発光の表示時間(秒)
+      recentWindow: 20   // 中央値を取る直近バーガー数
+    },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
-    landPause:   0.10,  // 6段目の完成から数え上げまでの間(秒)
+    landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
@@ -355,13 +394,18 @@ function pick(pileKey){
 function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 function buildBurger(){
+  // 段構成は params.tiers で可変。上下バンズは常に1枚ずつ、中段は具材:ソースの指定枚数。
+  const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
+  const nIng   = Math.max(0, Math.round(t.ingredients));
+  const nSauce = Math.max(0, Math.round(t.sauces));
   const bottom = pick("bun");                                   // 下バンズ
   const top    = pick("bun");                                   // 上バンズ（別々に引く）
-  const ings   = [pick("ingredient"), pick("ingredient"), pick("ingredient")]; // 具材3枚
-  const sauce  = pick("sauce");                                 // ソース1枚
-  if ([bottom, top, sauce, ...ings].some(x => x == null)) return null;
-  const mid = shuffle([...ings, sauce]);                        // 2〜5段の並びはランダム
-  return { stack: [bottom, mid[0], mid[1], mid[2], mid[3], top] }; // index0=最下段
+  const mids   = [];
+  for (let i=0;i<nIng;i++)   mids.push(pick("ingredient"));     // 具材（毎回引き直し・山は減らない）
+  for (let i=0;i<nSauce;i++) mids.push(pick("sauce"));          // ソース
+  if (bottom == null || top == null || mids.some(x => x == null)) return null;
+  shuffle(mids);                                                // 中段の並びはランダム
+  return { stack: [bottom, ...mids, top] };                     // index0=最下段
 }
 
 // 得点 =（基礎の合計 ＋ 加算）×（乗算の積）
@@ -377,24 +421,24 @@ function evaluate(stack){
           if (j < 0 || j >= stack.length) continue;
           const t = CONFIG.items[stack[j]].type;
           if (t === "bun") continue;                 // バンズに接する側は無効
-          if (r.targets.includes(t)){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,j], kind:"mult" }); }
+          if (r.targets.includes(t)){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,j], kind:"mult", mult:r.mult }); }
         }
       }
     } else if (r.kind === "stackedPair"){            // 下段=lower の直上が upper（方向あり）
       for (let i=0;i<stack.length-1;i++){
-        if (stack[i] === r.lower && stack[i+1] === r.upper){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,i+1], kind:"mult" }); }
+        if (stack[i] === r.lower && stack[i+1] === r.upper){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,i+1], kind:"mult", mult:r.mult }); }
       }
     } else if (r.kind === "adjacentPair"){           // a と b が隣接（順不同）
       for (let i=0;i<stack.length-1;i++){
         const x=stack[i], y=stack[i+1];
-        if (x!==y && ((x===r.a&&y===r.b)||(x===r.b&&y===r.a))){ add += r.add; hits.push({ label:r.label, effect:"+"+r.add, idx:[i,i+1], kind:"add" }); }
+        if (x!==y && ((x===r.a&&y===r.b)||(x===r.b&&y===r.a))){ add += r.add; hits.push({ label:r.label, effect:"+"+r.add, idx:[i,i+1], kind:"add", add:r.add }); }
       }
     }
   }
   // 系統C：バンズ全体倍率（効果欄。今は空だが構造だけ用意）
   for (let i=0;i<stack.length;i++){
     const eff = CONFIG.items[stack[i]].effect;
-    if (eff && eff.mult){ mult *= eff.mult; hits.push({ label:"バンズ効果", effect:"×"+eff.mult, idx:[i], kind:"mult" }); }
+    if (eff && eff.mult){ mult *= eff.mult; hits.push({ label:"バンズ効果", effect:"×"+eff.mult, idx:[i], kind:"mult", mult:eff.mult }); }
   }
 
   const total = Math.round((base + add) * mult);
@@ -406,10 +450,10 @@ function evaluate(stack){
    ========================================================================= */
 function effHeight(name, pos){ return VIS_H[name] + (pos === "top" ? TOP_BUN_EXTRA : 0); }
 function biteOf(name){ const b = CONFIG.params.bite[name]; return (b == null ? CONFIG.params.biteDefault : b); }
-function posOf(i){ return i === 0 ? "bottom" : (i === 5 ? "top" : "mid"); }
+function posOf(i, len){ return i === 0 ? "bottom" : (i === len - 1 ? "top" : "mid"); }
 
 function computeLayout(stack){
-  const effs = stack.map((n,i)=>effHeight(n, posOf(i)));
+  const effs = stack.map((n,i)=>effHeight(n, posOf(i, stack.length)));
   const bottoms = [0];
   for (let i=1;i<stack.length;i++){
     let bite = biteOf(stack[i]);
@@ -424,8 +468,9 @@ function computeLayout(stack){
    DOM / 描画
    ========================================================================= */
 const $ = id => document.getElementById(id);
-const stageInner = $("stageInner"), hintEl = $("hint");
-const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), firedRules = $("firedRules");
+const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
+const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
+const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
 
 const reduceMQ = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -436,35 +481,39 @@ let history = [];
 let animTimers = [];
 function clearTimers(){ animTimers.forEach(clearTimeout); animTimers = []; }
 
-/* 進行の状態（1クリック=1段。6回で1個・6回目で得点） */
+/* 進行の状態（1クリック=1段。総段数で1個・最終段で得点） */
 let mode = "reserve";   // "reserve"=落下中クリックは次段の予約 / "ignore"=無視
-let stack = null;       // 進行中のバーガー（6要素）。未開始はnull
+let stack = null;       // 進行中のバーガー。未開始はnull
 let layout = null, sc = null;
-let revealed = 0;       // 置いた段数(0..6)
+let revealed = 0;       // 置いた段数
 let tierEls = [];
 let shown = new Set();  // 表示済みヒットのindex
 let dropping = false;   // 段が落下中か
 let queued = 0;         // 予約数（reserve時）
 let genToken = 0;       // 数え上げ中断用（バーガー世代）
+let hitMeta = [];       // ヒットごとの等級情報（コンボ）
+let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
+let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 
 function makeTier(name, i){
+  const pos = posOf(i, stack.length);
   const tier = document.createElement("div");
   tier.className = "tier";
   const food = document.createElement("div");
   food.className = "food";
   food.dataset.item = name;
   food.dataset.type = CONFIG.items[name].type;
-  food.dataset.pos = posOf(i);
-  food.style.height = effHeight(name, posOf(i)) + "px";
+  food.dataset.pos = pos;
+  food.style.height = effHeight(name, pos) + "px";
   tier.appendChild(food);
   return tier;
 }
 
-function needNew(){ return stack === null || revealed >= 6; }
+function needNew(){ return stack === null || revealed >= stack.length; }
 
 function onTap(){
   if (dropping){                                 // 落下中のクリック
-    if (mode === "reserve" && revealed + queued < 6){ queued++; updateProgress(); }
+    if (mode === "reserve" && stack && revealed + queued < stack.length){ queued++; updateProgress(); }
     return;                                       // ignore時・満杯時は無視（演出を上書きしない）
   }
   advance();
@@ -483,32 +532,74 @@ function startBurger(){
   if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
   $("msg").textContent = "";
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
-  revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(6);
+  revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
+  runMult = 1; hitMeta = computeGrades();
   genToken++; clearTimers();
   hintEl.style.display = "none";
   stageInner.innerHTML = "";
-  // ステージ高は固定（CSS）。演出でレイアウトを動かさないため、ここで高さは変えない。
-  scoreEl.textContent = "–"; scoreEl.classList.add("building");   // 得点は6段目まで伏せる
-  fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–";
-  firedRules.innerHTML = "";
+  // ステージ高は固定（CSS）。段数が多くて背が高いバーガーは、はみ出さないよう縮小して収める。
+  const avail = 250 - 14 - 8;
+  const s = layout.total > avail ? avail / layout.total : 1;
+  stageInner.style.transform = `translateX(-50%) scale(${s})`;
+  // 得点は最終段まで伏せる。乗算の積の現在値だけ×1.00から表示。
+  scoreEl.textContent = "–"; scoreEl.classList.add("building");
+  fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–"; fTotal.textContent = "–";
+  firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
+  multMeterEl.textContent = "×1.00";
   return true;
 }
 
+// 直近の乗算の積の中央値（相対しきい値の基準）
+function medianProduct(){
+  const w = CONFIG.params.grade.recentWindow || 20;
+  const arr = recentProducts.slice(-w).slice().sort((a,b)=>a-b);
+  if (!arr.length) return 1;
+  const m = Math.floor(arr.length/2);
+  return arr.length % 2 ? arr[m] : (arr[m-1]+arr[m])/2;
+}
+
+// 各ヒット（コンボ）の等級を決める。しきい値は絶対値でなく相対値（中央値との比）。
+function computeGrades(){
+  const gp = CONFIG.params.grade;
+  const med = medianProduct();
+  const medExcess = Math.max(gp.floor, med - 1);   // 直近が強いほど基準が上がる
+  const baseSum = Math.max(1, sc.base);
+  const meta = sc.hits.map(h => {
+    // 乗算はその倍率、加算は基礎点に対する相対で「効き」を factor に正規化
+    const f = h.kind === "mult" ? h.mult : (1 + (h.add || 0) / baseSum);
+    const rel = (f - 1) / medExcess;
+    let grade = rel >= gp.big ? 2 : rel >= gp.mid ? 1 : 0;
+    for (const k of h.idx){                         // 食材ごとの固定等級（今は全てnull＝無効）
+      const tt = CONFIG.items[stack[k]] && CONFIG.items[stack[k]].tier;
+      if (tt != null) grade = Math.max(grade, tt);
+    }
+    return { f, rel, grade, badge:false };
+  });
+  // バッジ上限：grade>=1 の中から rel の上位 maxBadges 件だけバッジ許可（残りは光るだけ）
+  meta.map((m,i)=>[i,m]).filter(([,m])=>m.grade>=1).sort((a,b)=>b[1].rel-a[1].rel)
+      .slice(0, gp.maxBadges).forEach(([i])=>{ meta[i].badge = true; });
+  return meta;
+}
+
+const GRADE_JA = ["小","中","大"];
 function showBreakdown(sc){
-  fBase.textContent = sc.base;
-  fAdd.textContent  = sc.add;
-  fMult.textContent = sc.mult.toFixed(2);
+  fBase.textContent  = sc.base;
+  fAdd.textContent   = sc.add;
+  fMult.textContent  = "×" + sc.mult.toFixed(2);
+  fTotal.textContent = sc.total;
+  comboCount.textContent = `（${sc.hits.length}件）`;
   firedRules.innerHTML = "";
   if (sc.hits.length === 0){
-    const c = document.createElement("span"); c.className = "chip"; c.textContent = "発動ルールなし（基礎点のみ）";
+    const c = document.createElement("span"); c.className = "chip"; c.textContent = "コンボなし（基礎点のみ）";
     firedRules.appendChild(c);
   } else {
-    for (const h of sc.hits){
+    sc.hits.forEach((h, i) => {
       const c = document.createElement("span");
       c.className = "chip " + h.kind;
-      c.textContent = h.label + "  " + h.effect;
+      const g = hitMeta[i] ? GRADE_JA[hitMeta[i].grade] : "";
+      c.innerHTML = `${h.label}  ${h.effect}<span class="g">${g}</span>`;
       firedRules.appendChild(c);
-    }
+    });
   }
 }
 
@@ -531,7 +622,7 @@ function dropTier(r){
     landed(r);
     dropping = false;
     // reserve：落下が終わったら予約を1つ消化して次段へ（演出の速さは1段ぶんのまま）
-    if (mode === "reserve" && r < 5 && queued > 0){ queued--; updateProgress(); advance(); }
+    if (mode === "reserve" && r < stack.length - 1 && queued > 0){ queued--; updateProgress(); advance(); }
   }, CONFIG.params.fallDur * 1000 + 30));
 }
 
@@ -541,30 +632,59 @@ function landed(r){
     below.classList.add("squash");
     animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
-  revealHits(r);                                    // 接触面が揃ったルールをその場で光らせる
-  if (r === 5){ queued = 0; complete(); }           // 6段目で完成
+  revealHits(r);                                    // 接触面が揃ったコンボをその場で演出
+  if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成
 }
 
 function revealHits(r){
   sc.hits.forEach((h, i) => {
     if (shown.has(i)) return;
-    if (Math.max(...h.idx) <= r){ shown.add(i); glowHit(h); }   // 両側の段が揃ったヒットのみ
+    if (Math.max(...h.idx) <= r){ shown.add(i); present(i); }   // 両側の段が揃ったヒットのみ
   });
 }
-function glowHit(h){
-  for (const k of h.idx) if (tierEls[k]){ tierEls[k].classList.add("hit"); if (!reduced) tierEls[k].classList.add("anim"); }
+
+// 発動（コンボ）の演出。等級で出し方を変える。演出は絶対配置の重ねのみ・レイアウトは動かさない。
+function present(i){
+  const h = sc.hits[i], m = hitMeta[i] || { grade:0, badge:false };
+  // 乗算は「溜まる数字」を更新（バッジが消えてもこの数字は残る）
+  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2);
+    if (!reduced){ multMeterEl.classList.remove("bump"); void multMeterEl.offsetWidth; multMeterEl.classList.add("bump"); } }
+  if (reduced) return;                              // reduced-motion：光・バッジ・画面反応は省く
+  // 小：接触面が光るだけ（大は強く光る）。一瞬で消す。
+  const glowMs = CONFIG.params.grade.glowMs * 1000;
+  for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
+    el.classList.add(m.grade >= 2 ? "hitbig" : "hit");
+    animTimers.push(setTimeout(() => el.classList.remove("hit","hitbig"), glowMs));
+  }
+  // 中／大：許可されたものだけバッジ。大は画面全体も反応。
+  if (m.grade >= 1 && m.badge){ popBadge(h, m.grade); if (m.grade >= 2) screenFlash(); }
+}
+
+function popBadge(h, grade){
   const ys = h.idx.map(k => layout.bottoms[k] + layout.effs[k]/2);
   const y = ys.reduce((a,c)=>a+c,0) / ys.length;
-  const badge = document.createElement("div");
-  badge.className = "badge " + (h.kind === "add" ? "add" : "");
-  badge.textContent = h.effect;
-  badge.style.bottom = y + "px";
-  stageInner.appendChild(badge);
+  const b = document.createElement("div");
+  b.className = "badge" + (h.kind === "add" ? " add" : "") + (grade >= 2 ? " big" : "");
+  b.textContent = h.effect;
+  b.style.bottom = y + "px";
+  stageInner.appendChild(b);
+  const ms = CONFIG.params.grade.badgeMs * 1000;
+  animTimers.push(setTimeout(() => b.classList.add("out"), Math.max(0, ms - 160)));
+  animTimers.push(setTimeout(() => b.remove(), ms + 220));
+}
+
+function screenFlash(){
+  const el = $("screenFlash");
+  el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
 }
 
 function complete(){
-  showBreakdown(sc);                                // 内訳・発動ルール
+  showBreakdown(sc);                                // 内訳・コンボ一覧
   history.push(sc.total);
+  recentProducts.push(sc.mult);                     // 次回以降の相対しきい値の基準
+  const w = CONFIG.params.grade.recentWindow || 20;
+  if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
+  multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   updateStats(); renderBars(); updateProgress();
   const my = genToken;
   const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); countUp(sc.total, my); };
@@ -587,19 +707,20 @@ function countUp(target, token){                    // 点数は最後に数え�
 
 function updateProgress(){
   const el = $("progress");
-  if (stack === null){ el.textContent = "押すと1段ずつ積み上がる（6回で1個）"; return; }
-  if (revealed >= 6){ el.textContent = "完成！　もう一度押すと次のバーガー"; return; }
+  const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
+  if (stack === null){ el.textContent = `押すと1段ずつ積み上がる（${total}回で1個）`; return; }
+  if (revealed >= stack.length){ el.textContent = "完成！　もう一度押すと次のバーガー"; return; }
   const res = (mode === "reserve" && queued > 0) ? `　予約 ${queued}` : "";
-  el.textContent = `${revealed} / 6 段${res}`;
+  el.textContent = `${revealed} / ${stack.length} 段${res}`;
 }
 
 function resetBurger(){
   clearTimers(); genToken++;
-  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
-  stageInner.innerHTML = "";
+  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = []; runMult = 1;
+  stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)";
   scoreEl.classList.remove("building"); scoreEl.textContent = "0";
-  fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "1.00";
-  firedRules.innerHTML = "";
+  fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
+  firedRules.innerHTML = ""; comboCount.textContent = "（0件）"; multMeterEl.textContent = "×1.00";
   hintEl.style.display = "";
   updateProgress();
 }
@@ -676,8 +797,22 @@ function renderSettings(){
     const p=document.createElement("p"); p.className="lbl"; p.textContent=title; g.appendChild(p);
     const grid=document.createElement("div"); grid.className="grid"; g.appendChild(grid); host.appendChild(g); return grid; };
 
+  // 段構成（テスト用に段数を変えられる。総段数 = 2 + 具材 + ソース）
+  let g = group("段構成（上下バンズは常に各1枚）");
+  gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
+  gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
+
+  // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）
+  g = group("演出の等級（相対しきい値・バッジ上限）");
+  gridRow(g, "基準の床(floor)", numInput(()=>CONFIG.params.grade.floor, v=>CONFIG.params.grade.floor=v, 0.05));
+  gridRow(g, "中のしきい値", numInput(()=>CONFIG.params.grade.mid, v=>CONFIG.params.grade.mid=v, 0.1));
+  gridRow(g, "大のしきい値", numInput(()=>CONFIG.params.grade.big, v=>CONFIG.params.grade.big=v, 0.1));
+  gridRow(g, "バッジ上限(件/個)", numInput(()=>CONFIG.params.grade.maxBadges, v=>CONFIG.params.grade.maxBadges=Math.max(0,Math.round(v)), 1));
+  gridRow(g, "バッジ表示(秒)", numInput(()=>CONFIG.params.grade.badgeMs, v=>CONFIG.params.grade.badgeMs=v, 0.05));
+  gridRow(g, "発光(秒)", numInput(()=>CONFIG.params.grade.glowMs, v=>CONFIG.params.grade.glowMs=v, 0.05));
+
   // 基礎点
-  let g = group("基礎点");
+  g = group("基礎点");
   for (const n of ORDER) gridRow(g, n, numInput(()=>CONFIG.items[n].base, v=>CONFIG.items[n].base=v, 1));
 
   // 倍率
@@ -710,7 +845,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; updateStats(); renderBars(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; updateStats(); renderBars(); });
 
 renderPiles();
 renderSettings();
