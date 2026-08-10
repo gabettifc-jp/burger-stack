@@ -680,16 +680,21 @@ const DEFAULTS = {
       // 揺れ：振幅の上限(px)。#stage は overflow:hidden で閉じ込めるので暴れてもボタンには波及しない。
       //   既定は箱に収まる範囲（バーガーが見えたまま強く揺れる）。持続と減衰の形(decay)で「強さ」を出す。
       shake:     { gain:5, ampMax:44, decay:"settle" }, // gain=振幅係数 / ampMax=振幅の上限px / decay: settle・hard・long
-      // 帯アップの段階化（5段階）。上に行くほど大げさ・長く続く・複数箇所・音が層に。実効は帯レベル(=stage)で決まる。
-      bandup:    { on:true, durBase:0.9, durStep:1.45, durMax:2.4, ampBase:1.5, ampStep:1.2, ampMax:3.2, spotsBase:2, layers:5 },
+      // 帯アップ（積み中の跨ぎ）は1個で何度も起きるので「短く・軽く」保つ。落下は止めない（ヒットストップは完成に集約）。
+      //   durMax を小さく＝短い。重い盛り上がりは完成（下記 complete）へ集約する。
+      bandup:    { on:true, durBase:0.35, durStep:1.12, durMax:0.6, ampBase:1.2, ampStep:1.12, ampMax:2.0, spotsBase:1, layers:4 },
       // 得点をバーガーに重ねて大きく表示。size=大きさ倍率 / opacity=不透明度 / x,y=バーガー内の表示位置(%)。
       burgerScore: { on:true, size:1.0, opacity:0.95, x:50, y:52 },
-      // 回収：売上（お金）をコインで受け取る。バーガーから飛び出し累計へ飛んで積もる。
-      //   per=何点で1枚 / min,max=枚数の下限上限 / speed=飛ぶ時間(秒) / arc=軌道の山の高さ(px) /
-      //   stagger=1枚ごとの間隔(秒。音の連鎖にもなる) / pileMax=積もりの最大枚数（超えたら古いものから消す）。
-      coins: { on:true, per:8, min:4, max:36, speed:0.7, arc:120, stagger:0.05, pileMax:60 },
-      // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。
-      complete:  { on:true, base:1.0, scale:1.30 },
+      // 回収：売上（お金）をコインで受け取る。バーガーから飛び出し累計へ飛んで積もる（非ブロッキング＝飛行中も操作可）。
+      //   見た目：per=何点で1枚 / min,max=枚数の下限上限 / speed=飛ぶ時間(秒) / arc=軌道の山(px) /
+      //           stagger=1枚ごとの発射間隔(秒) / pileMax=積もりの最大枚数（超えたら古いものから消す）。
+      //   音：点数に比例させない。回数は soundMin〜soundMax（既定8〜12）、鳴る時間は soundDur(秒)で一定。
+      //       点数の大きさは「音程の高さ・厚み・回数(8〜12の範囲)」で表す。pitchSpan=連鎖で上がる音程幅(半音)。
+      coins: { on:true, per:8, min:4, max:36, speed:0.7, arc:120, stagger:0.05, pileMax:60,
+               soundMin:8, soundMax:12, soundDur:0.7, pitchSpan:12 },
+      // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。1個に1回なので長めでよい。
+      //   dur=完成演出の長さ(秒。閃光・揺れ・衝撃波の持続の基準)。調整欄で伸ばせる。
+      complete:  { on:true, base:1.0, scale:1.30, dur:1.4 },
       easing:    { drop:"softbounce", number:"outslow" }  // 数字は「速く出てゆっくり消える(outslow)」を既定に
     },
     // デバッグ：点数（帯レベル）を段階的に上げて演出だけを確認するモード。rampMax=到達帯 / rampStep=刻み / rampInterval=間隔(秒)。
@@ -710,7 +715,10 @@ const DEFAULTS = {
       feedCap:   3      // 右上コンボ履歴の件数
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
-    fallDur:     0.30,  // 1段の落下アニメ時間(秒)
+    fallDur:     0.30,  // 1段の落下アニメ時間(秒)。既定＝中程度。実際は下の fallByBand（最終到達帯で決まる）を使う。
+    // 落下速度＝その回の期待度の表示。計算層で確定した最終到達帯で落下時間を変える（低い回は速く＝つまらない、
+    //   高い回は遅く＝大きい、と体で分かる）。配列の添字＝最終到達帯（0..）。帯ごとに調整欄で個別に変えられる。
+    fallByBand:  [0.15, 0.22, 0.30, 0.40, 0.50, 0.60, 0.60, 0.60],
     perClick:    0,     // 1クリックで落とす段数（0=全段〈既定〉／1〜=その段数）。複数でも必ず1段ずつ順に落ちる。
     dropGap:     0.12,  // 段が落ちてから次の段が落ちるまでの間隔(秒)
     fastForward: true,  // 落下中のクリックで落下を速める「早送り」。既定ON
@@ -908,11 +916,13 @@ const Sound = (() => {
       chord(cont/2, [0, 7], { type: "triangle", dur: 0.6, gain: 0.16, stagger: 0.03 });            // 下支え
       if (CONFIG.params.sound.bass && CONFIG.params.sound.bass.on) bass(0.8 + 0.1*(L||0)); },
     collect(){ const K = scheme().coin; chord(K.root, K.semis, { type: K.wave || "square", dur: K.dur || 0.1, gain: 0.20, stagger: 0.06 }); },
-    // 回収コイン：1枚ごとに1回鳴らす（連鎖）。枚数 i が進むほど少しずつ音程が上がり、受け取りの積み上がりが耳で分かる。
-    coin(i){ const K = scheme().coin, n = i || 0;
-      const semi = K.semis[n % K.semis.length] + Math.min(24, Math.floor(n / K.semis.length) * 3 + n * 0.6);
-      osc(K.root * Math.pow(2, semi / 12), { type: K.wave || "square", dur: 0.08, gain: 0.15, atk: 0.002 });
-      osc(K.root * 2 * Math.pow(2, semi / 12), { type: "sine", dur: 0.05, gain: 0.06, atk: 0.001 }); },  // 上の倍音でキラッと
+    // 回収コインの「チャリン」1回。semi=音程(半音・連鎖で上がる) / thick=厚み(0..1・点数が大きいほど厚い)。
+    //  鳴る回数・時間は呼び出し側で固定（点数に比例させない）。点数の大きさは音程・厚みで表す。
+    coinChink(semi, thick){ const K = scheme().coin, th = Math.max(0, Math.min(1, thick || 0));
+      const f = K.root * Math.pow(2, (semi || 0) / 12);
+      osc(f, { type: K.wave || "square", dur: 0.08, gain: 0.14 * (1 + 0.5 * th), atk: 0.002 });
+      osc(f * 2, { type: "sine", dur: 0.05, gain: 0.05 * (1 + th), atk: 0.001 });                 // 上の倍音でキラッと
+      if (th > 0.4) osc(f * 1.5, { type: "triangle", dur: 0.06, gain: 0.05 * th, atk: 0.001 }); },  // 厚み（第5音）
     tense(){ osc(scheme().land.root * 2, { type: "sine", dur: 0.07, gain: 0.07, atk: 0.01 }); },        // 予告中の緊張の短い音
     reachFail(){ osc(scheme().land.root * 0.75, { type: "sawtooth", dur: 0.30, gain: 0.13, atk: 0.02 }); } // 届かなかった下降音
   };
@@ -1360,11 +1370,19 @@ function showBreakdown(sc){
   }
 }
 
+// その回の落下時間＝最終到達帯（planで確定）で決まる。低い回は速く／高い回は遅く（期待の育ち方を落下速度で見せる）。
+function fallDurForBand(b){
+  const arr = CONFIG.params.fallByBand;
+  if (Array.isArray(arr) && arr.length){ const i = Math.max(0, Math.min(arr.length - 1, Math.round(b || 0))); return Math.max(0.02, arr[i]); }
+  return CONFIG.params.fallDur;
+}
+function curFallDur(){ return fallDurForBand(plan && plan.final ? plan.final.band : 0); }
 function dropTier(r){
   const el = makeTier(stack[r], r);
   el.style.bottom = layout.bottoms[r] + "px";
   el.style.zIndex = r;                              // 上の段ほど手前
-  el.style.setProperty("--fall", CONFIG.params.fallDur + "s");
+  const fd = curFallDur();                          // この回の見込み（最終到達帯）で落下時間が決まる
+  el.style.setProperty("--fall", fd + "s");
   el.style.setProperty("--squash", CONFIG.params.squash + "s");
   tierEls[r] = el;
   stageInner.appendChild(el);
@@ -1377,7 +1395,7 @@ function dropTier(r){
   void el.offsetHeight;                             // 強制リフロー
   el.classList.remove("drop");
   el.classList.add("land");
-  scheduleLand(r, CONFIG.params.fallDur);
+  scheduleLand(r, fd);
   if (holding && CONFIG.params.fastForward !== false) fastForward();   // 押しっぱなし中はこの段も即・早送り
 }
 // 着地タイマーを張る（早送りで貼り替えられるよう分離）。
@@ -1390,7 +1408,7 @@ function fastForward(){
   if (!dropping || !dropEl || ffUsed) return;      // この段は既に早送り済み or 落下中でない
   ffUsed = true;                                   // 次の段間隔もこの段については詰める
   if (dropTimer){ clearTimeout(dropTimer); dropTimer = null; }
-  const fast = Math.min(CONFIG.params.fallDur, 0.05);
+  const fast = Math.min(curFallDur(), 0.05);
   const food = dropEl.querySelector(".food");
   if (food) food.style.transitionDuration = fast + "s";   // 途中からでも現在値→着地へ短時間で寄せる
   scheduleLand(dropIdx, fast);
@@ -1529,31 +1547,40 @@ function burstBand(L){
   const upShake = up.shake != null ? up.shake : 3.0;
   const spill = fxSpill();                              // 視覚が飽和したら、あふれ分を画面全体の変化（閃光の強さ・持続）へ回す
   if (!reduced){
-    if (upFlash > 0) screenFlash(upFlash * amp * (1 + 0.25*spill), dur*1000*0.7 * (1 + 0.35*spill));
-    if (upShake > 0) strongShake(upShake * amp, Math.min(1600, dur*1000*0.7));
+    // 積み中の跨ぎは軽く：閃光・小さめの揺れ・少数の破片・弱いカメラ寄りのみ。ヒットストップは掛けない（落下を止めない／重い演出は完成へ）。
+    if (upFlash > 0) screenFlash(upFlash * amp * (1 + 0.25*spill), Math.min(420, dur*1000*0.7) * (1 + 0.35*spill));
+    if (upShake > 0) strongShake(upShake * amp, Math.min(360, dur*1000*0.7));
     for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 90 + Math.random()*70, s%2 ? "juice" : "sesame", 1.8*amp);
-    cameraZoom(amp); hitstop(amp);
+    cameraZoom(amp * 0.5);                              // カメラ寄りも控えめ
   }
   if (upSound > 0) Sound.bandUp(upSound, t);            // 層を重ねた音（連続レベルで層が押し寄せる・低音も）
 }
 
-// 完成の演出：そのバーガーで到達した最高帯（bandPeak）で強くなる。最上段は特別。
+// 完成の演出：そのバーガーで到達した最高帯（bandPeak）で強くなる。1個に1回なので、ここに重い演出を集約し長めに置く。
 function celebrateComplete(){
   const cc = CONFIG.params.fx.complete || {}; if (cc.on === false) return;
   const maxStage = fxStages();
   const save = fxForceBand; fxForceBand = bandPeak;     // 完成の演出の強さは「最高帯」基準（連続で整形）にする
   const t = Math.max(0, Math.min(maxStage, fxL()));     // 整形済み連続レベル
   const amp = (cc.base || 1) * Math.pow(cc.scale || 1.3, t);
+  const D = Math.max(0.2, cc.dur || 1.4);               // 完成演出の長さ(秒)＝調整欄で伸ばせる
   const W = $("stage").clientWidth, spots = 1 + Math.round(t);
   const topStage = t >= maxStage - 0.5;
-  for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 110 + Math.random()*60, s%2 ? "steam" : "sesame", 1.6*amp);
+  // 破片を長さ D にわたって数回に分けて撒く（一瞬で終わらせず、完成に時間をかける）
+  const bursts = Math.max(2, Math.round(2 + t));
+  for (let b = 0; b < bursts; b++){
+    animTimers.push(setTimeout(() => { if (reduced) return;
+      for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 110 + Math.random()*70, (s+b)%2 ? "steam" : "sesame", 1.6*amp);
+    }, b * (D*1000) / bursts));
+  }
   if (topStage && !reduced){                              // 最上段：文字は出さず、強さで示す（衝撃波＋大量の破片）
     const el = document.createElement("div"); el.className = "shockwave insane";
-    el.style.setProperty("--bdur","1.6s"); el.style.setProperty("--bamp","150px"); el.style.left="50%"; el.style.top="46%";
-    $("stage").appendChild(el); animTimers.push(setTimeout(() => el.remove(), 1800));
+    el.style.setProperty("--bdur", D.toFixed(2)+"s"); el.style.setProperty("--bamp","150px"); el.style.left="50%"; el.style.top="46%";
+    $("stage").appendChild(el); animTimers.push(setTimeout(() => el.remove(), D*1000 + 220));
     spawnParticles(W/2, 150, "cheese", 4*amp); spawnParticles(W/2, 120, "juice", 4*amp);
   }
-  if (!reduced){ screenFlash(1.3*amp, 560); strongShake(1.4*amp, 560); cameraZoom(0.8*amp); }
+  // 重い演出は完成に集約：長い閃光・大きい揺れ・カメラ寄り＋ヒットストップ（積み中は掛けない）。
+  if (!reduced){ screenFlash(1.3*amp, D*1000*0.6); strongShake(1.4*amp, Math.min(1600, D*1000*0.5)); cameraZoom(0.8*amp); hitstop(1.2*amp); }
   numberJuice(1.4*amp);                                  // 完成の「合計点」の文字だけは大きく弾く
   fxForceBand = save;
 }
@@ -1884,7 +1911,8 @@ function collect(){
   if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
   updateStats(); renderBars();
   animateCum(total);                                // 累計に加算される演出
-  flyCoins(total, coinFrom);                        // コインが飛んで累計へ積もる（音は枚数ぶん連鎖・OFF時は一発の回収音）
+  const bandNorm = Math.min(1, (bandPeak || 0) / Math.max(1, fxStages()));   // 点数の大きさ（帯基準）→ コイン音の音程・厚み・回数
+  flyCoins(total, coinFrom, bandNorm);              // コインが飛んで累計へ積もる（非ブロッキング／音は固定回数・時間）
   // 時間軸系：もち等、完成のたびに基礎点が育つ（デッキに在る間だけ）。
   for (const nm of catalogNames()){ const e = CONFIG.items[nm].effect;
     if (e && e.id === "mochiGrow" && CONFIG.items[nm].count > 0) temporalBonus[nm] = (temporalBonus[nm] || 0) + (e.per || 0); }
@@ -2017,34 +2045,47 @@ function afterTierBonus(){ updateProgress(); if (tuningOpen()) renderSettings();
 function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
-// 回収：売上（お金）をコインで受け取る。バーガー（得点表示）から累計へ1枚ずつ飛び、積もる。音は1枚ごとに連鎖。
+// 回収：売上（お金）をコインで受け取る。バーガー（得点表示）から累計へ飛び、積もる。
+//  ★非ブロッキング：コインのタイマーは clearTimers（バーガー切替）で消さない専用プール coinTimers を使う。
+//    次のバーガーを始めても、飛行中のコインは rAF で勝手に飛び続けて着地する（回収の完了を待たせない）。
 let piledCoins = [];
-function flyCoins(total, fromRect){
+let coinTimers = [];
+function clearCoinTimers(){ coinTimers.forEach(clearTimeout); coinTimers = []; }
+function flyCoins(total, fromRect, bandNorm){
   const cfg = CONFIG.params.fx.coins || {};
   if (cfg.on === false || !coinLayerEl) { Sound.collect(); return 0; }   // OFF時は従来の一発の回収音
-  const n = Math.max(cfg.min || 1, Math.min(cfg.max || 40, Math.round((total || 0) / Math.max(1, cfg.per || 8))));   // 得点が大きいほど枚数が増える
+  const nrm = Math.max(0, Math.min(1, bandNorm || 0));
+  // 見た目の枚数は点数比例（上限あり）。音の回数はこれとは切り離す（下記）。
+  const n = Math.max(cfg.min || 1, Math.min(cfg.max || 40, Math.round((total || 0) / Math.max(1, cfg.per || 8))));
   const to = cumTotalEl.getBoundingClientRect();
   const fx = fromRect.left + fromRect.width / 2, fy = fromRect.top + fromRect.height * 0.55;
   const tx = to.left + to.width / 2, ty = to.top + to.height / 2;
   const dur = Math.max(0.1, cfg.speed || 0.7), arc = cfg.arc != null ? cfg.arc : 120, stag = Math.max(0, cfg.stagger != null ? cfg.stagger : 0.05);
   for (let i = 0; i < n; i++){
-    animTimers.push(setTimeout(() => launchCoin(fx, fy, tx, ty, dur, arc, i), i * stag * 1000));   // 1枚ずつ順に発射（受け取りに時間をかける）
+    coinTimers.push(setTimeout(() => launchCoin(fx, fy, tx, ty, dur, arc), i * stag * 1000));   // 1枚ずつ順に発射（非ブロッキング）
   }
+  // 音：点数に比例させない。回数は soundMin..soundMax（点数の大きさで 8→12 の範囲）、鳴る時間は soundDur で一定。
+  //   点数の大きさは「音程の高さ・厚み・回数(8〜12)」で表す（延々と鳴り続けない）。
+  const sMin = Math.max(1, Math.round(cfg.soundMin || 8)), sMax = Math.max(sMin, Math.round(cfg.soundMax || 12));
+  const sN = Math.round(sMin + (sMax - sMin) * nrm), sDur = Math.max(0.05, cfg.soundDur || 0.7) * 1000;
+  const span = cfg.pitchSpan != null ? cfg.pitchSpan : 12, basePitch = nrm * span * 0.5, thick = nrm;
+  for (let k = 0; k < sN; k++){ const fr = sN > 1 ? k / (sN - 1) : 0;
+    coinTimers.push(setTimeout(() => Sound.coinChink(basePitch + fr * span, thick), fr * sDur)); }
   return n;
 }
-function launchCoin(fx, fy, tx, ty, dur, arc, i){
-  if (reduced || !coinLayerEl){ Sound.coin(i); pileCoin(tx, ty); return; }   // reduced：飛ばさず音と積もりだけ
+function launchCoin(fx, fy, tx, ty, dur, arc){
+  if (reduced || !coinLayerEl){ pileCoin(tx, ty); return; }   // reduced：飛ばさず積もりだけ（音は別で鳴らす）
   const el = document.createElement("div"); el.className = "coin";
   coinLayerEl.appendChild(el);
   const jx = (Math.random()*2 - 1) * 22;                                       // 軌道を少しばらす
   const cx = (fx + tx) / 2 + jx, cy = Math.min(fy, ty) - arc * (0.6 + Math.random()*0.7);   // 制御点＝山なりの頂点
   const s0 = performance.now(), D = dur * 1000, spin = 360 + Math.random()*360;
-  function step(now){
+  function step(now){                                          // rAF：世代（genToken）に縛られず飛び続ける＝非ブロッキング
     const t = Math.min(1, (now - s0) / D), u = 1 - t;
     const x = u*u*fx + 2*u*t*cx + t*t*tx, y = u*u*fy + 2*u*t*cy + t*t*ty;      // 二次ベジェの弧
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(t*spin).toFixed(0)}deg)`;
     if (t < 1) requestAnimationFrame(step);
-    else { el.remove(); Sound.coin(i); pileCoin(tx, ty); }                     // 到着＝1枚ぶんの音＋積もる
+    else { el.remove(); pileCoin(tx, ty); }                    // 到着＝積もる（音は枚数と切り離して別に鳴らす）
   }
   requestAnimationFrame(step);
 }
@@ -2058,7 +2099,7 @@ function pileCoin(tx, ty){
   const cap = Math.max(0, Math.round(cfg.pileMax || 60));
   while (piledCoins.length > cap){ const old = piledCoins.shift(); if (old) old.remove(); }        // 超えたら古いものから消す
 }
-function clearPiledCoins(){ for (const c of piledCoins) c.remove(); piledCoins = []; if (coinLayerEl) coinLayerEl.innerHTML = ""; }
+function clearPiledCoins(){ clearCoinTimers(); for (const c of piledCoins) c.remove(); piledCoins = []; if (coinLayerEl) coinLayerEl.innerHTML = ""; }
 
 function animateCum(delta){
   const from = cumTotalValue, to = cumTotalValue + delta; cumTotalValue = to;
@@ -2366,9 +2407,18 @@ function renderSettings(){
   gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
   gridRow(g, "演出を省略(結果だけ表示)", boolInput(()=>CONFIG.params.skipFx, v=>CONFIG.params.skipFx=v));
 
+  // 落下速度＝その回の期待度。最終到達帯（planで確定）ごとに個別に落下時間を設定できる。
+  g = group("落下の速さ＝期待度（最終到達帯ごと・秒）");
+  { const arr = CONFIG.params.fallByBand;
+    for (let i = 0; i < arr.length; i++){ const idx = i;
+      gridRow(g, (idx === arr.length-1 ? `帯${idx}以上` : `帯${idx}`) + "の落下時間", numInput(()=>arr[idx], v=>arr[idx]=Math.max(0.02,v), 0.01)); }
+    const note=document.createElement("p"); note.className="barnote"; note.textContent="※ 低い回は速く（つまらない）／高い回は遅く（大きい）。落下速度そのものが期待度の表示。";
+    g.parentElement.appendChild(note);
+  }
+
   // 演出速度（1段あたりの時間）
   g = group("演出の速さ（秒・1段あたり）");
-  gridRow(g, "1段の落下時間", numInput(()=>CONFIG.params.fallDur,     v=>CONFIG.params.fallDur=v,     0.01));
+  gridRow(g, "1段の落下時間(既定・帯表未使用時)", numInput(()=>CONFIG.params.fallDur, v=>CONFIG.params.fallDur=v, 0.01));
   gridRow(g, "完成〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
   gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
   gridRow(g, "着地の縮み時間", numInput(()=>CONFIG.params.squash,      v=>CONFIG.params.squash=v,      0.01));
@@ -2411,10 +2461,11 @@ function renderSettings(){
   gridRow(g, "拡大の上限", fxNum(fx.bandup,"ampMax",0.1));
   gridRow(g, "音の層数(base)", fxNum(fx.bandup,"layers",1));
 
-  g = group("演出：完成（最高帯で強くなる・文字は出さない）");
+  g = group("演出：完成（最高帯で強くなる・重い演出を集約・長め可）");
   gridRow(g, "ON", boolInput(()=>fx.complete.on, v=>fx.complete.on=v));
   gridRow(g, "強さ(base)", fxNum(fx.complete,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.complete,"scale",0.05));
+  gridRow(g, "完成演出の長さ(秒・dur)", numInput(()=>fx.complete.dur, v=>fx.complete.dur=Math.max(0.2,v), 0.1));
 
   g = group("演出：揺れ（バーガー本体だけ・箱の中に限定）");
   gridRow(g, "帯アップの揺れ強さ", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
@@ -2439,6 +2490,10 @@ function renderSettings(){
   gridRow(g, "軌道の山(px・arc)", numInput(()=>fx.coins.arc, v=>fx.coins.arc=Math.max(0,v), 10));
   gridRow(g, "1枚ごとの間隔(秒・stagger)", numInput(()=>fx.coins.stagger, v=>fx.coins.stagger=Math.max(0,v), 0.01));
   gridRow(g, "積もりの最大枚数(pileMax)", numInput(()=>fx.coins.pileMax, v=>fx.coins.pileMax=Math.max(0,Math.round(v)), 5));
+  gridRow(g, "音の回数・下限(soundMin)", numInput(()=>fx.coins.soundMin, v=>fx.coins.soundMin=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "音の回数・上限(soundMax)", numInput(()=>fx.coins.soundMax, v=>fx.coins.soundMax=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "音の鳴る時間(秒・soundDur)", numInput(()=>fx.coins.soundDur, v=>fx.coins.soundDur=Math.max(0.05,v), 0.05));
+  gridRow(g, "音程の幅(半音・pitchSpan)", numInput(()=>fx.coins.pitchSpan, v=>fx.coins.pitchSpan=Math.max(0,v), 1));
 
   g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
   gridRow(g, "ON", boolInput(()=>fx.hitstop.on, v=>fx.hitstop.on=v));
