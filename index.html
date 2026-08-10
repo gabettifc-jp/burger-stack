@@ -267,9 +267,10 @@
     padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px))}
   .actionbar-in{max-width:640px; margin:0 auto}
   .barrow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px}
-  #progress{margin:0; color:var(--muted); font-size:.85rem; font-weight:600; min-height:1.1em}
-  #gear{flex:none; padding:6px 10px; border-radius:8px; border:1px solid var(--accent); background:#2b313a;
+  #progress{margin:0; color:var(--muted); font-size:.85rem; font-weight:600; min-height:1.1em; flex:1 1 auto}
+  #gear,#skip{flex:none; padding:6px 10px; border-radius:8px; border:1px solid var(--accent); background:#2b313a;
     color:var(--accent); font-weight:700; font-size:.8rem; cursor:pointer; touch-action:manipulation}
+  #skip{border-color:var(--line); color:var(--muted)}
   #tap{width:100%; padding:18px; font-size:1.3rem; font-weight:800; color:#241a00;
     background:linear-gradient(var(--accent),#eab63c); border:none; border-radius:14px; cursor:pointer;
     touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none}
@@ -421,6 +422,7 @@
   <div class="actionbar-in">
     <div class="barrow">
       <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+      <button id="skip" title="演出を飛ばして結果だけ表示">⏭ 結果</button>
       <button id="gear" title="調整パネルを開く">⚙️ 調整</button>
     </div>
     <button id="tap">🍔 積む（1回に1段）</button>
@@ -515,6 +517,7 @@ const DEFAULTS = {
     perClick:    1,     // 1クリックで落とす段数（1=現行〜全段）。複数でも必ず1段ずつ順に落ちる。
     dropGap:     0.12,  // 段が落ちてから次の段が落ちるまでの間隔(秒)
     fastForward: true,  // 落下中のクリックで落下を速める「早送り」。既定ON
+    skipFx:      false, // 演出を省略して結果だけ即表示（計算層は同じ。演出＝再生をスキップ）。既定OFF
     landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
     completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
@@ -806,12 +809,10 @@ let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
 let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
-let bandLevelCur = 0;   // 現在の帯レベル（音色・揺れの判定に使う。確定表示済みレベルに同期）
-let bandShown = 0;      // 演出を確定表示した帯レベル
-let bandTarget = 0;     // 乗算の積が示す目標帯レベル
-let bandStepping = false; // 帯アップを一段ずつ順に確定中か
-let reachActive = false;  // 予告（リーチ）表示中か
-let reachTarget = 0;      // 予告している次の帯のしきい値
+let bandLevelCur = 0;   // いま見えている帯レベル（音色・揺れの判定に使う）。plan由来で進み、状態はタイマーが持たない
+let reachActive = false;  // 予告（リーチ）表示中か（確定planから設定／届いた段で解除。タイマーは進めない）
+let reachTarget = 0;      // 予告している帯のしきい値（この値に届く段で解除）
+let plan = null;          // 計算層：クリック時に確定した1個ぶんの結果。演出はこれを再生するだけ
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
@@ -845,6 +846,7 @@ function onTap(){
     return;                                       // 演出は上書きしない（必ず1段ずつ）
   }
   if (stack === null){ if (!startBurger()) return; }   // 未開始なら新しいバーガー
+  if (CONFIG.params.skipFx){ skipToEnd(); return; }    // 演出省略：結果だけ即表示（計算層は同じ）
   requestDrops();                                // 1クリックぶん（＝perClick段）を要求
   pump();                                         // シーケンサ始動（1段ずつ順に落とす）
 }
@@ -873,17 +875,47 @@ function pump(){
 function beginNext(){
   stack = null;
   if (!startBurger()) return;
+  if (CONFIG.params.skipFx){ skipToEnd(); return; }   // 演出省略：結果だけ即表示
   requestDrops(); pump();
 }
 
+// スキップ：演出（再生）を飛ばして、確定済み plan の最終状態だけを即表示する。
+// 計算層は同じ（結果は変わらない）。タイマーで進む状態を持たないので、途中どこからでも安全に飛べる。
+function skipToEnd(){
+  if (!plan) return;
+  clearTimers(); clearBandTransients();
+  const n = plan.stack.length;
+  for (let r = 0; r < n; r++){                       // 残りの段をアニメなしで積む
+    let el = tierEls[r];
+    if (!el){ el = makeTier(plan.stack[r], r); el.style.bottom = plan.layout.bottoms[r] + "px"; el.style.zIndex = r; tierEls[r] = el; stageInner.appendChild(el); }
+    const food = el.querySelector(".food"); if (food) food.style.transition = "none";
+    el.classList.remove("drop"); el.classList.add("land");
+  }
+  revealed = n; wantDrop = n; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
+  runBase = plan.final.base; runMult = plan.final.mult; bandLevelCur = plan.final.band;   // 最終値を反映
+  baseMeterEl.textContent = "基礎 " + plan.sc.base;
+  multMeterEl.textContent = "×" + plan.sc.mult.toFixed(2);
+  applyBandVisual(plan.final.band);                  // 帯の見た目は最終段位（planで確定）
+  comboFeedEl.innerHTML = "";
+  for (const h of plan.sc.hits) pushCombo(h);        // コンボ履歴は直近数件が残る（cap）
+  complete();                                        // 完成（合計表示・回収待ち）へ
+}
+// スキップボタン：演出中なら最終へ飛ぶ。停止中（未開始）なら1個作って即結果表示。
+function onSkip(){
+  Sound.unlock();
+  if (offering || awaitingCollect) return;           // 3択中／回収待ちは対象外
+  if (stack === null){ if (!startBurger()) return; }
+  skipToEnd();
+}
+
 function startBurger(){
-  const b = buildBurger();
-  if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
+  const p = buildPlan();                            // 計算層：クリック時点で結果を全部確定
+  if (!p){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
   $("msg").textContent = "";
-  stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
+  plan = p; stack = p.stack; sc = p.sc; layout = p.layout; hitMeta = p.grades;   // 演出はこのplanを再生
   revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = new Array(stack.length);
-  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; hitMeta = computeGrades();
+  runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false;
   applyBandVisual(0); clearBandTransients();        // 帯の見た目と一時演出（バースト等）をリセット
   genToken++; clearTimers();
   hintEl.style.display = "none";
@@ -909,24 +941,62 @@ function medianProduct(){
   return arr.length % 2 ? arr[m] : (arr[m-1]+arr[m])/2;
 }
 
-// 各ヒット（コンボ）の等級を決める。しきい値は絶対値でなく相対値（中央値との比）。
-function computeGrades(){
+// 各ヒット（コンボ）の等級を決める。しきい値は絶対値でなく相対値（中央値との比）。純関数（sc, stackを受ける）。
+function computeGrades(score, st){
   const gp = CONFIG.params.grade;
   const med = medianProduct();
   const medExcess = Math.max(gp.floor, med - 1);   // 直近が強いほど基準が上がる
-  const baseSum = Math.max(1, sc.base);
-  const meta = sc.hits.map(h => {
+  const baseSum = Math.max(1, score.base);
+  return score.hits.map(h => {
     // 乗算はその倍率、加算は基礎点に対する相対で「効き」を factor に正規化
     const f = h.kind === "mult" ? h.mult : (1 + (h.add || 0) / baseSum);
     const rel = (f - 1) / medExcess;
     let grade = rel >= gp.big ? 2 : rel >= gp.mid ? 1 : 0;
     for (const k of h.idx){                         // 食材ごとの固定等級（今は全てnull＝無効）
-      const tt = CONFIG.items[stack[k]] && CONFIG.items[stack[k]].tier;
+      const tt = CONFIG.items[st[k]] && CONFIG.items[st[k]].tier;
       if (tt != null) grade = Math.max(grade, tt);
     }
     return { f, rel, grade };
   });
-  return meta;                                      // 表示件数はコンボ表示（入れ替え式）側で制限する
+}
+
+/* =========================================================================
+   計算層：クリックした時点で1個ぶんの結果を全部確定させる（6段の中身・発動コンボ・
+   最終得点、さらに段ごとの再生スケジュール＝基礎/倍率/帯/予告）。演出は plan を再生するだけ。
+   ========================================================================= */
+function buildPlan(){
+  const b = buildBurger(); if (!b) return null;
+  const st = b.stack, score = evaluate(st), lay = computeLayout(st), grades = computeGrades(score, st);
+  const n = st.length;
+  const revealAt = {};                              // 各ヒットが「出そろう」段（両側が揃う＝max(idx)）
+  score.hits.forEach((h, i) => { const at = Math.max(...h.idx); (revealAt[at] = revealAt[at] || []).push(i); });
+  const steps = []; let runBase = 0, runMult = 1;
+  for (let r = 0; r < n; r++){
+    runBase += CONFIG.items[st[r]].base;
+    const reveals = revealAt[r] || [];
+    for (const i of reveals){ const h = score.hits[i]; if (h.kind === "mult") runMult *= h.mult; }
+    if (r === n - 1) runMult = score.mult;          // 最終段でコンボ数ボーナス等の全体倍率を織り込む（表示と一致）
+    steps.push({ r, item: st[r], base: CONFIG.items[st[r]].base, runBase, runMult, reveals, bandFrom: 0, bandTo: 0, reach: null });
+  }
+  for (let r = 0; r < n; r++){
+    steps[r].bandFrom = r > 0 ? bandLevelOf(steps[r-1].runMult) : 0;
+    steps[r].bandTo   = bandLevelOf(steps[r].runMult);
+  }
+  // 予告（リーチ）は「本当に届く回」だけに出す：確定した最終倍率が、その段の次の帯を実際に跨ぐときのみ立てる。
+  // 外れる回に当たりそうな煽りは出さない（結果と乖離させない）。
+  const rc = CONFIG.params.reach, finalMult = steps[n-1].runMult;
+  if (rc && rc.on !== false){
+    for (let r = 0; r < n - 1; r++){
+      const left = (n - 1) - r;
+      if (left < 1 || left > (rc.maxTiers || 2)) continue;
+      const cur = steps[r].runMult, nextT = bandThreshold(bandLevelOf(cur) + 1);
+      if (cur < nextT && finalMult >= nextT && (nextT / cur) <= (rc.window || 2.5)){
+        steps[r].reach = { need: nextT / cur, target: Math.round(nextT), threshold: nextT };
+      }
+    }
+  }
+  return { stack: st, sc: score, layout: lay, grades, steps,
+           final: { base: score.base, add: score.add, mult: score.mult, total: score.total, band: steps[n-1].bandTo } };
 }
 
 const GRADE_JA = ["小","中","大"];
@@ -991,7 +1061,7 @@ function fastForward(){
 }
 // 着地の確定＋次段の予約消化。複数要求されていても、間隔をあけて必ず1段ずつ落とす。
 function finishDrop(r){
-  landed(r);
+  applyStep(r);
   dropping = false; dropEl = null; dropIdx = -1; dropTimer = null;
   if (r >= stack.length - 1) return;               // 最終段は landed→complete() 済み
   if (revealed < wantDrop){                        // まだ要求が残る：間隔をあけて次の段へ
@@ -1002,13 +1072,13 @@ function finishDrop(r){
 
 function bump(el){ if (reduced) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
 
-function landed(r){
-  // 1クリックごとのフィードバック：基礎点を左の「流れ」に +N として出す（短命）＋累計基礎点を更新
-  const base = CONFIG.items[stack[r]].base;
-  runBase += base;
+// 演出（再生）：確定済み plan.steps[r] を段ごとに再生するだけ。ここでは結果を計算しない。
+function applyStep(r){
+  const step = plan.steps[r];
+  runBase = step.runBase;
   baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
   Sound.land(r);                                    // 着地音（段が上がると音程が上がる・帯で音色が変わる）
-  popFlow("base", tierY(r), "+" + base);            // 置いた具材の左隣に +N（バッジなし）
+  popFlow("base", tierY(r), "+" + step.base);       // 置いた具材の左隣に +N（バッジなし）
   if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる
     const stg = $("stage"); stg.classList.remove("shake"); void stg.offsetWidth; stg.classList.add("shake");
     animTimers.push(setTimeout(() => stg.classList.remove("shake"), 150));
@@ -1018,26 +1088,23 @@ function landed(r){
     below.classList.add("squash");
     animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
-  revealHits(r);                                    // 接触面が揃ったコンボをその場で演出
-  if (r < stack.length - 1) updateReach(r);         // まだ段が残るなら予告（リーチ）を判定
-  if (r === stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→停止（残り要求も止める）
-}
-
-function revealHits(r){
-  sc.hits.forEach((h, i) => {
-    if (shown.has(i)) return;
-    if (Math.max(...h.idx) <= r){ shown.add(i); present(i); }   // 両側の段が揃ったヒットのみ
-  });
+  for (const i of step.reveals) presentHit(i);      // この段で出そろうコンボを再生（倍率はplanで確定済み）
+  runMult = step.runMult;
+  multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl);
+  if (step.bandTo > step.bandFrom) crossBands(step.bandFrom, step.bandTo);   // 跨ぐぶんを1段ずつ確定
+  else bandLevelCur = step.bandTo;
+  if (step.reach) showReach(step.reach);            // 予告：本当に届く回だけ（planで確定済み）
+  if (r === plan.stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→停止
 }
 
 function tierY(r){ return layout.bottoms[r] + layout.effs[r]/2; }
 function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
 
-// 帯（band）：乗算の積で決まる帯レベル。start と等比 ratio で自動生成（手で列挙しない）。
-function bandLevel(){
+// 帯（band）：乗算の積で決まる帯レベル。start と等比 ratio で自動生成（手で列挙しない）。純関数。
+function bandLevelOf(m){
   const b = CONFIG.params.band;
-  if (!b || !(b.start > 0) || runMult < b.start) return 0;
-  return 1 + Math.floor(Math.log(runMult / b.start) / Math.log(Math.max(1.0001, b.ratio || 1.6)));
+  if (!b || !(b.start > 0) || m < b.start) return 0;
+  return 1 + Math.floor(Math.log(m / b.start) / Math.log(Math.max(1.0001, b.ratio || 1.6)));
 }
 // 帯の色。stages 段階を循環（stageで色相）、一巡ごと（cycle）に明るく＝全体が一段派手に。
 const BAND_HUES = [45, 28, 330, 190, 265, 130];
@@ -1062,32 +1129,38 @@ function applyBandVisual(L){
 }
 function bandThreshold(lvl){ const b = CONFIG.params.band; return (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), lvl - 1); }
 
-// 乗算が変わったら帯を更新。上がるときは一段ずつ順に確定する（一気に出さない）。
-function updateBand(){
-  bandTarget = bandLevel();
-  if (bandTarget < bandShown){ bandShown = bandTarget; bandLevelCur = bandTarget; applyBandVisual(bandTarget); return; }
-  if (bandTarget > bandShown && !bandStepping) stepBand();
+// 帯を跨ぐ演出：fromL→toL を1段ずつ順に確定（一気に出さない）。跨ぐ段数はplanで確定済み。
+// 状態はタイマーが持たず、いつでも clearBandTransients＋applyBandVisual(plan由来) で復元できる。
+function crossBands(fromL, toL){
+  const levels = []; for (let L = fromL + 1; L <= toL; L++) levels.push(L);
+  if (reduced){                                   // reduced：見た目は最終段位へ即時反映、爆発は省く
+    bandLevelCur = toL; applyBandVisual(toL);
+    for (const L of levels){ if (reachActive && bandThreshold(L) >= reachTarget - 1e-6) endReach(); }
+    return;
+  }
+  const myGen = genToken;                          // バーガーが変わったら（clearTimers＋世代交代で）打ち切る
+  const stepOne = (k) => {
+    if (myGen !== genToken || k >= levels.length) return;
+    const L = levels[k];
+    const pause = (CONFIG.params.band.pause != null ? CONFIG.params.band.pause : 0.20) * 1000;  // 爆発直前の無音の溜め
+    animTimers.push(setTimeout(() => {
+      if (myGen !== genToken) return;
+      bandLevelCur = L; applyBandVisual(L);         // その帯を確定（見た目も1段ずつ）
+      burstBand(L);                                 // 溜めのあと爆発
+      if (reachActive && bandThreshold(L) >= reachTarget - 1e-6) endReach();  // 予告に届いた＝リーチ成功
+      stepOne(k + 1);                               // 次の段へ（順に確定）
+    }, pause));
+  };
+  stepOne(0);
 }
-function stepBand(){
-  if (bandShown >= bandTarget){ bandStepping = false; return; }
-  bandStepping = true;
-  const lvl = bandShown + 1;
-  const pause = (CONFIG.params.band.pause != null ? CONFIG.params.band.pause : 0.20) * 1000;  // 爆発直前の無音の溜め
-  animTimers.push(setTimeout(() => {
-    bandShown = lvl; bandLevelCur = lvl; applyBandVisual(lvl);   // その段を確定
-    celebrateBand(lvl);                                          // 溜めのあと爆発
-    animTimers.push(setTimeout(stepBand, 300));                  // 次の段へ（順に確定）
-  }, pause));
-}
-// 帯アップの演出（現行より一段強い既定。音・光・揺れは調整欄で個別に弱められる）。
-function celebrateBand(lvl){
+// 帯アップのバースト（現行より一段強い既定。音・光・揺れは調整欄で個別に弱められる）。
+function burstBand(L){
   const up = (CONFIG.params.band.up) || {};
-  const value = Math.round(bandThreshold(lvl));
-  if (reachActive && bandThreshold(lvl) >= reachTarget - 1e-6) endReach(true);   // 予告に届いた＝リーチ成功
+  const value = Math.round(bandThreshold(L));
   multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");
   animTimers.push(setTimeout(() => multMeterEl.classList.remove("cel"), 700));
   const el = document.createElement("div");
-  el.className = "milestone" + ((lvl - 1) >= 2 ? " big" : "");
+  el.className = "milestone" + ((L - 1) >= 2 ? " big" : "");
   el.textContent = "×" + value + "!";
   $("stage").appendChild(el);
   animTimers.push(setTimeout(() => el.classList.add("out"), 640));
@@ -1099,40 +1172,26 @@ function celebrateBand(lvl){
   if (upSound > 0) Sound.bandUp(upSound);
 }
 
-// 予告（リーチ）：残り数段で次の帯に届きそうなら表示。全体が緊張した見た目になる。
-function updateReach(r){
-  const rc = CONFIG.params.reach; if (!rc || rc.on === false) return;
-  const left = stack.length - 1 - r;                 // この段の後に残る段数
-  const nextTh = bandThreshold(bandShown + 1);       // 次の帯のしきい値
+// 予告（リーチ）：本当に届く回だけ plan.steps[r].reach として立つ。ここは表示だけ。
+function showReach(reach){
+  reachActive = true; reachTarget = reach.threshold;
   const el = $("reach"), stg = $("stage");
-  if (left >= 1 && left <= (rc.maxTiers || 2) && runMult < nextTh && (nextTh / runMult) <= (rc.window || 2.5)){
-    reachActive = true; reachTarget = nextTh;
-    el.textContent = `あと ×${(nextTh / runMult).toFixed(2)} で ×${Math.round(nextTh)}帯`;
-    el.classList.add("show"); if (!reduced) stg.classList.add("tense");
-    if (!reduced) Sound.tense();
-  } else if (reachActive && runMult >= reachTarget){  // すでに届いていた（updateBand側で処理）
-    endReach(true);
-  }
+  el.textContent = `あと ×${reach.need.toFixed(2)} で ×${reach.target}帯`;
+  el.classList.add("show");
+  if (!reduced){ stg.classList.add("tense"); Sound.tense(); }
 }
-function endReach(reached){                            // 予告の終了。reached=true 成功 / false 失敗
+function endReach(){                                   // 予告の解除（届いた段で呼ぶ）
   reachActive = false;
   $("reach").classList.remove("show"); $("stage").classList.remove("tense");
 }
-function missNote(){                                   // 届かなかった演出（「×2.9で止まった」）
-  const el = document.createElement("div"); el.className = "missnote";
-  el.textContent = "×" + runMult.toFixed(2) + " で止まった";
-  $("stage").appendChild(el);
-  animTimers.push(setTimeout(() => el.remove(), 900));
-  if (!reduced) Sound.reachFail();
-}
 
-// 帯の一時演出（バースト・メーターの弾け・揺れ・予告）を確実に消す（タイマー取消しの取りこぼし対策）。
+// 一時演出（バースト・メーターの弾け・揺れ・予告）を確実に消す。状態はここで完全リセットする。
 function clearBandTransients(){
   $("stage").querySelectorAll(".milestone,.missnote").forEach(e => e.remove());
   multMeterEl.classList.remove("cel");
   $("stage").classList.remove("shake","bigshake","tense");
   const rl = $("reach"); if (rl) rl.classList.remove("show");
-  reachActive = false; bandShown = 0; bandTarget = 0; bandStepping = false;
+  reachActive = false; reachTarget = 0;
 }
 
 // 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
@@ -1145,11 +1204,10 @@ function pushCombo(h){
   while (comboFeedEl.children.length > cap) comboFeedEl.lastChild.remove();
 }
 
-// 発動（コンボ）の演出。SHIYOU §5：接触面が光り、その場に倍率が出る。
+// 発動（コンボ）の再生。SHIYOU §5：接触面が光り、その場に倍率が出る。倍率の積算はしない（planで確定済み）。
 //  ×N は「具材の隣（右）」にただの値として一瞬出す（バッジなし）。大きい発動だけ画面も反応。
-function present(i){
-  const h = sc.hits[i], m = hitMeta[i] || { grade:0 };
-  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); updateBand(); }
+function presentHit(i){
+  const h = plan.sc.hits[i], m = plan.grades[i] || { grade:0 };
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
   popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
   pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
@@ -1190,8 +1248,8 @@ function strongShake(mul){
 }
 
 // 完成：ここで停止して合計点を大きく見せる。まだ銀行には入れない（回収は次のタップ）。
+// 予告は「本当に届く回」だけなので、届かず完成（＝止まった）は構造上起きない。
 function complete(){
-  if (reachActive){ missNote(); endReach(false); }  // 予告が出たまま届かず完成＝「×N で止まった」
   showBreakdown(sc);                                // 4行と一覧を確定表示
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   baseMeterEl.textContent = "基礎 " + sc.base;
@@ -1309,7 +1367,7 @@ function updateProgress(){
 
 function resetBurger(){
   clearTimers(); genToken++;
-  stack = null; revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
+  stack = null; plan = null; revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false; offering = false;
   applyBandVisual(0); clearBandTransients();
@@ -1506,6 +1564,7 @@ function renderSettings(){
   gridRow(g, "1クリックで落ちる段数", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(1,Math.round(v)), 1));
   gridRow(g, "段が落ちる間隔(秒)", numInput(()=>CONFIG.params.dropGap, v=>CONFIG.params.dropGap=Math.max(0,v), 0.02));
   gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
+  gridRow(g, "演出を省略(結果だけ表示)", boolInput(()=>CONFIG.params.skipFx, v=>CONFIG.params.skipFx=v));
 
   // 演出速度（1段あたりの時間）
   g = group("演出の速さ（秒・1段あたり）");
@@ -1524,6 +1583,7 @@ function renderSettings(){
 
 /* ===== 起動・イベント ===== */
 $("tap").addEventListener("click", onTap);
+$("skip").addEventListener("click", onSkip);         // 演出を飛ばして結果だけ表示
 window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); onTap(); } });
 document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventListener("change", () => {
   mode = document.querySelector('input[name="mode"]:checked').value;
