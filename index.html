@@ -169,7 +169,10 @@
     background:var(--bg); border-top:1px solid var(--line);
     padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px))}
   .actionbar-in{max-width:640px; margin:0 auto}
-  #progress{margin:0 0 6px; color:var(--muted); font-size:.85rem; font-weight:600; min-height:1.1em; text-align:center}
+  .barrow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px}
+  #progress{margin:0; color:var(--muted); font-size:.85rem; font-weight:600; min-height:1.1em}
+  #gear{flex:none; padding:6px 10px; border-radius:8px; border:1px solid var(--accent); background:#2b313a;
+    color:var(--accent); font-weight:700; font-size:.8rem; cursor:pointer; touch-action:manipulation}
   #tap{width:100%; padding:18px; font-size:1.3rem; font-weight:800; color:#241a00;
     background:linear-gradient(var(--accent),#eab63c); border:none; border-radius:14px; cursor:pointer;
     touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none}
@@ -204,6 +207,21 @@
   .stepper .c{min-width:20px; text-align:center; font-weight:700}
   details{border:1px solid var(--line); border-radius:10px; padding:6px 10px; background:#1b1f25}
   details summary{cursor:pointer; font-weight:700; font-size:.9rem; padding:4px 0}
+  /* 調整パネルを目立たせる（見つけやすく・開き方が分かるように） */
+  #tuning{outline:1px solid var(--accent)}
+  #tuningDetails{border-color:var(--accent)}
+  .tsummary{list-style:none; text-align:center; color:#241a00; background:linear-gradient(var(--accent),#eab63c);
+    border-radius:8px; padding:10px; font-size:.95rem; margin:-2px 0 2px}
+  .tsummary::-webkit-details-marker{display:none}
+  #tuningDetails[open] .tsummary{margin-bottom:8px}
+  /* ルール行（有効化＋倍率/加算＋連続数） */
+  .rulerow{display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px dashed #2c333d}
+  .rulerow input[type=checkbox]{width:18px; height:18px; flex:none; accent-color:var(--accent)}
+  .rulerow .rn{flex:1; font-size:.8rem}
+  .rctrls{display:flex; gap:8px; align-items:center; flex:none}
+  .mini{display:inline-flex; align-items:center; gap:3px}
+  .mini .mt{font-size:.72rem; color:var(--muted)}
+  .mini .mininp{width:62px}
   .grid{display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; margin:8px 0}
   .grid label{font-size:.82rem; color:var(--muted)}
   .grid input{width:84px; padding:5px 7px; background:#0f1216; border:1px solid var(--line); color:var(--text); border-radius:7px; font-size:.9rem}
@@ -275,10 +293,11 @@
     <div id="piles"></div>
   </section>
 
-  <!-- 6. 数値調整 -->
-  <section>
-    <details>
-      <summary>数値の調整（基礎点・倍率・加算・食い込み・演出速度）</summary>
+  <!-- 6. 調整パネル -->
+  <section id="tuning">
+    <p class="lbl">⚙️ 調整パネル</p>
+    <details id="tuningDetails">
+      <summary class="tsummary">⚙️ ここを押して開く — 段数・倍率・コンボ・演出を調整</summary>
       <div id="settings"></div>
       <div class="btnrow">
         <button id="resetCfg">数値を初期化</button>
@@ -295,7 +314,10 @@
 <!-- 連打ボタンは画面下に固定：演出でレイアウトが動いても位置は不変 -->
 <div class="actionbar">
   <div class="actionbar-in">
-    <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+    <div class="barrow">
+      <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+      <button id="gear" title="調整パネルを開く">⚙️ 調整</button>
+    </div>
     <button id="tap">🍔 積む（1回に1段）</button>
   </div>
 </div>
@@ -331,13 +353,20 @@ const DEFAULTS = {
     { id:"mayo",    sys:"A", kind:"sauceContact", sauce:"マヨネーズ", targets:["dairy","veg"],  mult:1.3, label:"マヨネーズ：接する乳/野菜×1.3" },
     // 系統B：具材（順序が問題。上下で違う）
     { id:"melty",   sys:"B", kind:"stackedPair",  lower:"パティ", upper:"チーズ", mult:2, label:"とろけチーズ：パティの直上がチーズ ×2" },
-    { id:"crisp",   sys:"B", kind:"adjacentPair", a:"レタス", b:"トマト",        add:25, label:"シャキシャキ：レタス＋トマト隣接 +25" }
+    { id:"crisp",   sys:"B", kind:"adjacentPair", a:"レタス", b:"トマト",        add:25, label:"シャキシャキ：レタス＋トマト隣接 +25" },
+    // 系統B'：3枚以上の並びを条件にするコンボ（runType）。既定は無効（enabled:false）で得点を変えない。
+    //   調整パネルで有効化＋倍率設定して使う。連続数(runLen)と対象系統(target)で条件を決める。
+    { id:"veg3",    sys:"B", kind:"runType", target:"veg",  runLen:3, mult:1.0, enabled:false, label:"野菜の連続：野菜が指定数以上つづく ×" },
+    { id:"meat3",   sys:"B", kind:"runType", target:"meat", runLen:3, mult:1.0, enabled:false, label:"肉の連続：肉が指定数以上つづく ×" }
     // 系統C：バンズ（全体に効く）… 現在は空。items[].effect に将来 {mult:x} を入れる形で対応。
   ],
   // 演出速度と食い込み量（食材ごと）
   params: {
     // 段構成（テスト用に段数を変えられる）。総段数 = 2(上下バンズ) + 具材 + ソース。
     tiers: { ingredients: 3, sauces: 1 },
+    // C：コンボ数ボーナス。1バーガーでコンボが threshold 件以上成立したら、全体にさらに倍率。
+    //   追加倍率 = 1 + perCombo × (成立件数 − (threshold−1))。既定 perCombo:0 ＝ 無効（得点不変）。
+    comboBonus: { threshold: 2, perCombo: 0 },
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
@@ -377,6 +406,7 @@ const TYPE_JA = { meat:"肉", dairy:"乳", veg:"野菜", sauce:"ソース", bun:
 
 let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れるように公開（リセット時に貼り替え）
 
 /* =========================================================================
    ロジック（生成・得点）
@@ -414,6 +444,7 @@ function evaluate(stack){
   let add = 0, mult = 1; const hits = [];
 
   for (const r of CONFIG.rules){
+    if (r.enabled === false) continue;             // 無効ルールは飛ばす
     if (r.kind === "sauceContact"){
       for (let i=0;i<stack.length;i++){
         if (stack[i] !== r.sauce) continue;
@@ -433,6 +464,20 @@ function evaluate(stack){
         const x=stack[i], y=stack[i+1];
         if (x!==y && ((x===r.a&&y===r.b)||(x===r.b&&y===r.a))){ add += r.add; hits.push({ label:r.label, effect:"+"+r.add, idx:[i,i+1], kind:"add", add:r.add }); }
       }
+    } else if (r.kind === "runType"){                // 系統B'：同じ系統が指定数以上つづく並び
+      const need = Math.max(1, Math.round(r.runLen || 3));
+      let i = 0;
+      while (i < stack.length){
+        if (CONFIG.items[stack[i]].type === r.target){
+          let j = i; while (j < stack.length && CONFIG.items[stack[j]].type === r.target) j++;
+          if (j - i >= need){
+            const idx = []; for (let k=i;k<j;k++) idx.push(k);
+            if ("mult" in r){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx, kind:"mult", mult:r.mult }); }
+            else if ("add" in r){ add += r.add; hits.push({ label:r.label, effect:"+"+r.add, idx, kind:"add", add:r.add }); }
+          }
+          i = j;
+        } else i++;
+      }
     }
   }
   // 系統C：バンズ全体倍率（効果欄。今は空だが構造だけ用意）
@@ -441,8 +486,15 @@ function evaluate(stack){
     if (eff && eff.mult){ mult *= eff.mult; hits.push({ label:"バンズ効果", effect:"×"+eff.mult, idx:[i], kind:"mult", mult:eff.mult }); }
   }
 
+  // C：コンボ数ボーナス（2件以上で件数に応じ全体倍率。既定 perCombo:0 で無効）
+  const cb = CONFIG.params.comboBonus || { threshold:2, perCombo:0 };
+  const comboCount = hits.length;
+  const over = Math.max(0, comboCount - ((cb.threshold || 2) - 1));
+  const comboMult = 1 + (cb.perCombo || 0) * over;
+  if (comboMult !== 1) mult *= comboMult;
+
   const total = Math.round((base + add) * mult);
-  return { base, add, mult, total, hits };
+  return { base, add, mult, total, hits, comboCount, comboMult };
 }
 
 /* =========================================================================
@@ -589,6 +641,11 @@ function showBreakdown(sc){
   fTotal.textContent = sc.total;
   comboCount.textContent = `（${sc.hits.length}件）`;
   firedRules.innerHTML = "";
+  if (sc.comboMult && sc.comboMult !== 1){        // C：コンボ数ボーナス
+    const c = document.createElement("span"); c.className = "chip mult";
+    c.textContent = `コンボ数ボーナス ×${sc.comboMult.toFixed(2)}（${sc.comboCount}件）`;
+    firedRules.appendChild(c);
+  }
   if (sc.hits.length === 0){
     const c = document.createElement("span"); c.className = "chip"; c.textContent = "コンボなし（基礎点のみ）";
     firedRules.appendChild(c);
@@ -791,6 +848,18 @@ function gridRow(host, labelText, input){
   const l = document.createElement("label"); l.textContent = labelText;
   host.append(l, input);
 }
+function boolInput(get, set){
+  const inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = !!get();
+  inp.addEventListener("change", () => set(inp.checked));
+  return inp;
+}
+// 小さなラベル付き数値（幅広く設定できる。上限なし）
+function miniNum(prefix, get, set, step){
+  const wrap = document.createElement("span"); wrap.className = "mini";
+  const t = document.createElement("span"); t.className = "mt"; t.textContent = prefix;
+  const inp = numInput(get, set, step); inp.classList.add("mininp");
+  wrap.append(t, inp); return wrap;
+}
 function renderSettings(){
   const host = $("settings"); host.innerHTML = "";
   const group = (title) => { const g = document.createElement("div"); g.className="setgroup";
@@ -815,13 +884,31 @@ function renderSettings(){
   g = group("基礎点");
   for (const n of ORDER) gridRow(g, n, numInput(()=>CONFIG.items[n].base, v=>CONFIG.items[n].base=v, 1));
 
-  // 倍率
-  g = group("倍率（乗算ルール）");
-  for (const r of CONFIG.rules) if ("mult" in r) gridRow(g, r.label, numInput(()=>r.mult, v=>r.mult=v, 0.1));
+  // A/B：コンボ（ルール）の有効化と倍率/加算。倍率は広い範囲で個別に設定できる。
+  {
+    const gp = document.createElement("div"); gp.className = "setgroup";
+    const t = document.createElement("p"); t.className = "lbl"; t.textContent = "コンボ（ルール）：有効化と倍率/加算";
+    gp.appendChild(t);
+    const note = document.createElement("p"); note.className = "barnote";
+    note.textContent = "各ルールを個別にON/OFF。倍率は広く設定可（例 ×0.5〜×10）。「◯の連続」は3枚以上の並びで発動するコンボ（既定OFF・連続数も変更可）。";
+    gp.appendChild(note);
+    for (const r of CONFIG.rules){
+      const row = document.createElement("div"); row.className = "rulerow";
+      row.appendChild(boolInput(() => r.enabled !== false, v => r.enabled = v));
+      const nm = document.createElement("span"); nm.className = "rn"; nm.textContent = r.label; row.appendChild(nm);
+      const ctrls = document.createElement("span"); ctrls.className = "rctrls";
+      if ("mult" in r) ctrls.appendChild(miniNum("×", () => r.mult, v => r.mult = v, 0.05));
+      if ("add"  in r) ctrls.appendChild(miniNum("+", () => r.add,  v => r.add  = v, 1));
+      if (r.kind === "runType") ctrls.appendChild(miniNum("連続", () => r.runLen, v => r.runLen = Math.max(1, Math.round(v)), 1));
+      row.appendChild(ctrls); gp.appendChild(row);
+    }
+    host.appendChild(gp);
+  }
 
-  // 加算
-  g = group("加算（加算ルール）");
-  for (const r of CONFIG.rules) if ("add" in r) gridRow(g, r.label, numInput(()=>r.add, v=>r.add=v, 1));
+  // C：コンボ数ボーナス（2件以上で件数に応じ全体倍率）
+  g = group("コンボ数ボーナス（複数コンボで全体に上乗せ）");
+  gridRow(g, "発動する最小件数", numInput(()=>CONFIG.params.comboBonus.threshold, v=>CONFIG.params.comboBonus.threshold=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "1件ごとの上乗せ(0で無効)", numInput(()=>CONFIG.params.comboBonus.perCombo, v=>CONFIG.params.comboBonus.perCombo=v, 0.05));
 
   // 食い込み量
   g = group("食い込み量（px・大きいほど深く潰れる）");
@@ -844,8 +931,12 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   if (mode === "ignore") queued = 0;          // 無視に切替えたら予約は破棄
   updateProgress();
 }));
-$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); resetBurger(); renderPiles(); renderSettings(); });
+$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; resetBurger(); renderPiles(); renderSettings(); });
 $("clearHist").addEventListener("click", () => { history = []; recentProducts = []; updateStats(); renderBars(); });
+$("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
+  $("tuningDetails").open = true;
+  $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 renderPiles();
 renderSettings();
