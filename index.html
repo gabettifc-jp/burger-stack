@@ -421,11 +421,11 @@
 <div class="actionbar">
   <div class="actionbar-in">
     <div class="barrow">
-      <div id="progress">押すと1段ずつ積み上がる（6回で1個）</div>
+      <div id="progress">押すと1個ぶんが1段ずつ落ちる</div>
       <button id="skip" title="演出を飛ばして結果だけ表示">⏭ 結果</button>
       <button id="gear" title="調整パネルを開く">⚙️ 調整</button>
     </div>
-    <button id="tap">🍔 積む（1回に1段）</button>
+    <button id="tap">🍔 積む（押しっぱなしで早送り）</button>
   </div>
 </div>
 
@@ -514,7 +514,7 @@ const DEFAULTS = {
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
-    perClick:    1,     // 1クリックで落とす段数（1=現行〜全段）。複数でも必ず1段ずつ順に落ちる。
+    perClick:    0,     // 1クリックで落とす段数（0=全段〈既定〉／1〜=その段数）。複数でも必ず1段ずつ順に落ちる。
     dropGap:     0.12,  // 段が落ちてから次の段が落ちるまでの間隔(秒)
     fastForward: true,  // 落下中のクリックで落下を速める「早送り」。既定ON
     skipFx:      false, // 演出を省略して結果だけ即表示（計算層は同じ。演出＝再生をスキップ）。既定OFF
@@ -794,6 +794,9 @@ function clearTimers(){ animTimers.forEach(clearTimeout); animTimers = []; }
 
 /* 進行の状態（1クリック=1段。総段数で1個・最終段で得点） */
 let mode = "reserve";   // "reserve"=落下中クリックは次段の予約 / "ignore"=無視
+let holding = false;    // タップボタンを押しっぱなし中か（押している間は落下を早送りし続ける）
+let holdTimer = null;   // 長押し判定タイマー（短い押下＝通常タップ、長押しで早送り）
+const HOLD_MS = 180;    // これ以上押し続けたら「押しっぱなし」とみなす
 let stack = null;       // 進行中のバーガー。未開始はnull
 let layout = null, sc = null;
 let revealed = 0;       // 置いた段数
@@ -853,10 +856,11 @@ function onTap(){
 // 進行中（落下中、または段間の待ちで次段が控えている）か。新規クリック扱いにしないための判定。
 function midSequence(){ return dropping || (!!stack && revealed < wantDrop && revealed < stack.length); }
 
-// 1クリックで要求する段数（1〜全段）。複数でも落ちるのは必ず1段ずつ。
+// 1クリックで要求する段数（0=全段／1〜=その段数）。複数でも落ちるのは必ず1段ずつ。
 function tiersPerClick(){
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
-  return Math.max(1, Math.min(total, Math.round(CONFIG.params.perClick || 1)));
+  const p = Math.round(CONFIG.params.perClick || 0);
+  return (p <= 0) ? total : Math.max(1, Math.min(total, p));   // 0以下＝全段
 }
 // クリック＝「落とす段数」の要求を増やす。実際の落下はpump()が1段ずつ処理する。
 function requestDrops(){
@@ -1043,6 +1047,7 @@ function dropTier(r){
   el.classList.remove("drop");
   el.classList.add("land");
   scheduleLand(r, CONFIG.params.fallDur);
+  if (holding && CONFIG.params.fastForward !== false) fastForward();   // 押しっぱなし中はこの段も即・早送り
 }
 // 着地タイマーを張る（早送りで貼り替えられるよう分離）。
 function scheduleLand(r, dur){
@@ -1290,6 +1295,7 @@ function sample(arr, n){
 }
 function showOffer(){
   offering = true;
+  wantDrop = revealed;                             // 3択が出た時点で予約を破棄（選択後に勝手に次が始まらないように）
   const picks = sample(ORDER.slice(), 3);          // 候補は現在のカード（＝SHOKUZAI 第1段階/定番）
   offerEl.innerHTML = "";
   const title = document.createElement("div"); title.className = "offer-title";
@@ -1316,7 +1322,7 @@ function chooseOffer(name){
   if (name){ CONFIG.items[name].count += 1; renderPiles(); }   // 山に1枚足す（希釈が起きる層）
   else { animateCum(Math.max(0, Math.round(CONFIG.params.offer.skipReward || 0))); Sound.collect(); } // スキップ報酬（暫定・累計へ）
   offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
-  beginNext();                                      // 選んだら即座に次のバーガー
+  resetBurger();                                    // 待機状態へ戻す。次のバーガーは「次のクリック」で始まる（勝手に始めない）
 }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
@@ -1354,10 +1360,11 @@ function updateProgress(){
   if (offering){ el.textContent = "カードを1枚選ぶ（タップ）"; return; }
   if (awaitingCollect){ el.textContent = "完成！　押すと点数を回収して次へ"; return; }
   if (stack === null){
-    const per = Math.max(1, Math.min(total, Math.round(CONFIG.params.perClick || 1)));
+    const per = tiersPerClick();                    // 0=全段のときは total になる
     const clicks = Math.ceil(total / per);
-    el.textContent = per <= 1 ? `押すと1段ずつ積み上がる（${total}回で1個）`
-                              : `押すと${per}段ずつ落ちる（${clicks}回で1個・落下は1段ずつ）`;
+    el.textContent = per >= total ? `押すと1個ぶん（${total}段）が1段ずつ落ちる`
+                   : per <= 1     ? `押すと1段ずつ積み上がる（${total}回で1個）`
+                                  : `押すと${per}段ずつ落ちる（${clicks}回で1個・落下は1段ずつ）`;
     return;
   }
   const pend = Math.max(0, wantDrop - revealed);    // 要求済みでまだ落ちていない段
@@ -1561,7 +1568,7 @@ function renderSettings(){
 
   // 操作：1クリックで落とす段数・段の間隔・早送り（複数段でも必ず1段ずつ落ちる）
   g = group("操作（クリックと落下）");
-  gridRow(g, "1クリックで落ちる段数", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "1クリックで落ちる段数(0=全段)", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(0,Math.round(v)), 1));
   gridRow(g, "段が落ちる間隔(秒)", numInput(()=>CONFIG.params.dropGap, v=>CONFIG.params.dropGap=Math.max(0,v), 0.02));
   gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
   gridRow(g, "演出を省略(結果だけ表示)", boolInput(()=>CONFIG.params.skipFx, v=>CONFIG.params.skipFx=v));
@@ -1582,9 +1589,30 @@ function renderSettings(){
 }
 
 /* ===== 起動・イベント ===== */
-$("tap").addEventListener("click", onTap);
+// タップは pointerdown で主動作＋長押し判定。押しっぱなしの間は落下を早送りし続ける。
+function pressStart(){
+  if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {                      // 長押し確定：以後 dropTier ごとに早送り＋今落下中なら即
+    holding = true;
+    if (dropping && CONFIG.params.fastForward !== false) fastForward();
+  }, HOLD_MS);
+}
+function pressEnd(){ holding = false; if (holdTimer){ clearTimeout(holdTimer); holdTimer = null; } }
+$("tap").addEventListener("pointerdown", e => { if (e.button && e.button > 0) return; onTap(); pressStart(); });
+window.addEventListener("pointerup", pressEnd);
+window.addEventListener("pointercancel", pressEnd);
 $("skip").addEventListener("click", onSkip);         // 演出を飛ばして結果だけ表示
-window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); onTap(); } });
+window.addEventListener("keydown", e => {
+  if (e.code !== "Space" && e.code !== "Enter") return;
+  e.preventDefault();
+  if (e.repeat){                                      // キー押しっぱなし（オートリピート）＝早送り扱い
+    holding = true;
+    if (dropping && CONFIG.params.fastForward !== false) fastForward();
+    return;
+  }
+  onTap(); pressStart();
+});
+window.addEventListener("keyup", e => { if (e.code === "Space" || e.code === "Enter") pressEnd(); });
 document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventListener("change", () => {
   mode = document.querySelector('input[name="mode"]:checked').value;
   if (mode === "ignore") wantDrop = revealed;  // 無視に切替えたら未処理の予約は破棄
