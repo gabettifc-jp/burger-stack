@@ -79,7 +79,7 @@
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.5); filter:brightness(1.7)}100%{transform:scale(1)}}
   .grid input.txtinp{width:140px}
   /* 第1層：完成ごとの3択（回収直後にステージ上に出す。タップで即決・確認画面なし） */
-  #offer{position:absolute; inset:0; z-index:8; display:none; flex-direction:column; gap:8px;
+  #offer{position:absolute; inset:0; z-index:10; display:none; flex-direction:column; gap:8px;
     align-items:stretch; justify-content:center; padding:10px; border-radius:12px; background:rgba(12,14,19,.86)}
   #offer.show{display:flex}
   .offer-title{font-size:.74rem; color:var(--muted); text-align:center; margin-bottom:2px}
@@ -759,7 +759,7 @@ function startBurger(){
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
   revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
   runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; hitMeta = computeGrades();
-  applyBandVisual(0);                               // 帯の見た目をリセット
+  applyBandVisual(0); clearBandTransients();        // 帯の見た目と一時演出（バースト等）をリセット
   genToken++; clearTimers();
   hintEl.style.display = "none";
   stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
@@ -938,6 +938,14 @@ function celebration(value, index){
   animTimers.push(setTimeout(() => b.remove(), 900));
   if (!reduced) screenFlash();
 }
+// 帯の一時演出（バースト「×N!」・メーターの弾け・揺れ）を確実に消す。
+// これらの除去は setTimeout(animTimers) 任せなので、次バーガー開始の clearTimers() で
+// 取り消されると消え残る。バーガーごとのリセット時にここで DOM/クラスを直接片付ける。
+function clearBandTransients(){
+  $("stage").querySelectorAll(".milestone").forEach(e => e.remove());
+  multMeterEl.classList.remove("cel");
+  $("stage").classList.remove("shake");
+}
 
 // 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
 function pushCombo(h){
@@ -1099,7 +1107,7 @@ function resetBurger(){
   clearTimers(); genToken++;
   stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false; offering = false;
-  applyBandVisual(0);
+  applyBandVisual(0); clearBandTransients();
   offerEl.classList.remove("show"); offerEl.innerHTML = "";
   stageInner.innerHTML = ""; stageInner.style.transform = "translateX(-50%)"; comboFeedEl.innerHTML = "";
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
