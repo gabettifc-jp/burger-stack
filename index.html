@@ -77,7 +77,31 @@
   @keyframes msin{0%{opacity:0; transform:translate(-50%,-30%) scale(.6)}45%{opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
   #multMeter.cel{animation:mcel .6s ease-out}
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.5); filter:brightness(1.7)}100%{transform:scale(1)}}
+  /* 帯アップの強い揺れ（帯の落下揺れより一段上。強さは band.up.shake で変わる） */
+  #stage.bigshake{animation:bigshake .34s ease-out}
+  @keyframes bigshake{0%,100%{transform:translate(0,0)}
+    15%{transform:translate(calc(var(--bigshake,4px)*-1),0)}40%{transform:translate(var(--bigshake,4px),0)}
+    65%{transform:translate(calc(var(--bigshake,4px)*-.6),0)}85%{transform:translate(calc(var(--bigshake,4px)*.4),0)}}
+  /* 予告（リーチ）：残り数段で次の帯に届きそうなときに出す。中央下に「あと ×N で ×M帯」 */
+  #reach{position:absolute; left:50%; bottom:64px; z-index:9; transform:translateX(-50%) scale(.9);
+    font-weight:900; font-size:1.05rem; color:#fff; white-space:nowrap; pointer-events:none; opacity:0;
+    padding:4px 12px; border-radius:999px; background:rgba(20,10,4,.7);
+    text-shadow:0 0 10px var(--bcol,var(--accent)), 0 1px 4px #000; box-shadow:0 0 0 0 var(--bcol,var(--accent))}
+  #reach.show{opacity:1; transform:translateX(-50%) scale(1); animation:reachpulse .7s ease-in-out infinite}
+  @keyframes reachpulse{0%,100%{box-shadow:0 0 6px 1px var(--bcol,var(--accent)); filter:brightness(1)}
+    50%{box-shadow:0 0 18px 4px var(--bcol,var(--accent)); filter:brightness(1.35)}}
+  /* 予告中：画面全体が緊張した見た目（枠が明滅する）。音は Sound.tense() 側で鳴る。 */
+  #stage.tense{animation:tense .55s ease-in-out infinite}
+  @keyframes tense{0%,100%{box-shadow:inset 0 0 0 0 rgba(255,120,40,0)}
+    50%{box-shadow:inset 0 0 42px 2px rgba(255,140,50,.5)}}
+  /* 届かなかった演出：「×N で止まった」 */
+  .missnote{position:absolute; left:50%; top:44%; z-index:9; transform:translate(-50%,-50%);
+    font-weight:900; font-size:1.4rem; color:#c9d2dc; white-space:nowrap; pointer-events:none;
+    text-shadow:0 2px 6px #000; animation:missnote .9s ease-out forwards}
+  @keyframes missnote{0%{opacity:0; transform:translate(-50%,-38%) scale(1.1)}
+    20%{opacity:1}100%{opacity:0; transform:translate(-50%,-58%) scale(.92)}}
   .grid input.txtinp{width:140px}
+  select.selinp{width:150px; background:#20242b; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:3px 6px; font-size:.82rem}
   /* 第1層：完成ごとの3択（回収直後にステージ上に出す。タップで即決・確認画面なし） */
   #offer{position:absolute; inset:0; z-index:10; display:none; flex-direction:column; gap:8px;
     align-items:stretch; justify-content:center; padding:10px; border-radius:12px; background:rgba(12,14,19,.86)}
@@ -94,7 +118,9 @@
     font-weight:700; font-size:.82rem; text-align:center; cursor:pointer; touch-action:manipulation; user-select:none}
   .offer-skip:active{transform:translateY(1px)}
   @media (prefers-reduced-motion: reduce){
-    .flowpop, .cfx, .milestone, #multMeter.bump, #baseMeter.bump, #multMeter.cel, #stage.shake { animation:none !important }
+    .flowpop, .cfx, .milestone, .missnote, #multMeter.bump, #baseMeter.bump, #multMeter.cel,
+    #stage.shake, #stage.bigshake, #stage.tense, #reach.show { animation:none !important }
+    #reach.show{opacity:1}   /* 予告は状態として残す（明滅だけ止める） */
     #multMeter, .bandbg, #stageInner { transition:none !important }
   }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
@@ -230,6 +256,9 @@
   #screenFlash{position:fixed; inset:0; pointer-events:none; z-index:40; opacity:0;
     background:radial-gradient(circle at 50% 42%, rgba(255,207,90,.42), rgba(255,207,90,0) 68%)}
   #screenFlash.go{animation:sflash .28s ease-out}
+  /* 帯アップは一段強い閃光（白を混ぜて広く・明るく）。band.up.flash が既定1.2超のとき */
+  #screenFlash.strong{background:radial-gradient(circle at 50% 42%, rgba(255,240,200,.62), rgba(255,210,110,0) 80%)}
+  #screenFlash.strong.go{animation:sflash .42s ease-out}
   @keyframes sflash{0%{opacity:0}28%{opacity:1}100%{opacity:0}}
 
   /* ===== 3. 連打ボタン（画面下に固定。演出では絶対に動かない） ===== */
@@ -314,6 +343,7 @@
         <div id="multMeter">×1.00</div>
       </div>
       <div id="comboFeed"></div>
+      <div id="reach"></div>
       <div id="offer"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
@@ -458,8 +488,13 @@ const DEFAULTS = {
       size:  true,  // 倍率表示の大きさ
       bg:    true,  // 背景の明るさ
       shake: true,  // 段が落ちるときの揺れ
-      edge:  true   // バーガーのふちの光り
+      edge:  true,  // バーガーのふちの光り
+      pause: 0.20,  // 帯が上がる瞬間、爆発の直前に置く無音の溜め(秒)
+      // 帯アップ時の演出強度（現行より一段上げた既定。個別に弱められる）
+      up: { sound: 1.3, flash: 1.4, shake: 1.5 }
     },
+    // 予告（リーチ）：残り数段で次の帯に届きそうなときに表示。届いた/届かなかったで演出を分ける。
+    reach: { on: true, maxTiers: 2, window: 2.5 },   // maxTiers=残り何段から / window=あと何倍以内なら予告
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
@@ -480,8 +515,8 @@ const DEFAULTS = {
     landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
     completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
-    // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。
-    sound: { on: false, volume: 0.4 },
+    // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。scheme=音のパターン番号（0=標準/現行）。
+    sound: { on: false, volume: 0.4, scheme: 0 },
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
     offer: { every: 1, skipReward: 10 },   // every=何個ごとに出すか（既定 毎回）/ skipReward=スキップ報酬（暫定・累計へ）
     countUp:     0.18,  // 点数の数え上げ時間(秒)
@@ -518,55 +553,110 @@ window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れ
 /* =========================================================================
    効果音（Web Audio API・コード生成。音声ファイルは使わない＝素材権利を持ち込まない）
    既定OFF。ON時、最初のタップ（ユーザー操作）で AudioContext を解錠する。
+   10種類の音パターン（scheme）を用意し、調整欄で切り替えて比較できる。既定=0（標準/現行）。
+   各schemeは root(基準周波数)＋semis(半音)で旋律を組む。帯が上がると waves を巡って音色が変わる。
    ========================================================================= */
+const SOUND_SCHEMES = [
+  { name:"標準（現行）", waves:["sine","triangle","square","sawtooth"], noise:0,
+    land:{root:196,scale:[0,2,4,7,9,12,14,16,19,21,24],dur:.10,gain:.22,atk:.003},
+    combo:{root:523,small:[9],mid:[0,7],big:[0,4,7]}, up:{root:392,semis:[4,7,10]},
+    done:{root:196,semis:[12,16,19],wave:"triangle",dur:.42}, coin:{root:784,semis:[0,7],wave:"square",dur:.10} },
+  { name:"木琴", waves:["triangle","triangle","sine","triangle"], noise:0,
+    land:{root:262,scale:[0,4,7,12,16,19,24,28,31,36,40],dur:.09,gain:.24,atk:.001},
+    combo:{root:523,small:[12],mid:[0,7],big:[0,4,7]}, up:{root:523,semis:[0,4,7]},
+    done:{root:262,semis:[12,16,19],wave:"triangle",dur:.30}, coin:{root:1047,semis:[0,5],wave:"triangle",dur:.09} },
+  { name:"電子音", waves:["square","sawtooth","square","sawtooth"], noise:0,
+    land:{root:220,scale:[0,2,3,5,7,8,10,12,15,17,19],dur:.09,gain:.15,atk:.002},
+    combo:{root:440,small:[12],mid:[0,7],big:[0,3,7],wave:"square"}, up:{root:440,semis:[0,5,10],wave:"square"},
+    done:{root:220,semis:[12,15,19],wave:"square",dur:.30}, coin:{root:880,semis:[0,12],wave:"square",dur:.08} },
+  { name:"和風", waves:["sine","sine","triangle","sine"], noise:0,
+    land:{root:174,scale:[0,2,3,7,8,12,14,15,19,20,24],dur:.18,gain:.20,atk:.006},
+    combo:{root:392,small:[7],mid:[0,7],big:[0,7,12],wave:"sine"}, up:{root:392,semis:[0,3,7],wave:"sine"},
+    done:{root:196,semis:[12,14,19],wave:"sine",dur:.50}, coin:{root:587,semis:[0,7],wave:"sine",dur:.14} },
+  { name:"レジ音", waves:["square","square","triangle","square"], noise:.06,
+    land:{root:988,scale:[0,5,0,5,7,12,7,12,0,5,7],dur:.05,gain:.13,atk:.001},
+    combo:{root:1319,small:[0],mid:[0,5],big:[0,5,9],wave:"square"}, up:{root:1319,semis:[0,5,9],wave:"square"},
+    done:{root:1047,semis:[0,7,12],wave:"square",dur:.20}, coin:{root:988,semis:[0,7],wave:"square",dur:.12} },
+  { name:"ベル", waves:["sine","sine","sine","sine"], noise:0,
+    land:{root:330,scale:[0,4,7,11,12,16,19,23,24,28,31],dur:.50,gain:.15,atk:.002,detune2:1200},
+    combo:{root:660,small:[12],mid:[0,7],big:[0,4,7],wave:"sine"}, up:{root:660,semis:[0,4,7],wave:"sine"},
+    done:{root:330,semis:[12,16,19],wave:"sine",dur:.60}, coin:{root:990,semis:[0,7],wave:"sine",dur:.20} },
+  { name:"マリンバ", waves:["triangle","triangle","triangle","triangle"], noise:0,
+    land:{root:175,scale:[0,3,5,7,10,12,15,17,19,22,24],dur:.20,gain:.22,atk:.004},
+    combo:{root:349,small:[12],mid:[0,7],big:[0,3,7],wave:"triangle"}, up:{root:349,semis:[0,3,7],wave:"triangle"},
+    done:{root:175,semis:[12,15,19],wave:"triangle",dur:.40}, coin:{root:698,semis:[0,5],wave:"triangle",dur:.14} },
+  { name:"8ビット", waves:["square","square","square","square"], noise:0,
+    land:{root:262,scale:[0,2,4,5,7,9,11,12,14,16,19],dur:.06,gain:.16,atk:.001},
+    combo:{root:523,small:[12],mid:[0,7],big:[0,4,7],wave:"square"}, up:{root:523,semis:[0,4,7],wave:"square"},
+    done:{root:262,semis:[7,12,16],wave:"square",dur:.25}, coin:{root:1047,semis:[0,12],wave:"square",dur:.07} },
+  { name:"パーカッション", waves:["triangle","triangle","triangle","triangle"], noise:.5,
+    land:{root:110,scale:[0,0,3,3,5,5,7,7,10,10,12],dur:.09,gain:.18,atk:.001},
+    combo:{root:220,small:[7],mid:[0,7],big:[0,5,7],wave:"triangle"}, up:{root:220,semis:[0,5,7],wave:"triangle"},
+    done:{root:110,semis:[7,12,19],wave:"triangle",dur:.30}, coin:{root:440,semis:[0,7],wave:"triangle",dur:.10} },
+  { name:"パイプ", waves:["sawtooth","sawtooth","sawtooth","sawtooth"], noise:0,
+    land:{root:147,scale:[0,2,4,5,7,9,11,12,14,16,17],dur:.30,gain:.13,atk:.02,fifth:true},
+    combo:{root:294,small:[12],mid:[0,7],big:[0,4,7],wave:"sawtooth"}, up:{root:294,semis:[0,4,7],wave:"sawtooth"},
+    done:{root:147,semis:[12,16,19],wave:"sawtooth",dur:.50}, coin:{root:441,semis:[0,7],wave:"sawtooth",dur:.20} },
+];
 const Sound = (() => {
-  let ctx = null, master = null;
+  let ctx = null, master = null, noiseBuf = null;
+  function scheme(){ const i = Math.round((CONFIG.params.sound && CONFIG.params.sound.scheme) || 0);
+    return SOUND_SCHEMES[Math.max(0, Math.min(SOUND_SCHEMES.length - 1, i))]; }
   function on(){ return CONFIG.params.sound && CONFIG.params.sound.on; }
   function unlock(){                                   // タップ内で呼ぶ（自動再生制限の解錠）
     if (!on()) return;
     try {
       if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-        ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination); }
+        ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination);
+        const n = (ctx.sampleRate * 0.3) | 0; noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; }
       if (ctx.state === "suspended") ctx.resume().catch(()=>{});
     } catch(e){ ctx = null; }
   }
   function ready(){ if (!on() || !ctx) return false; master.gain.value = CONFIG.params.sound.volume; return true; }
-  function tone(freq, o){
+  function osc(freq, o){
     o = o || {}; if (!ready()) return;
     try {
       const t = ctx.currentTime + (o.delay || 0);
-      const osc = ctx.createOscillator(); osc.type = o.type || "sine"; osc.frequency.value = freq;
-      if (o.detune) osc.detune.value = o.detune;
-      const g = ctx.createGain(); const peak = (o.gain == null ? 0.25 : o.gain), dur = o.dur || 0.12;
+      const g = ctx.createGain(); const peak = Math.max(0.0002, (o.gain == null ? 0.2 : o.gain) * (o.mul || 1)), dur = o.dur || 0.12;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(peak, t + (o.attack || 0.005));
+      g.gain.exponentialRampToValueAtTime(peak, t + (o.atk || 0.005));
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(g); g.connect(master);
-      osc.start(t); osc.stop(t + dur + 0.03);
+      g.connect(master);
+      const mk = (f, det) => { const s = ctx.createOscillator(); s.type = o.type || "sine"; s.frequency.value = f; if (det) s.detune.value = det; s.connect(g); s.start(t); s.stop(t + dur + 0.03); };
+      mk(freq, o.detune || 0);
+      if (o.detune2) mk(freq, o.detune2);
+      if (o.fifth)  mk(freq * 1.4983, o.detune || 0);
     } catch(e){}
   }
-  function chord(freqs, o){ freqs.forEach(f => tone(f, o)); }
-  const WAVES = ["sine", "triangle", "square", "sawtooth"];
-  function bandType(){ const L = bandLevelCur || 0; return L <= 0 ? "sine" : WAVES[(L - 1) % WAVES.length]; }   // 帯で音色が変わる
-  function bandDetune(){ const L = bandLevelCur || 0; return L <= 0 ? 0 : Math.floor((L - 1) / WAVES.length) * 7; }
-  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-  function scaleFreq(i){ return 196 * Math.pow(2, PENTA[Math.min(i, PENTA.length - 1)] / 12); } // 段が上がると音程が上がる
+  function noise(o){
+    o = o || {}; if (!ready() || !noiseBuf) return;
+    try {
+      const t = ctx.currentTime + (o.delay || 0); const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+      const g = ctx.createGain(); const dur = o.dur || 0.06;
+      g.gain.setValueAtTime((o.gain || 0.12) * (o.mul || 1), t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = o.hp || 1800;
+      src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + 0.02);
+    } catch(e){}
+  }
+  function bandWave(){ const w = scheme().waves; const L = bandLevelCur || 0; return L <= 0 ? w[0] : w[(L - 1) % w.length]; } // 帯で音色が変わる
+  function bandDetune(){ const L = bandLevelCur || 0; return L <= 0 ? 0 : Math.floor((L - 1) / 4) * 7; }
+  function chord(root, semis, o){ (semis || [0]).forEach((s, i) => osc(root * Math.pow(2, s / 12), Object.assign({}, o, { delay: (o.delay || 0) + (o.stagger ? i * o.stagger : 0) }))); }
   return {
     unlock,
     setVolume(){ if (ctx && master) master.gain.value = CONFIG.params.sound.volume; },
-    land(i){ tone(scaleFreq(i), { type: bandType(), detune: bandDetune(), dur: 0.10, gain: 0.22, attack: 0.003 }); },
-    combo(grade){                                     // コンボは等級で変える
-      const type = bandType(), d = bandDetune();
-      if (grade >= 2)      chord([523, 659, 784], { type, detune: d, dur: 0.28, gain: 0.26, attack: 0.004 });
-      else if (grade >= 1) chord([523, 784], { type, detune: d, dur: 0.16, gain: 0.22 });
-      else                 tone(880, { type, detune: d, dur: 0.09, gain: 0.13 });
-    },
-    bandUp(){                                         // 帯が上がった合図（上昇アルペジオ）
-      const type = bandType(), d = bandDetune();
-      [0, 1, 2].forEach(k => tone(392 * Math.pow(2, (4 + k * 3) / 12), { type, detune: d, dur: 0.14, gain: 0.20, delay: k * 0.05 }));
-    },
-    complete(){ chord([392, 494, 587], { type: "triangle", dur: 0.42, gain: 0.22, attack: 0.006 }); }, // 解決和音
-    collect(){ tone(784, { type: "square", dur: 0.09, gain: 0.20 }); tone(1175, { type: "square", dur: 0.14, gain: 0.20, delay: 0.06 }); } // チャリン
+    land(i){ const S = scheme(), L = S.land, sc = L.scale, f = L.root * Math.pow(2, sc[Math.min(i, sc.length - 1)] / 12);
+      osc(f, { type: bandWave(), detune: bandDetune(), detune2: L.detune2, fifth: L.fifth, dur: L.dur, gain: L.gain, atk: L.atk });
+      if (S.noise) noise({ gain: 0.12 * S.noise, dur: 0.04, hp: 3000 }); },
+    combo(grade){ const C = scheme().combo, w = C.wave || bandWave(), d = bandDetune();
+      const semis = grade >= 2 ? C.big : grade >= 1 ? C.mid : C.small;
+      chord(C.root, semis, { type: w, detune: d, dur: grade >= 2 ? 0.26 : 0.15, gain: grade >= 2 ? 0.24 : 0.18, stagger: grade >= 2 ? 0.02 : 0 }); },
+    bandUp(mul){ const U = scheme().up, w = U.wave || bandWave();
+      chord(U.root, U.semis, { type: w, detune: bandDetune(), dur: 0.15, gain: 0.20 * (mul || 1), stagger: 0.05 }); },
+    complete(){ const D = scheme().done; chord(D.root, D.semis, { type: D.wave || "triangle", dur: D.dur || 0.4, gain: 0.20, stagger: 0.02 }); },
+    collect(){ const K = scheme().coin; chord(K.root, K.semis, { type: K.wave || "square", dur: K.dur || 0.1, gain: 0.20, stagger: 0.06 }); },
+    tense(){ osc(scheme().land.root * 2, { type: "sine", dur: 0.07, gain: 0.07, atk: 0.01 }); },        // 予告中の緊張の短い音
+    reachFail(){ osc(scheme().land.root * 0.75, { type: "sawtooth", dur: 0.30, gain: 0.13, atk: 0.02 }); } // 届かなかった下降音
   };
 })();
 
@@ -709,7 +799,12 @@ let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
 let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
-let bandLevelCur = 0;   // 現在の帯レベル（乗算の積で決まる）
+let bandLevelCur = 0;   // 現在の帯レベル（音色・揺れの判定に使う。確定表示済みレベルに同期）
+let bandShown = 0;      // 演出を確定表示した帯レベル
+let bandTarget = 0;     // 乗算の積が示す目標帯レベル
+let bandStepping = false; // 帯アップを一段ずつ順に確定中か
+let reachActive = false;  // 予告（リーチ）表示中か
+let reachTarget = 0;      // 予告している次の帯のしきい値
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
@@ -873,6 +968,7 @@ function landed(r){
     animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
   revealHits(r);                                    // 接触面が揃ったコンボをその場で演出
+  if (r < stack.length - 1) updateReach(r);         // まだ段が残るなら予告（リーチ）を判定
   if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成→停止
 }
 
@@ -913,38 +1009,79 @@ function applyBandVisual(L){
   s.setProperty("--bedge",  (b.edge  !== false && L > 0) ? Math.min(16, L*2.2).toFixed(1) + "px" : "0px");
   s.setProperty("--bshake", (b.shake !== false && L > 0) ? Math.min(7, L*0.9).toFixed(2) : "0");
 }
-// 乗算が変わったら帯を更新。上がった瞬間だけバースト（越えた帯のしきい値を表示）。
+function bandThreshold(lvl){ const b = CONFIG.params.band; return (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), lvl - 1); }
+
+// 乗算が変わったら帯を更新。上がるときは一段ずつ順に確定する（一気に出さない）。
 function updateBand(){
-  const L = bandLevel();
-  if (L === bandLevelCur) return;
-  const rising = L > bandLevelCur;
-  bandLevelCur = L;
-  applyBandVisual(L);
-  if (rising && L > 0){
-    const b = CONFIG.params.band;
-    const threshold = (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), L - 1);
-    celebration(Math.round(threshold), L - 1);      // 跨いだ瞬間のバーストは残す
-    Sound.bandUp(L);                                // 帯が上がった音
-  }
+  bandTarget = bandLevel();
+  if (bandTarget < bandShown){ bandShown = bandTarget; bandLevelCur = bandTarget; applyBandVisual(bandTarget); return; }
+  if (bandTarget > bandShown && !bandStepping) stepBand();
 }
-function celebration(value, index){
+function stepBand(){
+  if (bandShown >= bandTarget){ bandStepping = false; return; }
+  bandStepping = true;
+  const lvl = bandShown + 1;
+  const pause = (CONFIG.params.band.pause != null ? CONFIG.params.band.pause : 0.20) * 1000;  // 爆発直前の無音の溜め
+  animTimers.push(setTimeout(() => {
+    bandShown = lvl; bandLevelCur = lvl; applyBandVisual(lvl);   // その段を確定
+    celebrateBand(lvl);                                          // 溜めのあと爆発
+    animTimers.push(setTimeout(stepBand, 300));                  // 次の段へ（順に確定）
+  }, pause));
+}
+// 帯アップの演出（現行より一段強い既定。音・光・揺れは調整欄で個別に弱められる）。
+function celebrateBand(lvl){
+  const up = (CONFIG.params.band.up) || {};
+  const value = Math.round(bandThreshold(lvl));
+  if (reachActive && bandThreshold(lvl) >= reachTarget - 1e-6) endReach(true);   // 予告に届いた＝リーチ成功
   multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");
   animTimers.push(setTimeout(() => multMeterEl.classList.remove("cel"), 700));
-  const b = document.createElement("div");
-  b.className = "milestone" + (index >= 2 ? " big" : "");
-  b.textContent = "×" + value + "!";
-  $("stage").appendChild(b);
-  animTimers.push(setTimeout(() => b.classList.add("out"), 600));
-  animTimers.push(setTimeout(() => b.remove(), 900));
-  if (!reduced) screenFlash();
+  const el = document.createElement("div");
+  el.className = "milestone" + ((lvl - 1) >= 2 ? " big" : "");
+  el.textContent = "×" + value + "!";
+  $("stage").appendChild(el);
+  animTimers.push(setTimeout(() => el.classList.add("out"), 640));
+  animTimers.push(setTimeout(() => el.remove(), 940));
+  const upSound = up.sound != null ? up.sound : 1.3;   // 0 を明示したら無音（|| だと既定に化ける）
+  const upFlash = up.flash != null ? up.flash : 1.4;
+  const upShake = up.shake != null ? up.shake : 1.5;
+  if (!reduced){ if (upFlash > 0) screenFlash(upFlash); if (upShake > 0) strongShake(upShake); }
+  if (upSound > 0) Sound.bandUp(upSound);
 }
-// 帯の一時演出（バースト「×N!」・メーターの弾け・揺れ）を確実に消す。
-// これらの除去は setTimeout(animTimers) 任せなので、次バーガー開始の clearTimers() で
-// 取り消されると消え残る。バーガーごとのリセット時にここで DOM/クラスを直接片付ける。
+
+// 予告（リーチ）：残り数段で次の帯に届きそうなら表示。全体が緊張した見た目になる。
+function updateReach(r){
+  const rc = CONFIG.params.reach; if (!rc || rc.on === false) return;
+  const left = stack.length - 1 - r;                 // この段の後に残る段数
+  const nextTh = bandThreshold(bandShown + 1);       // 次の帯のしきい値
+  const el = $("reach"), stg = $("stage");
+  if (left >= 1 && left <= (rc.maxTiers || 2) && runMult < nextTh && (nextTh / runMult) <= (rc.window || 2.5)){
+    reachActive = true; reachTarget = nextTh;
+    el.textContent = `あと ×${(nextTh / runMult).toFixed(2)} で ×${Math.round(nextTh)}帯`;
+    el.classList.add("show"); if (!reduced) stg.classList.add("tense");
+    if (!reduced) Sound.tense();
+  } else if (reachActive && runMult >= reachTarget){  // すでに届いていた（updateBand側で処理）
+    endReach(true);
+  }
+}
+function endReach(reached){                            // 予告の終了。reached=true 成功 / false 失敗
+  reachActive = false;
+  $("reach").classList.remove("show"); $("stage").classList.remove("tense");
+}
+function missNote(){                                   // 届かなかった演出（「×2.9で止まった」）
+  const el = document.createElement("div"); el.className = "missnote";
+  el.textContent = "×" + runMult.toFixed(2) + " で止まった";
+  $("stage").appendChild(el);
+  animTimers.push(setTimeout(() => el.remove(), 900));
+  if (!reduced) Sound.reachFail();
+}
+
+// 帯の一時演出（バースト・メーターの弾け・揺れ・予告）を確実に消す（タイマー取消しの取りこぼし対策）。
 function clearBandTransients(){
-  $("stage").querySelectorAll(".milestone").forEach(e => e.remove());
+  $("stage").querySelectorAll(".milestone,.missnote").forEach(e => e.remove());
   multMeterEl.classList.remove("cel");
-  $("stage").classList.remove("shake");
+  $("stage").classList.remove("shake","bigshake","tense");
+  const rl = $("reach"); if (rl) rl.classList.remove("show");
+  reachActive = false; bandShown = 0; bandTarget = 0; bandStepping = false;
 }
 
 // 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
@@ -988,13 +1125,22 @@ function popFlow(cls, y, text){
   animTimers.push(setTimeout(() => el.remove(), life + 60));
 }
 
-function screenFlash(){
+function screenFlash(mul){
   const el = $("screenFlash");
+  el.classList.toggle("strong", (mul || 1) > 1.2);   // 帯アップは一段強い閃光（調整欄で弱められる）
   el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
+}
+// 帯アップ用の強い揺れ（既定は帯の落下揺れより一段上。調整欄の band.up.shake で弱める）。
+function strongShake(mul){
+  const stg = $("stage");
+  stg.style.setProperty("--bigshake", (2.4 * (mul || 1.5)).toFixed(2) + "px");
+  stg.classList.remove("bigshake"); void stg.offsetWidth; stg.classList.add("bigshake");
+  animTimers.push(setTimeout(() => stg.classList.remove("bigshake"), 360));
 }
 
 // 完成：ここで停止して合計点を大きく見せる。まだ銀行には入れない（回収は次のタップ）。
 function complete(){
+  if (reachActive){ missNote(); endReach(false); }  // 予告が出たまま届かず完成＝「×N で止まった」
   showBreakdown(sc);                                // 4行と一覧を確定表示
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   baseMeterEl.textContent = "基礎 " + sc.base;
@@ -1189,6 +1335,14 @@ function boolInput(get, set){
   inp.addEventListener("change", () => set(inp.checked));
   return inp;
 }
+// 選択式（名前付きの候補から選ぶ。音のパターン切替などに使う）
+function selectInput(options, get, set){
+  const sel = document.createElement("select"); sel.className = "selinp";
+  options.forEach((name, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = name; sel.appendChild(o); });
+  sel.value = String(get());
+  sel.addEventListener("change", () => set(parseInt(sel.value, 10)));
+  return sel;
+}
 // 小さなラベル付き数値（幅広く設定できる。上限なし）
 function miniNum(prefix, get, set, step){
   const wrap = document.createElement("span"); wrap.className = "mini";
@@ -1234,6 +1388,17 @@ function renderSettings(){
   gridRow(g, "背景の明るさ", boolInput(()=>CONFIG.params.band.bg, v=>CONFIG.params.band.bg=v));
   gridRow(g, "落下の揺れ", boolInput(()=>CONFIG.params.band.shake, v=>CONFIG.params.band.shake=v));
   gridRow(g, "ふちの光り", boolInput(()=>CONFIG.params.band.edge, v=>CONFIG.params.band.edge=v));
+  // 帯が上がる瞬間の演出（爆発直前の無音の溜め・音/光/揺れの強さ。0で無効化＝弱められる）
+  gridRow(g, "上がる前の溜め(秒)", numInput(()=>CONFIG.params.band.pause, v=>CONFIG.params.band.pause=Math.max(0,v), 0.05));
+  gridRow(g, "帯アップの音(0で無音)", numInput(()=>CONFIG.params.band.up.sound, v=>CONFIG.params.band.up.sound=Math.max(0,v), 0.1));
+  gridRow(g, "帯アップの光(1で通常)", numInput(()=>CONFIG.params.band.up.flash, v=>CONFIG.params.band.up.flash=Math.max(0,v), 0.1));
+  gridRow(g, "帯アップの揺れ(0で無し)", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
+
+  // 予告（リーチ）：残り数段で次の帯に届きそうなときの緊張演出
+  g = group("予告（リーチ）＝次の帯に届きそうなときの緊張演出");
+  gridRow(g, "予告を出す", boolInput(()=>CONFIG.params.reach.on, v=>CONFIG.params.reach.on=v));
+  gridRow(g, "残り何段まで対象か", numInput(()=>CONFIG.params.reach.maxTiers, v=>CONFIG.params.reach.maxTiers=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "届く見込みの幅(×以内)", numInput(()=>CONFIG.params.reach.window, v=>CONFIG.params.reach.window=Math.max(1.05,v), 0.1));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。大で画面反応・発光の強さに使う。
   g = group("演出の等級（相対しきい値・大で画面反応）");
@@ -1288,6 +1453,7 @@ function renderSettings(){
   // 効果音（Web Audio・コード生成。既定OFF）
   g = group("効果音（既定OFF）");
   gridRow(g, "音を鳴らす", boolInput(()=>CONFIG.params.sound.on, v=>{ CONFIG.params.sound.on=v; if(v) Sound.unlock(); }));
+  gridRow(g, "音のパターン", selectInput(SOUND_SCHEMES.map(s=>s.name), ()=>CONFIG.params.sound.scheme, v=>{ CONFIG.params.sound.scheme=v; if(CONFIG.params.sound.on) Sound.land(0); }));
   gridRow(g, "音量", numInput(()=>CONFIG.params.sound.volume, v=>{ CONFIG.params.sound.volume=Math.max(0,Math.min(1,v)); Sound.setVolume(); }, 0.05));
 }
 
