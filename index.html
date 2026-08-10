@@ -328,6 +328,9 @@
   .scorehead .unit{color:var(--muted); font-size:.9rem}
   .scorehead .cum{margin-left:auto; color:var(--muted); font-size:.85rem; align-self:center}
   .scorehead .cum b{color:var(--text); font-weight:800}
+  /* コイン着弾ごとの小さな跳ね（得点欄・累計） */
+  #score.numbump, #cumTotal.numbump{display:inline-block; animation:numbump .18s ease-out}
+  @keyframes numbump{0%{transform:scale(1)}40%{transform:scale(1.16)}100%{transform:scale(1)}}
   .cumpop{position:absolute; right:6px; top:0; color:var(--good); font-weight:800; font-size:.95rem;
     pointer-events:none; animation:cumfly .5s ease-out forwards}
   @keyframes cumfly{0%{opacity:0; transform:translateY(8px)}25%{opacity:1}100%{opacity:0; transform:translateY(-16px)}}
@@ -474,13 +477,13 @@
   <!-- 2. 得点と内訳（4行固定。個々のコンボ一覧は畳んでおく） -->
   <section>
     <p class="lbl">このバーガーの売値（価格）</p>
-    <div class="scorehead"><span class="unit">¥</span><span id="score">0</span>
+    <div class="scorehead"><span class="unit">¥</span><span id="score" class="building">–</span>
       <span class="cum">売上 ¥<b id="cumTotal">0</b></span></div>
     <div class="breakdown4">
-      <div><span>基礎点</span><b id="fBase">0</b></div>
-      <div><span>加算</span><b id="fAdd">0</b></div>
-      <div><span>乗算の積</span><b id="fMult">×1.00</b></div>
-      <div><span>合計</span><b id="fTotal">0</b></div>
+      <div><span>基礎点</span><b id="fBase">–</b></div>
+      <div><span>加算</span><b id="fAdd">–</b></div>
+      <div><span>乗算の積</span><b id="fMult">–</b></div>
+      <div><span>合計</span><b id="fTotal">–</b></div>
     </div>
     <details id="comboList">
       <summary>コンボ内訳 <span id="comboCount">（0件）</span></summary>
@@ -687,11 +690,10 @@ const DEFAULTS = {
       // 回収：売上（お金）をコインで受け取る。周囲から集まって「収束先」に重なり、到達したら消える（積もりは残さない）。
       //   target=収束先（"score"=得点欄「このバーガーの売値」の枠〈既定〉／"price"=バーガー上の価格の数字／"cum"=売上累計）。
       //   spread=コインが湧く範囲(px。target の右側に湧いて左へ収束する)。非ブロッキング＝飛行中も操作可。
-      //   見た目：per=何点で1枚 / min,max=枚数の下限上限 / speed=飛ぶ時間(秒・短め) / arc=軌道の山(px) / stagger=発射間隔(秒)。
-      //   音：点数に比例させない。回数は soundMin〜soundMax（既定8〜12）、鳴る時間は soundDur(秒)で一定。
-      //       点数の大きさは「音程の高さ・厚み・回数(8〜12の範囲)」で表す。pitchSpan=連鎖で上がる音程幅(半音)。
-      coins: { on:true, target:"score", spread:150, per:8, min:4, max:24, speed:0.4, arc:60, stagger:0.03,
-               soundMin:8, soundMax:12, soundDur:0.7, pitchSpan:12 },
+      //   枚数：per=何点で1枚 / min,max=枚数の下限上限（＝着弾＝数字が増える回数＝鳴る回数）。
+      //   見た目：speed=飛ぶ時間(秒・短め) / arc=軌道の山(px) / stagger=発射間隔(秒)。
+      //   音：着弾ごとに1回鳴る。pitchSpan=枚が進むほど上げる音程幅(半音)。厚みは点数（帯）で決まる。
+      coins: { on:true, target:"score", spread:150, per:8, min:4, max:24, speed:0.4, arc:60, stagger:0.03, pitchSpan:12 },
       // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。1個に1回なので長めでよい。
       //   dur=完成演出の長さ(秒。閃光・揺れ・衝撃波の持続の基準)。調整欄で伸ばせる。
       complete:  { on:true, base:1.0, scale:1.30, dur:1.4 },
@@ -1139,8 +1141,9 @@ let plan = null;          // 計算層：クリック時に確定した1個ぶ�
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
-let cumTotalValue = 0;  // セッション累計点
-let cumToken = 0;       // 累計カウントアップ中断用
+let cumTotalValue = 0;  // セッション累計点（コインの着弾で増える）
+let currentCollectId = 0;   // 回収の識別子。新しい回収で++。飛行中の古いコインが得点欄を書かないよう照合する
+let collectFillActive = false;  // 得点欄（このバーガーの売値）をコインで満たし中か。次バーガーの1段目着地で false
 let completedCount = 0; // 回収したバーガーの数（3択の頻度に使う）
 let offering = false;   // 3択の選択中
 
@@ -1253,10 +1256,8 @@ function startBurger(){
   const avail = 250 - 14 - 8;
   const s = layout.total > avail ? avail / layout.total : 1;
   stageInner.style.setProperty("--fit", s.toFixed(4)); stageInner.style.setProperty("--zoom", "1");
-  // 得点（合計）は完成まで伏せる。基礎点と乗算の積は1段ごとに増える計器で見せる。
-  scoreEl.textContent = "–"; scoreEl.classList.remove("done"); scoreEl.classList.add("building");
-  fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–"; fTotal.textContent = "–";
-  firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
+  // 得点欄（このバーガーの売値）は、前の回収のコイン満たしを見せ切るため、ここでは消さない。
+  //  次バーガーの1段目が着地した時点で resetScorePanel() が空に戻す（＝前の回収の数字を上書きしない）。
   multMeterEl.textContent = "×1.00"; burgerScoreClear();
   return true;
 }
@@ -1399,7 +1400,15 @@ function fastForward(){
   scheduleLand(dropIdx, fast);
 }
 // 着地の確定＋次段の予約消化。複数要求されていても、間隔をあけて必ず1段ずつ落とす。
+// 得点欄（このバーガーの売値）を「この新しいバーガー用に空」へ戻す。前の回収のコイン満たしを打ち切る。
+function resetScorePanel(){
+  collectFillActive = false;                         // 飛行中の古いコインは以後この得点欄を書かない（累計は増え続ける）
+  scoreEl.textContent = "–"; scoreEl.classList.remove("done"); scoreEl.classList.add("building");
+  fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–"; fTotal.textContent = "–";
+  firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
+}
 function finishDrop(r){
+  if (r === 0) resetScorePanel();                    // 新バーガーの1段目着地：得点欄を空に戻す（前の回収の数字を残さない）
   if (tierEls[r]) tierEls[r].classList.remove("trailing");   // 着地でトレイルを消す
   applyStep(r);
   dropping = false; dropEl = null; dropIdx = -1; dropTimer = null;
@@ -1866,7 +1875,7 @@ function applyEasing(){
 // 完成：ここで停止して合計点を大きく見せる。まだ銀行には入れない（回収は次のタップ）。
 // 予告は「本当に届く回」だけなので、届かず完成（＝止まった）は構造上起きない。
 function complete(){
-  showBreakdown(sc);                                // 4行と一覧を確定表示
+  // 得点欄（このバーガーの売値）は回収まで空にしておく（＝コインの着弾で満たす）。ここでは埋めない。
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   wantDrop = revealed;                              // 予約された入力はここで破棄
   bandPeak = Math.max(bandPeak, plan.final.band);   // 到達した最高帯（完成演出の基準）
@@ -1877,26 +1886,26 @@ function complete(){
   updateProgress();
   celebrateComplete();                              // 最高帯に応じた完成演出（文字は出さず強さで示す）
   const my = genToken;
-  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); scoreEl.classList.add("done"); numberJuice(1.4);
-    burgerScoreShow("0", "total");                   // 完成：合計をバーガーに大きく重ねる（一部隠れてよい）。数え上げは countUp が両方を更新
-    countUp(sc.total, my); };  // 得点の文字の演出
+  const run = () => { if (my !== genToken) return; numberJuice(1.4);
+    burgerScoreShow("0", "total"); burgerCountUp(sc.total, my); };  // 完成：合計はバーガーに大きく重ねるだけ（下の得点欄は伏せたまま）
   if (reduced || CONFIG.params.landPause <= 0) run();
   else animTimers.push(setTimeout(run, CONFIG.params.landPause * 1000));
 }
 
-// 回収：完成した点を銀行に入れ（統計・グラフ更新）、累計に加算する演出を出して次を始める。
+// 回収：得点欄（このバーガーの売値）と売上累計を、コインの着弾に同期して段階的に満たす。時間で勝手に数え上げない。
 function collect(){
   const total = sc.total, prod = sc.mult;
-  const bandNorm = Math.min(1, (bandPeak || 0) / Math.max(1, fxStages()));   // 点数の大きさ（帯基準）→ コイン音の音程・厚み・回数
-  flyCoins(total, bandNorm);                        // コインが収束先（既定＝価格の数字）へ集まって消える（非ブロッキング／音は固定回数・時間）
-  // 価格表示は「売上」としてコインに変わって消す（次の場面〈3択〉へ数字を持ち越さない）。収束先の位置は #stage 基準で決まる。
-  burgerScoreClear();
+  showBreakdown(sc);                                // 明細（基礎点/加算/乗算/合計）は回収の瞬間に出す
+  const cid = ++currentCollectId; collectFillActive = true;   // この回収の識別子。以後この売値をコインで満たす
+  scoreEl.classList.remove("building"); scoreEl.classList.add("done"); scoreEl.textContent = "¥0";   // 得点欄は0から着弾で増える
+  const bandNorm = Math.min(1, (bandPeak || 0) / Math.max(1, fxStages()));   // 点数の大きさ（帯基準）→ コイン音の音程・厚み
+  flyCoins(total, bandNorm, cid);                   // コインが得点欄へ集まり、1枚着弾ごとに得点欄と累計が増える（非ブロッキング）
+  burgerScoreClear();                               // バーガー上の大きい価格は消す（コインに変わって飛ぶ）
   history.push(total);
   recentProducts.push(prod);                        // 次回以降の相対しきい値の基準
   const w = CONFIG.params.grade.recentWindow || 20;
   if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
   updateStats(); renderBars();
-  animateCum(total);                                // 累計に加算される演出
   // 時間軸系：もち等、完成のたびに基礎点が育つ（デッキに在る間だけ）。
   for (const nm of catalogNames()){ const e = CONFIG.items[nm].effect;
     if (e && e.id === "mochiGrow" && CONFIG.items[nm].count > 0) temporalBonus[nm] = (temporalBonus[nm] || 0) + (e.per || 0); }
@@ -2044,33 +2053,42 @@ function coinTargetRect(){
   const y = s.top + s.height * ((bs.y != null ? bs.y : 52) / 100);
   return { left: x, top: y, width: 0, height: 0 };
 }
-function flyCoins(total, bandNorm){
+function flyCoins(total, bandNorm, cid){
   const cfg = CONFIG.params.fx.coins || {};
-  if (cfg.on === false || !coinLayerEl) { Sound.collect(); return 0; }   // OFF時は従来の一発の回収音
   const nrm = Math.max(0, Math.min(1, bandNorm || 0));
-  // 見た目の枚数は点数比例（上限あり）。音の回数はこれとは切り離す（下記）。
+  const span = cfg.pitchSpan != null ? cfg.pitchSpan : 12, thick = nrm;
   const n = Math.max(cfg.min || 1, Math.min(cfg.max || 40, Math.round((total || 0) / Math.max(1, cfg.per || 8))));
+  // total を n 枚に整数配分（合計は total ちょうど）。各枚の着弾で得点欄・累計がこの分だけ増える。
+  const dtotal = Math.round(total), base = Math.floor(dtotal / n), rem = dtotal - base * n;
+  const deltas = [], prefix = []; let acc = 0;
+  for (let i = 0; i < n; i++){ const d = base + (i < rem ? 1 : 0); deltas.push(d); acc += d; prefix.push(acc); }
+  // コイン演出OFF／reduced：飛ばさず、最終値を即反映（着弾を1回にまとめて音だけ鳴らす）。
+  if (cfg.on === false || !coinLayerEl || reduced){
+    for (let i = 0; i < n; i++) coinArrive(cid, prefix[i], deltas[i], (n>1?i/(n-1):0)*span, thick, false);
+    return n;
+  }
   const to = coinTargetRect();
-  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;                 // 収束先（価格の数字など）
+  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;                 // 収束先（既定＝得点欄）
   const spread = cfg.spread != null ? cfg.spread : 150;
   const dur = Math.max(0.1, cfg.speed || 0.7), arc = cfg.arc != null ? cfg.arc : 60, stag = Math.max(0, cfg.stagger != null ? cfg.stagger : 0.05);
   for (let i = 0; i < n; i++){
     const ang = (-Math.PI/2) + Math.random() * Math.PI;                          // 収束先の右半分(-90〜+90°)に湧く＝左へ収束
     const rad = spread * (0.45 + Math.random() * 0.7);
     const sx = tx + Math.cos(ang) * rad, sy = ty + Math.sin(ang) * rad;          // cos>=0 → 右側から
-    coinTimers.push(setTimeout(() => launchCoin(sx, sy, tx, ty, dur, arc), i * stag * 1000));   // 1枚ずつ順に発射（非ブロッキング・到達で消える）
+    const scoreAfter = prefix[i], delta = deltas[i], pitch = (n>1?i/(n-1):0)*span;
+    coinTimers.push(setTimeout(() => launchCoin(sx, sy, tx, ty, dur, arc,
+      () => coinArrive(cid, scoreAfter, delta, pitch, thick, true)), i * stag * 1000));   // 着弾＝数字の増加の原因
   }
-  // 音：点数に比例させない。回数は soundMin..soundMax（点数の大きさで 8→12 の範囲）、鳴る時間は soundDur で一定。
-  //   点数の大きさは「音程の高さ・厚み・回数(8〜12)」で表す（延々と鳴り続けない）。
-  const sMin = Math.max(1, Math.round(cfg.soundMin || 8)), sMax = Math.max(sMin, Math.round(cfg.soundMax || 12));
-  const sN = Math.round(sMin + (sMax - sMin) * nrm), sDur = Math.max(0.05, cfg.soundDur || 0.7) * 1000;
-  const span = cfg.pitchSpan != null ? cfg.pitchSpan : 12, basePitch = nrm * span * 0.5, thick = nrm;
-  for (let k = 0; k < sN; k++){ const fr = sN > 1 ? k / (sN - 1) : 0;
-    coinTimers.push(setTimeout(() => Sound.coinChink(basePitch + fr * span, thick), fr * sDur)); }
   return n;
 }
-function launchCoin(fx, fy, tx, ty, dur, arc){
-  if (reduced || !coinLayerEl) return;                          // reduced：飛ばさない（音だけ鳴る）
+// コイン1枚の着弾：売上累計を +delta（常時）、得点欄をその回収の途中合計に（同じ回収なら）。音＋小さな跳ね。
+function coinArrive(cid, scoreAfter, delta, pitchSemi, thick, sound){
+  cumTotalValue += delta; if (cumTotalEl){ cumTotalEl.textContent = cumTotalValue; numBounce(cumTotalEl); }   // 累計は常に増える（非ブロッキング）
+  if (collectFillActive && cid === currentCollectId){ scoreEl.textContent = "¥" + scoreAfter; numBounce(scoreEl); }  // このバーガーの売値（同じ回収の間だけ）
+  if (sound) Sound.coinChink(pitchSemi, thick);      // 着弾ごとに音（到達音程の上で連鎖上昇）
+}
+function launchCoin(fx, fy, tx, ty, dur, arc, onArrive){
+  if (reduced || !coinLayerEl){ if (onArrive) onArrive(); return; }             // reduced：飛ばさず着弾処理だけ
   const el = document.createElement("div"); el.className = "coin";
   coinLayerEl.appendChild(el);
   const jx = (Math.random()*2 - 1) * 22;                                       // 軌道を少しばらす
@@ -2082,39 +2100,26 @@ function launchCoin(fx, fy, tx, ty, dur, arc){
     el.style.opacity = (t > 0.8 ? (1 - (t - 0.8) / 0.2) : 1).toFixed(2);       // 到着間際でフェード
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(t*spin).toFixed(0)}deg)`;
     if (t < 1) requestAnimationFrame(step);
-    else el.remove();                                          // 到達＝消える（積もりは残さない）
+    else { el.remove(); if (onArrive) onArrive(); }             // 到達＝消える＋着弾処理（数字が増える・音・跳ね）
   }
   requestAnimationFrame(step);
 }
 function clearPiledCoins(){ clearCoinTimers(); if (coinLayerEl) coinLayerEl.innerHTML = ""; }   // 飛行中のコインとタイマーを片付ける
+// 数字の小さな跳ね（着弾ごと）。コインは非ブロッキングなので後始末はバーガー切替に巻き込まれない素のタイマーで。
+function numBounce(el){ if (!el || reduced) return; el.classList.remove("numbump"); void el.offsetWidth; el.classList.add("numbump");
+  setTimeout(() => el.classList.remove("numbump"), 200); }
 
-function animateCum(delta){
-  const from = cumTotalValue, to = cumTotalValue + delta; cumTotalValue = to;
-  const pop = document.createElement("div"); pop.className = "cumpop"; pop.textContent = "+" + delta;
-  document.querySelector(".scorehead").appendChild(pop);
-  setTimeout(() => pop.remove(), 520);
-  if (reduced){ cumTotalEl.textContent = to; return; }
-  const tok = ++cumToken, dur = (CONFIG.params.collectPop || 0.35) * 1000, s0 = performance.now();
-  function step(now){ if (tok !== cumToken) return;
-    const t = Math.min(1, (now - s0) / dur);
-    cumTotalEl.textContent = Math.round(from + (to - from) * t);
-    if (t < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-function countUp(target, token){                    // 点数は最後に数え上がる
-  const onBurger = burgerScoreEl.classList.contains("total");   // 完成の合計はバーガー上の大きい表示も一緒に数える
+// 完成時：バーガーに重ねた大きな価格だけを数え上げる（下の得点欄は回収まで伏せる）。
+function burgerCountUp(target, token){
+  const onB = () => burgerScoreEl.classList.contains("total");   // 回収でクリアされたら以後は触らない
   const dur = CONFIG.params.countUp * 1000;
-  const onB = () => onBurger && burgerScoreEl.classList.contains("total");   // 回収でクリアされたら以後は触らない
-  if (reduced || dur <= 0){ scoreEl.textContent = target; if (onB()) burgerScoreEl.textContent = "¥" + target; return; }
+  if (reduced || dur <= 0){ if (onB()) burgerScoreEl.textContent = "¥" + target; return; }
   const start = performance.now(); let lastFx = 0;
   const W = $("stage").clientWidth;
   function step(now){
     if (token !== genToken) return;                 // 次のバーガー開始で中断
     const t = Math.min(1, (now - start) / dur);
     const v = Math.round(target * t);
-    scoreEl.textContent = v;
     if (onB()) burgerScoreEl.textContent = "¥" + v;
     // 数え上げ中も演出を出し続ける（無音・無演出の時間を作らない）：文字は増やさず、破片だけを間欠で
     if (now - lastFx > 55){ lastFx = now;
@@ -2152,9 +2157,7 @@ function resetBurger(){
   applyBandVisual(0); clearBandTransients(); clearParticles();
   offerEl.classList.remove("show"); offerEl.innerHTML = "";
   stageInner.innerHTML = ""; stageInner.style.setProperty("--fit","1"); stageInner.style.setProperty("--zoom","1"); comboFeedEl.innerHTML = "";
-  scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
-  fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
-  firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
+  resetScorePanel();                                // 得点欄を空へ（collectFillActive も false＝古いコインは書かない）
   multMeterEl.textContent = "×1.00"; burgerScoreClear();
   hintEl.style.display = "";
   updateProgress();
@@ -2476,9 +2479,6 @@ function renderSettings(){
   gridRow(g, "飛ぶ時間(秒・speed)", numInput(()=>fx.coins.speed, v=>fx.coins.speed=Math.max(0.05,v), 0.05));
   gridRow(g, "軌道の山(px・arc)", numInput(()=>fx.coins.arc, v=>fx.coins.arc=Math.max(0,v), 10));
   gridRow(g, "1枚ごとの間隔(秒・stagger)", numInput(()=>fx.coins.stagger, v=>fx.coins.stagger=Math.max(0,v), 0.01));
-  gridRow(g, "音の回数・下限(soundMin)", numInput(()=>fx.coins.soundMin, v=>fx.coins.soundMin=Math.max(1,Math.round(v)), 1));
-  gridRow(g, "音の回数・上限(soundMax)", numInput(()=>fx.coins.soundMax, v=>fx.coins.soundMax=Math.max(1,Math.round(v)), 1));
-  gridRow(g, "音の鳴る時間(秒・soundDur)", numInput(()=>fx.coins.soundDur, v=>fx.coins.soundDur=Math.max(0.05,v), 0.05));
   gridRow(g, "音程の幅(半音・pitchSpan)", numInput(()=>fx.coins.pitchSpan, v=>fx.coins.pitchSpan=Math.max(0,v), 1));
 
   g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
@@ -2567,7 +2567,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; temporalBonus = {}; completedCount = 0; resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; temporalBonus = {}; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; temporalBonus = {}; collectFillActive = false; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
