@@ -1,24 +1,644 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>burger-stack</title>
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-    }
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: system-ui, sans-serif;
-      font-size: 3rem;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>burger-stack 試作0</title>
+<style>
+  /* ===== 色（プロトタイプ用・即調整できるよう1箇所に） ===== */
+  :root{
+    --bg:#171a1f; --panel:#20242b; --line:#333b46; --text:#e9edf2; --muted:#9aa6b3;
+    --accent:#ffcf5a; --good:#6ad19a; --bad:#e0745f;
+
+    --patty:#5b3a26; --patty2:#39230f; --char:#20130a;
+    --cheese:#f4b740; --cheese2:#e08b12;
+    --lettuce:#79b64f; --lettuce2:#5c9438;
+    --tomato:#d6402c; --tomato2:#a92a1c;
+    --onion:#f2e8f0; --onion2:#cdb0cb;
+    --pickle:#6f9a35; --pickle2:#51781f;
+    --ketchup:#c33627; --mustard:#e6c320; --mayo:#f5edd6;
+    --sesame:#e2a656; --sesame2:#c37f2c;
+    --muffin:#ecd8ac; --muffin2:#cfb887;
+    --melon:#efd486; --melon2:#d7b552;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:14px 14px 60px}
+  h1{font-size:1.15rem; margin:.2em 0 .1em}
+  .sub{color:var(--muted); font-size:.8rem; margin:0 0 12px}
+  section{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px}
+  .lbl{font-size:.72rem; color:var(--muted); letter-spacing:.04em; margin:0 0 6px; text-transform:uppercase}
+
+  /* ===== 1. バーガー表示 ===== */
+  #stage{position:relative; width:100%; min-height:220px; margin:0 auto; display:block; overflow:visible}
+  #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); width:230px; height:0}
+  .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
+          width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
+  .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+        color:var(--muted); font-size:.85rem; text-align:center}
+  .tier{position:absolute; left:50%; transform:translateX(-50%); width:230px; display:flex; justify-content:center}
+  .food{position:relative; width:200px; height:20px; border-radius:8px}
+  .tier.drop .food{transform:translateY(-260px); opacity:0}
+  .tier.land .food{transform:translateY(0); opacity:1}
+  .tier .food{transition:transform var(--fall,.14s) cubic-bezier(.3,1.3,.5,1), opacity .1s linear}
+  @keyframes squash{40%{transform:scaleY(.82) scaleX(1.05)}100%{transform:none}}
+  .tier.squash .food{animation:squash var(--squash,.12s) ease-out}
+  .tier.hit .food{box-shadow:0 0 0 3px var(--accent), 0 0 16px 5px rgba(255,207,90,.75)}
+  @keyframes pulse{0%{box-shadow:0 0 0 2px var(--accent),0 0 6px 2px rgba(255,207,90,.5)}
+                   100%{box-shadow:0 0 0 3px var(--accent),0 0 18px 6px rgba(255,207,90,.85)}}
+  .tier.hit.anim .food{animation:pulse .45s ease-in-out infinite alternate}
+  .badge{position:absolute; left:calc(50% + 118px); transform:translateY(50%);
+         background:var(--accent); color:#241a00; font-weight:700; font-size:.72rem;
+         padding:2px 7px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .badge.add{background:var(--good); color:#06251a}
+
+  /* ---- 食材の絵（横から見た形） ---- */
+  .food[data-type="bun"][data-pos="bottom"]{
+    background:linear-gradient(var(--b1),var(--b2)); border-radius:8px 8px 16px 16px;
+    box-shadow:inset 0 -5px 6px rgba(0,0,0,.28), inset 0 3px 4px rgba(255,255,255,.25)}
+  .food[data-type="bun"][data-pos="top"]{
+    background:linear-gradient(var(--b1),var(--b2));
+    border-radius:60% 60% 12px 12px / 78% 78% 12px 12px;
+    box-shadow:inset 0 6px 8px rgba(255,255,255,.28), inset 0 -4px 6px rgba(0,0,0,.22)}
+  .food[data-item="ゴマバンズ"]{--b1:var(--sesame); --b2:var(--sesame2)}
+  .food[data-item="イングリッシュマフィン"]{--b1:var(--muffin); --b2:var(--muffin2)}
+  .food[data-item="メロンパン"]{--b1:var(--melon); --b2:var(--melon2)}
+  /* ゴマ */
+  .food[data-item="ゴマバンズ"][data-pos="top"]::after{content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 3px 2px at 40% 42%, #fff6df 60%, transparent 62%),
+      radial-gradient(ellipse 3px 2px at 60% 55%, #fff6df 60%, transparent 62%),
+      radial-gradient(ellipse 3px 2px at 50% 34%, #fff6df 60%, transparent 62%),
+      radial-gradient(ellipse 3px 2px at 33% 60%, #fff6df 60%, transparent 62%),
+      radial-gradient(ellipse 3px 2px at 68% 40%, #fff6df 60%, transparent 62%);
+    opacity:.9}
+  /* メロンパンの格子 */
+  .food[data-item="メロンパン"][data-pos="top"]::after{content:""; position:absolute; inset:2px 8px auto 8px; height:60%;
+    background:
+      repeating-linear-gradient(60deg, rgba(120,90,20,.28) 0 1px, transparent 1px 9px),
+      repeating-linear-gradient(-60deg, rgba(120,90,20,.28) 0 1px, transparent 1px 9px)}
+  /* マフィンの粉ふき */
+  .food[data-item="イングリッシュマフィン"]::after{content:""; position:absolute; inset:0; border-radius:inherit;
+    background:radial-gradient(circle at 30% 40%, rgba(255,255,255,.5) 1px, transparent 2px) 0 0/10px 8px,
+               radial-gradient(circle at 70% 60%, rgba(180,160,120,.5) 1px, transparent 2px) 3px 2px/12px 9px;
+    opacity:.5}
+
+  .food[data-item="パティ"]{background:linear-gradient(var(--patty),var(--patty2)); border-radius:16px/11px;
+    box-shadow:inset 0 -4px 6px rgba(0,0,0,.45), inset 0 3px 4px rgba(255,255,255,.08)}
+  .food[data-item="パティ"]::before{content:""; position:absolute; inset:0; border-radius:inherit;
+    background:repeating-linear-gradient(90deg, transparent 0 15px, var(--char) 15px 18px); opacity:.35}
+
+  .food[data-item="チーズ"]{background:linear-gradient(var(--cheese),var(--cheese2)); border-radius:5px}
+  .food[data-item="チーズ"]::before,.food[data-item="チーズ"]::after{content:""; position:absolute; top:80%;
+    width:20px; height:16px; background:var(--cheese2); border-radius:0 0 6px 6px}
+  .food[data-item="チーズ"]::before{left:26px; transform:rotate(4deg)}
+  .food[data-item="チーズ"]::after{right:26px; transform:rotate(-4deg)}
+
+  .food[data-item="レタス"]{width:228px; background:var(--lettuce); border-radius:16px;
+    box-shadow:inset 0 -3px 5px rgba(0,0,0,.2)}
+  .food[data-item="レタス"]::before{content:""; position:absolute; left:-4px; right:-4px; top:-9px; height:18px;
+    background:radial-gradient(circle at 11px 9px, var(--lettuce) 8px, transparent 9px) repeat-x;
+    background-size:22px 18px}
+  .food[data-item="レタス"]::after{content:""; position:absolute; left:6px; right:6px; top:5px; height:6px;
+    background:var(--lettuce2); border-radius:4px; opacity:.6}
+
+  .food[data-item="トマト"]{background:radial-gradient(120% 140% at 50% 30%, var(--tomato), var(--tomato2)); border-radius:9px}
+  .food[data-item="トマト"]::before{content:""; position:absolute; inset:0;
+    background:radial-gradient(circle at 38% 55%, rgba(255,220,120,.9) 1.5px, transparent 2.5px) 0 0/22px 10px,
+               radial-gradient(circle at 62% 45%, rgba(255,220,120,.9) 1.5px, transparent 2.5px) 6px 3px/26px 10px;
+    opacity:.8}
+
+  .food[data-item="オニオン"]{background:linear-gradient(var(--onion),var(--onion2)); border-radius:9px; opacity:.96}
+  .food[data-item="オニオン"]::before{content:""; position:absolute; inset:3px 10px;
+    border:1px solid var(--onion2); border-radius:8px; opacity:.7}
+
+  .food[data-item="ピクルス"]{background:var(--pickle); border-radius:11px}
+  .food[data-item="ピクルス"]::before{content:""; position:absolute; inset:0; border-radius:inherit;
+    background:radial-gradient(circle at 30% 50%, var(--pickle2) 2px, transparent 3px) 0 0/16px 100%,
+              radial-gradient(circle at 70% 50%, var(--pickle2) 2px, transparent 3px) 8px 0/16px 100%;
+    opacity:.7}
+
+  .food[data-type="sauce"]{height:12px; border-radius:6px}
+  .food[data-item="ケチャップ"]{background:var(--ketchup)}
+  .food[data-item="マスタード"]{background:var(--mustard)}
+  .food[data-item="マヨネーズ"]{background:var(--mayo)}
+  .food[data-type="sauce"]::before{content:""; position:absolute; left:8px; right:8px; top:-3px; height:6px;
+    background:inherit; border-radius:6px;
+    -webkit-mask:radial-gradient(circle at 6px 6px, #000 5px, transparent 6px) repeat-x; mask:radial-gradient(circle at 6px 6px,#000 5px,transparent 6px) repeat-x;
+    -webkit-mask-size:12px 6px; mask-size:12px 6px}
+
+  /* ===== 2. 得点と内訳 ===== */
+  .scorewrap{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  #score{font-size:2.6rem; font-weight:800; line-height:1; color:var(--accent)}
+  .formula{color:var(--muted); font-size:.86rem}
+  .formula b{color:var(--text); font-weight:700}
+  #firedRules{margin-top:8px; display:flex; flex-wrap:wrap; gap:6px}
+  .chip{font-size:.72rem; background:#2b313a; border:1px solid var(--line); border-radius:999px; padding:2px 8px; color:var(--muted)}
+  .chip.mult{border-color:var(--accent); color:var(--accent)}
+  .chip.add{border-color:var(--good); color:var(--good)}
+
+  /* ===== 3. ボタン ===== */
+  #tap{width:100%; padding:20px; font-size:1.3rem; font-weight:800; color:#241a00;
+    background:linear-gradient(var(--accent),#eab63c); border:none; border-radius:14px; cursor:pointer;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none}
+  #tap:active{transform:translateY(1px); filter:brightness(1.05)}
+  #msg{color:var(--bad); font-size:.8rem; min-height:1.1em; margin-top:6px}
+
+  /* ===== 4. 棒グラフ・統計 ===== */
+  .stats{display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap}
+  .stat{flex:1; min-width:88px; background:#2b313a; border-radius:9px; padding:8px 10px}
+  .stat .k{font-size:.68rem; color:var(--muted)}
+  .stat .v{font-size:1.25rem; font-weight:800}
+  .stat.key{outline:1px solid var(--accent)}
+  .stat.key .v{color:var(--accent)}
+  #bars{display:flex; align-items:flex-end; gap:3px; height:96px; padding-top:4px}
+  #bars .bar{flex:1; min-width:5px; background:#3a4653; border-radius:3px 3px 0 0; transition:height .18s ease; position:relative}
+  #bars .bar.best{background:var(--accent)}
+  #bars .bar.newest{outline:1px solid #fff3}
+  .barnote{color:var(--muted); font-size:.72rem; margin-top:6px}
+
+  /* ===== 5/6. 山の編集・調整 ===== */
+  .pile{margin-bottom:10px}
+  .pile h3{font-size:.85rem; margin:0 0 6px; display:flex; justify-content:space-between}
+  .pile h3 span{color:var(--muted); font-weight:400}
+  .row{display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px dashed #2c333d}
+  .row .nm{flex:1; font-size:.9rem}
+  .row .tag{font-size:.66rem; color:var(--muted); background:#2b313a; padding:1px 6px; border-radius:6px}
+  .stepper{display:flex; align-items:center; gap:6px}
+  .stepper button{width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:#2b313a; color:var(--text); font-size:1.1rem; cursor:pointer; touch-action:manipulation}
+  .stepper .c{min-width:20px; text-align:center; font-weight:700}
+  details{border:1px solid var(--line); border-radius:10px; padding:6px 10px; background:#1b1f25}
+  details summary{cursor:pointer; font-weight:700; font-size:.9rem; padding:4px 0}
+  .grid{display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; margin:8px 0}
+  .grid label{font-size:.82rem; color:var(--muted)}
+  .grid input{width:84px; padding:5px 7px; background:#0f1216; border:1px solid var(--line); color:var(--text); border-radius:7px; font-size:.9rem}
+  .setgroup{margin:10px 0}
+  .setgroup .lbl{margin-top:8px}
+  .btnrow{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+  .btnrow button{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#2b313a; color:var(--text); cursor:pointer; font-size:.85rem}
+</style>
 </head>
 <body>
-  <p>Hello</p>
+<div class="wrap">
+  <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span></h1>
+  <p class="sub">ボタンを連打してバーガーを積む。デッキ（山）の中身を変えて、点数の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
+
+  <!-- 1. バーガー表示 -->
+  <section>
+    <p class="lbl">バーガー</p>
+    <div id="stage">
+      <div class="ground"></div>
+      <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
+      <div id="stageInner"></div>
+    </div>
+  </section>
+
+  <!-- 2. 得点と内訳 -->
+  <section>
+    <p class="lbl">今回の得点</p>
+    <div class="scorewrap">
+      <div id="score">0</div>
+      <div class="formula">
+        （基礎 <b id="fBase">0</b> ＋ 加算 <b id="fAdd">0</b>）× 乗算 <b id="fMult">1.00</b>
+      </div>
+    </div>
+    <div id="firedRules"></div>
+  </section>
+
+  <!-- 3. ボタン -->
+  <section>
+    <button id="tap">🍔 作る（連打）</button>
+    <div id="msg"></div>
+  </section>
+
+  <!-- 4. 棒グラフ・統計 -->
+  <section>
+    <p class="lbl">直近20回と統計</p>
+    <div class="stats">
+      <div class="stat"><div class="k">最高点</div><div class="v" id="sMax">0</div></div>
+      <div class="stat"><div class="k">平均点</div><div class="v" id="sAvg">0</div></div>
+      <div class="stat key"><div class="k">最高 ÷ 平均</div><div class="v" id="sRatio">–</div></div>
+      <div class="stat"><div class="k">試行回数</div><div class="v" id="sN">0</div></div>
+    </div>
+    <div id="bars"></div>
+    <div class="barnote" id="barnote">まだ記録なし。棒は左が古く、右が新しい。金色＝最高点。</div>
+  </section>
+
+  <!-- 5. 山の編集 -->
+  <section>
+    <p class="lbl">3つの山（＋−で枚数を変える。いつでも変更可）</p>
+    <div id="piles"></div>
+  </section>
+
+  <!-- 6. 数値調整 -->
+  <section>
+    <details>
+      <summary>数値の調整（基礎点・倍率・加算・食い込み・演出速度）</summary>
+      <div id="settings"></div>
+      <div class="btnrow">
+        <button id="resetCfg">数値を初期化</button>
+        <button id="clearHist">履歴をクリア</button>
+      </div>
+      <p class="barnote">※ 変更は次に作るバーガーから反映。保存はしない（リロードで初期化）。</p>
+    </details>
+  </section>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   設定（数値とルールを1箇所に。ロジックとは混ぜない）
+   - 数値だけ触れば調整できる。ルールは1件=1オブジェクトで追加可能。
+   ========================================================================= */
+const DEFAULTS = {
+  // 食材カタログ：基礎点・系統・初期枚数・所属する山・効果欄(バンズ用、今は空)
+  items: {
+    "パティ":            { pile:"ingredient", type:"meat",  base:20, count:2 },
+    "チーズ":            { pile:"ingredient", type:"dairy", base:10, count:2 },
+    "レタス":            { pile:"ingredient", type:"veg",   base:8,  count:2 },
+    "トマト":            { pile:"ingredient", type:"veg",   base:8,  count:1 },
+    "オニオン":          { pile:"ingredient", type:"veg",   base:6,  count:1 },
+    "ピクルス":          { pile:"ingredient", type:"veg",   base:4,  count:1 },
+    "ケチャップ":        { pile:"sauce", type:"sauce", base:2, count:1 },
+    "マスタード":        { pile:"sauce", type:"sauce", base:2, count:1 },
+    "マヨネーズ":        { pile:"sauce", type:"sauce", base:2, count:1 },
+    "ゴマバンズ":            { pile:"bun", type:"bun", base:5,  count:2, effect:null },
+    "イングリッシュマフィン": { pile:"bun", type:"bun", base:5,  count:1, effect:null },
+    "メロンパン":            { pile:"bun", type:"bun", base:12, count:1, effect:null }
+  },
+  // ルール（データとして定義。1行足せば1ルール追加）
+  rules: [
+    // 系統A：ソース（接触先の系統が問題。バンズに接する側は無効）
+    { id:"ketchup", sys:"A", kind:"sauceContact", sauce:"ケチャップ", targets:["veg"],          mult:1.4, label:"ケチャップ：接する野菜×1.4" },
+    { id:"mustard", sys:"A", kind:"sauceContact", sauce:"マスタード", targets:["meat"],         mult:1.8, label:"マスタード：接する肉×1.8" },
+    { id:"mayo",    sys:"A", kind:"sauceContact", sauce:"マヨネーズ", targets:["dairy","veg"],  mult:1.3, label:"マヨネーズ：接する乳/野菜×1.3" },
+    // 系統B：具材（順序が問題。上下で違う）
+    { id:"melty",   sys:"B", kind:"stackedPair",  lower:"パティ", upper:"チーズ", mult:2, label:"とろけチーズ：パティの直上がチーズ ×2" },
+    { id:"crisp",   sys:"B", kind:"adjacentPair", a:"レタス", b:"トマト",        add:25, label:"シャキシャキ：レタス＋トマト隣接 +25" }
+    // 系統C：バンズ（全体に効く）… 現在は空。items[].effect に将来 {mult:x} を入れる形で対応。
+  ],
+  // 演出速度と食い込み量（食材ごと）
+  params: {
+    fallPerTier: 0.08,  // 1段が落ちる間隔(秒)
+    fallDur:     0.14,  // 1段の落下アニメ時間(秒)
+    landPause:   0.10,  // 最終段着地から数え上げまでの間(秒)
+    countUp:     0.18,  // 点数の数え上げ時間(秒)
+    squash:      0.12,  // 着地時に下段が縮む時間(秒)
+    biteDefault: 12,    // 既定の食い込み量(px)
+    bite: {
+      "パティ":7, "チーズ":13, "レタス":20, "トマト":13, "オニオン":12, "ピクルス":12,
+      "ケチャップ":9, "マスタード":9, "マヨネーズ":9,
+      "ゴマバンズ":10, "イングリッシュマフィン":10, "メロンパン":10
+    }
+  }
+};
+
+// 見た目の高さ(px)。断面ではなく横から見た絵の高さ。（調整対象外・定数）
+const VIS_H = {
+  "パティ":30, "チーズ":16, "レタス":24, "トマト":18, "オニオン":16, "ピクルス":16,
+  "ケチャップ":12, "マスタード":12, "マヨネーズ":12,
+  "ゴマバンズ":30, "イングリッシュマフィン":28, "メロンパン":32
+};
+const TOP_BUN_EXTRA = 8; // 上バンズはドーム分だけ高い
+
+const ORDER = ["パティ","チーズ","レタス","トマト","オニオン","ピクルス",
+               "ケチャップ","マスタード","マヨネーズ",
+               "ゴマバンズ","イングリッシュマフィン","メロンパン"];
+const TYPE_JA = { meat:"肉", dairy:"乳", veg:"野菜", sauce:"ソース", bun:"バンズ" };
+
+let CONFIG = fresh();
+function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+
+/* =========================================================================
+   ロジック（生成・得点）
+   ========================================================================= */
+function pick(pileKey){
+  const entries = ORDER
+    .filter(n => CONFIG.items[n].pile === pileKey && CONFIG.items[n].count > 0)
+    .map(n => [n, CONFIG.items[n].count]);
+  let tot = 0; for (const [,c] of entries) tot += c;
+  if (tot <= 0) return null;
+  let r = Math.random() * tot;          // 山は減らない・毎回引き直し（枚数で重み付け）
+  for (const [n,c] of entries){ r -= c; if (r < 0) return n; }
+  return entries[entries.length-1][0];
+}
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function buildBurger(){
+  const bottom = pick("bun");                                   // 下バンズ
+  const top    = pick("bun");                                   // 上バンズ（別々に引く）
+  const ings   = [pick("ingredient"), pick("ingredient"), pick("ingredient")]; // 具材3枚
+  const sauce  = pick("sauce");                                 // ソース1枚
+  if ([bottom, top, sauce, ...ings].some(x => x == null)) return null;
+  const mid = shuffle([...ings, sauce]);                        // 2〜5段の並びはランダム
+  return { stack: [bottom, mid[0], mid[1], mid[2], mid[3], top] }; // index0=最下段
+}
+
+// 得点 =（基礎の合計 ＋ 加算）×（乗算の積）
+function evaluate(stack){
+  let base = 0; for (const n of stack) base += CONFIG.items[n].base;
+  let add = 0, mult = 1; const hits = [];
+
+  for (const r of CONFIG.rules){
+    if (r.kind === "sauceContact"){
+      for (let i=0;i<stack.length;i++){
+        if (stack[i] !== r.sauce) continue;
+        for (const j of [i-1, i+1]){                 // 上下に接する2枚
+          if (j < 0 || j >= stack.length) continue;
+          const t = CONFIG.items[stack[j]].type;
+          if (t === "bun") continue;                 // バンズに接する側は無効
+          if (r.targets.includes(t)){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,j], kind:"mult" }); }
+        }
+      }
+    } else if (r.kind === "stackedPair"){            // 下段=lower の直上が upper（方向あり）
+      for (let i=0;i<stack.length-1;i++){
+        if (stack[i] === r.lower && stack[i+1] === r.upper){ mult *= r.mult; hits.push({ label:r.label, effect:"×"+r.mult, idx:[i,i+1], kind:"mult" }); }
+      }
+    } else if (r.kind === "adjacentPair"){           // a と b が隣接（順不同）
+      for (let i=0;i<stack.length-1;i++){
+        const x=stack[i], y=stack[i+1];
+        if (x!==y && ((x===r.a&&y===r.b)||(x===r.b&&y===r.a))){ add += r.add; hits.push({ label:r.label, effect:"+"+r.add, idx:[i,i+1], kind:"add" }); }
+      }
+    }
+  }
+  // 系統C：バンズ全体倍率（効果欄。今は空だが構造だけ用意）
+  for (let i=0;i<stack.length;i++){
+    const eff = CONFIG.items[stack[i]].effect;
+    if (eff && eff.mult){ mult *= eff.mult; hits.push({ label:"バンズ効果", effect:"×"+eff.mult, idx:[i], kind:"mult" }); }
+  }
+
+  const total = Math.round((base + add) * mult);
+  return { base, add, mult, total, hits };
+}
+
+/* =========================================================================
+   レイアウト計算（食い込みで重ねる。上の段ほど手前）
+   ========================================================================= */
+function effHeight(name, pos){ return VIS_H[name] + (pos === "top" ? TOP_BUN_EXTRA : 0); }
+function biteOf(name){ const b = CONFIG.params.bite[name]; return (b == null ? CONFIG.params.biteDefault : b); }
+function posOf(i){ return i === 0 ? "bottom" : (i === 5 ? "top" : "mid"); }
+
+function computeLayout(stack){
+  const effs = stack.map((n,i)=>effHeight(n, posOf(i)));
+  const bottoms = [0];
+  for (let i=1;i<stack.length;i++){
+    let bite = biteOf(stack[i]);
+    bite = Math.min(bite, effs[i-1] - 4);            // 潰れすぎ防止
+    bottoms[i] = bottoms[i-1] + effs[i-1] - bite;
+  }
+  const total = bottoms[stack.length-1] + effs[stack.length-1];
+  return { effs, bottoms, total };
+}
+
+/* =========================================================================
+   DOM / 描画
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const stageInner = $("stageInner"), hintEl = $("hint");
+const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), firedRules = $("firedRules");
+const barsEl = $("bars"), barnote = $("barnote");
+
+const reduceMQ = window.matchMedia("(prefers-reduced-motion: reduce)");
+let reduced = reduceMQ.matches;
+reduceMQ.addEventListener?.("change", e => { reduced = e.matches; });
+
+let history = [];
+let animTimers = [];
+let animToken = 0;
+function clearTimers(){ animTimers.forEach(clearTimeout); animTimers = []; }
+
+function makeTier(name, i){
+  const tier = document.createElement("div");
+  tier.className = "tier";
+  const food = document.createElement("div");
+  food.className = "food";
+  food.dataset.item = name;
+  food.dataset.type = CONFIG.items[name].type;
+  food.dataset.pos = posOf(i);
+  food.style.height = effHeight(name, posOf(i)) + "px";
+  tier.appendChild(food);
+  return tier;
+}
+
+function roll(){
+  const b = buildBurger();
+  if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return; }
+  $("msg").textContent = "";
+  const sc = evaluate(b.stack);
+
+  history.push(sc.total);           // 得点は即記録（連打で取りこぼさない）
+  updateStats(); renderBars();
+  showBreakdown(sc);
+
+  animToken++; clearTimers();
+  play(b, sc, animToken);
+}
+
+function showBreakdown(sc){
+  fBase.textContent = sc.base;
+  fAdd.textContent  = sc.add;
+  fMult.textContent = sc.mult.toFixed(2);
+  firedRules.innerHTML = "";
+  if (sc.hits.length === 0){
+    const c = document.createElement("span"); c.className = "chip"; c.textContent = "発動ルールなし（基礎点のみ）";
+    firedRules.appendChild(c);
+  } else {
+    for (const h of sc.hits){
+      const c = document.createElement("span");
+      c.className = "chip " + h.kind;
+      c.textContent = h.label + "  " + h.effect;
+      firedRules.appendChild(c);
+    }
+  }
+}
+
+function play(b, sc, token){
+  const stack = b.stack;
+  const layout = computeLayout(stack);
+  hintEl.style.display = "none";
+  stageInner.innerHTML = "";
+  stageInner.style.height = layout.total + "px";
+  $("stage").style.minHeight = Math.max(220, layout.total + 40) + "px";
+
+  const p = CONFIG.params;
+  const tiers = stack.map((name, i) => {
+    const t = makeTier(name, i);
+    t.style.bottom = layout.bottoms[i] + "px";
+    t.style.zIndex = i;                      // 上の段ほど手前
+    t.style.setProperty("--fall", p.fallDur + "s");
+    t.style.setProperty("--squash", p.squash + "s");
+    stageInner.appendChild(t);
+    return t;
+  });
+
+  const finish = () => { showGlow(stack, sc, layout, tiers); countUp(sc.total, token); };
+
+  if (reduced){                              // アニメ省略
+    tiers.forEach(t => t.classList.add("land"));
+    finish();
+    return;
+  }
+
+  tiers.forEach(t => t.classList.add("drop"));
+  // 強制リフロー後に段階的に落とす
+  void stageInner.offsetHeight;
+  stack.forEach((name, i) => {
+    const id = setTimeout(() => {
+      tiers[i].classList.remove("drop");
+      tiers[i].classList.add("land");
+      if (i > 0){                            // 着地で下段が一瞬縮む
+        const below = tiers[i-1];
+        below.classList.add("squash");
+        animTimers.push(setTimeout(() => below.classList.remove("squash"), p.squash*1000 + 20));
+      }
+    }, i * p.fallPerTier * 1000);
+    animTimers.push(id);
+  });
+
+  const landDone = stack.length * p.fallPerTier * 1000 + p.landPause * 1000;
+  animTimers.push(setTimeout(finish, landDone));
+}
+
+function showGlow(stack, sc, layout, tiers){
+  for (const h of sc.hits){
+    for (const k of h.idx) if (tiers[k]){ tiers[k].classList.add("hit"); if (!reduced) tiers[k].classList.add("anim"); }
+    // 接触面にバッジ（倍率/加算）を表示
+    const ys = h.idx.map(k => layout.bottoms[k] + layout.effs[k]/2);
+    const y = ys.reduce((a,c)=>a+c,0) / ys.length;
+    const badge = document.createElement("div");
+    badge.className = "badge " + (h.kind === "add" ? "add" : "");
+    badge.textContent = h.effect;
+    badge.style.bottom = y + "px";
+    stageInner.appendChild(badge);
+  }
+}
+
+function countUp(target, token){
+  const dur = CONFIG.params.countUp * 1000;
+  if (reduced || dur <= 0){ scoreEl.textContent = target; return; }
+  const start = performance.now();
+  function step(now){
+    if (token !== animToken) return;         // 連打で上書きされたら中断
+    const t = Math.min(1, (now - start) / dur);
+    scoreEl.textContent = Math.round(target * t);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ===== 統計・棒グラフ ===== */
+function updateStats(){
+  const n = history.length;
+  $("sN").textContent = n;
+  if (n === 0){ $("sMax").textContent="0"; $("sAvg").textContent="0"; $("sRatio").textContent="–"; return; }
+  const max = Math.max(...history);
+  const avg = history.reduce((a,c)=>a+c,0) / n;
+  $("sMax").textContent = max;
+  $("sAvg").textContent = avg.toFixed(1);
+  $("sRatio").textContent = avg > 0 ? (max/avg).toFixed(2) + "×" : "–";
+}
+function renderBars(){
+  const last = history.slice(-20);
+  barsEl.innerHTML = "";
+  const shownMax = Math.max(1, ...last);
+  const overallMax = history.length ? Math.max(...history) : 0;
+  last.forEach((v, i) => {
+    const bar = document.createElement("div");
+    bar.className = "bar" + (v === overallMax ? " best" : "") + (i === last.length-1 ? " newest" : "");
+    bar.style.height = Math.max(2, (v / shownMax) * 100) + "%";
+    bar.title = String(v);
+    barsEl.appendChild(bar);
+  });
+  barnote.textContent = history.length
+    ? `直近${last.length}回を表示（全${history.length}回）。左が古く右が新しい。金色＝これまでの最高点。`
+    : "まだ記録なし。棒は左が古く、右が新しい。金色＝最高点。";
+}
+
+/* ===== 5. 山の編集 ===== */
+function renderPiles(){
+  const host = $("piles"); host.innerHTML = "";
+  const piles = [["ingredient","具材山"],["sauce","ソース山"],["bun","バンズ山"]];
+  for (const [key, title] of piles){
+    const names = ORDER.filter(n => CONFIG.items[n].pile === key);
+    let tot = 0; names.forEach(n => tot += CONFIG.items[n].count);
+    const box = document.createElement("div"); box.className = "pile";
+    const h = document.createElement("h3"); h.innerHTML = `${title} <span>計 ${tot} 枚</span>`;
+    box.appendChild(h);
+    for (const n of names){
+      const it = CONFIG.items[n];
+      const row = document.createElement("div"); row.className = "row";
+      const tag = it.type === "bun" || it.type === "sauce" ? "" : `<span class="tag">${TYPE_JA[it.type]}</span>`;
+      row.innerHTML = `<span class="nm">${n}</span>${tag}<span class="tag">基礎${it.base}</span>`;
+      const st = document.createElement("div"); st.className = "stepper";
+      const minus = document.createElement("button"); minus.textContent = "−";
+      const c = document.createElement("span"); c.className = "c"; c.textContent = it.count;
+      const plus = document.createElement("button"); plus.textContent = "＋";
+      minus.onclick = () => { it.count = Math.max(0, it.count - 1); renderPiles(); };
+      plus.onclick  = () => { it.count = it.count + 1; renderPiles(); };
+      st.append(minus, c, plus); row.appendChild(st); box.appendChild(row);
+    }
+    host.appendChild(box);
+  }
+}
+
+/* ===== 6. 数値調整 ===== */
+function numInput(get, set, step){
+  const inp = document.createElement("input");
+  inp.type = "number"; inp.step = String(step); inp.value = get();
+  inp.addEventListener("input", () => { const v = parseFloat(inp.value); if (!Number.isNaN(v)) set(v); });
+  return inp;
+}
+function gridRow(host, labelText, input){
+  const l = document.createElement("label"); l.textContent = labelText;
+  host.append(l, input);
+}
+function renderSettings(){
+  const host = $("settings"); host.innerHTML = "";
+  const group = (title) => { const g = document.createElement("div"); g.className="setgroup";
+    const p=document.createElement("p"); p.className="lbl"; p.textContent=title; g.appendChild(p);
+    const grid=document.createElement("div"); grid.className="grid"; g.appendChild(grid); host.appendChild(g); return grid; };
+
+  // 基礎点
+  let g = group("基礎点");
+  for (const n of ORDER) gridRow(g, n, numInput(()=>CONFIG.items[n].base, v=>CONFIG.items[n].base=v, 1));
+
+  // 倍率
+  g = group("倍率（乗算ルール）");
+  for (const r of CONFIG.rules) if ("mult" in r) gridRow(g, r.label, numInput(()=>r.mult, v=>r.mult=v, 0.1));
+
+  // 加算
+  g = group("加算（加算ルール）");
+  for (const r of CONFIG.rules) if ("add" in r) gridRow(g, r.label, numInput(()=>r.add, v=>r.add=v, 1));
+
+  // 食い込み量
+  g = group("食い込み量（px・大きいほど深く潰れる）");
+  gridRow(g, "既定値", numInput(()=>CONFIG.params.biteDefault, v=>CONFIG.params.biteDefault=v, 1));
+  for (const n of ORDER) gridRow(g, n, numInput(()=>biteOf(n), v=>CONFIG.params.bite[n]=v, 1));
+
+  // 演出速度
+  g = group("演出の速さ（秒。合計0.8秒以内が目安）");
+  gridRow(g, "1段の落下間隔", numInput(()=>CONFIG.params.fallPerTier, v=>CONFIG.params.fallPerTier=v, 0.01));
+  gridRow(g, "1段の落下時間", numInput(()=>CONFIG.params.fallDur,     v=>CONFIG.params.fallDur=v,     0.01));
+  gridRow(g, "着地〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
+  gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
+  gridRow(g, "着地の縮み時間", numInput(()=>CONFIG.params.squash,      v=>CONFIG.params.squash=v,      0.01));
+}
+
+/* ===== 起動・イベント ===== */
+$("tap").addEventListener("click", roll);
+window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); roll(); } });
+$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); renderPiles(); renderSettings(); });
+$("clearHist").addEventListener("click", () => { history = []; animToken++; clearTimers(); updateStats(); renderBars(); });
+
+renderPiles();
+renderSettings();
+updateStats();
+renderBars();
+</script>
 </body>
 </html>
