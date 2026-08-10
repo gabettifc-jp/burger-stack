@@ -37,7 +37,9 @@
   .lbl{font-size:.72rem; color:var(--muted); letter-spacing:.04em; margin:0 0 6px; text-transform:uppercase}
 
   /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
-  #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
+  /* overflow:hidden＝演出（揺れ・破片・衝撃波）を必ずこの箱の中に閉じ込める。外へはみ出してページを広げ、
+     画面下の固定バー（連打ボタン）を巻き込む事故を根絶する。連打ボタンは #stage の外なので一切動かない。 */
+  #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:hidden; border-radius:12px}
   /* 揺れはこの内側レイヤーだけに適用する。#stage（枠・背景・メーター）や画面下の固定バーは一切動かさない。 */
   #stageShake{position:absolute; inset:0; z-index:2; pointer-events:none}
   #stageShake.shake{animation:bshake .13s ease-out}   /* 帯にいる間、段が落ちるたびに揺れる（強さは帯で変わる） */
@@ -653,13 +655,18 @@ const DEFAULTS = {
     //   方針：色の派手さでなく「揺れ・光・音の量と持続」で押す。既定は控えめにせず、最大は桁違いまで取れる。
     //   スケーリングの基準は「帯レベル」。得点/乗算の絶対値ではなく帯に紐づけ、青天井でも破綻しないようにする。実効値(L)=base×scale^L（上限クランプ）。
     fx: {
+      // 演出強度は「離散的な帯レベル」ではなく連続値で動かす。段を積むにつれ、確定済みの最終到達帯へ向けて
+      // 徐々に上がる（跨いだ瞬間だけ上げない）。curve=強度カーブ / stages=段階数（増やせる）。
+      //   linear(直線) / exp(下は緩く上で急) / log(下で一気・上は緩やか) / smooth(S字：両端緩やか)。既定は log。
+      scaling:   { curve:"log", stages:5 },
       particles: { on:true, count:22, scale:1.4, speed:150, life:1.0, gravity:360, spread:0.75, max:800 }, // 文字を減らした分、密度は破片で確保。maxは総数上限（〜2000）
       hitstop:   { on:true, base:0.03, scale:1.35 },   // 大コンボ/帯上昇で画面停止 base×scale^L 秒（上限0.45s）
       trail:     { on:true, base:0.35, scale:1.25 },   // 落下段の残像（尾）の濃さ
       zoom:      { on:true, base:0.05, scale:1.20, dur:0.35 }, // 大発動でカメラが寄る（上限+60%）
       number:    { on:true, base:0.7,  scale:1.25 },   // 完成の合計の跳ね/拡大/色の強さ
-      // 揺れ：振幅の上限を大きく（現行の2〜3倍まで）取れる。減衰の形(decay)も選べる。
-      shake:     { ampMax:180, decay:"settle" },       // ampMax=振幅の上限px / decay: settle(減衰)・hard(一撃)・long(長く尾を引く)
+      // 揺れ：振幅の上限(px)。#stage は overflow:hidden で閉じ込めるので暴れてもボタンには波及しない。
+      //   既定は箱に収まる範囲（バーガーが見えたまま強く揺れる）。持続と減衰の形(decay)で「強さ」を出す。
+      shake:     { gain:5, ampMax:44, decay:"settle" }, // gain=振幅係数 / ampMax=振幅の上限px / decay: settle・hard・long
       // 帯アップの段階化（5段階）。上に行くほど大げさ・長く続く・複数箇所・音が層に。実効は帯レベル(=stage)で決まる。
       bandup:    { on:true, durBase:0.9, durStep:1.45, durMax:2.4, ampBase:1.5, ampStep:1.2, ampMax:3.2, spotsBase:2, layers:5 },
       // 得点をバーガーに重ねて大きく表示。size=大きさ倍率 / opacity=不透明度 / x,y=バーガー内の表示位置(%)。
@@ -693,7 +700,7 @@ const DEFAULTS = {
     completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
     // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。scheme=音のパターン番号（0=標準/現行）。
-    sound: { on: false, volume: 0.4, scheme: 0,
+    sound: { on: true, volume: 0.4, scheme: 0,   // 既定ON（最初のタップで解錠）
              // 低音（「ドン」）：帯アップ/完成で鳴らす。量(gain)と歪み(drive)を調整可。既定ON・量多め。
              bass: { on:true, gain:1.3, drive:0.5 } },
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
@@ -1394,8 +1401,9 @@ function applyStep(r){
   for (const i of step.reveals) presentHit(i);      // この段で出そろうコンボを再生（倍率はplanで確定済み）
   runMult = step.runMult;
   multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl);
-  if (step.bandTo > step.bandFrom) crossBands(step.bandFrom, step.bandTo);   // 跨ぐぶんを1段ずつ確定
+  if (step.bandTo > step.bandFrom) crossBands(step.bandFrom, step.bandTo);   // 跨ぐぶんを1段ずつ確定（跨いだ瞬間の爆発）
   else bandLevelCur = step.bandTo;
+  applyBandVisual(fxLevelRaw());                     // 持続の見た目は連続レベルで滑らかに上げる（最終帯へ向けて先読み）
   if (step.reach) showReach(step.reach);            // 予告：本当に届く回だけ（planで確定済み）
   if (r === plan.stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→停止
 }
@@ -1417,18 +1425,22 @@ function bandColor(stage, cycle){
   return `hsl(${h} 95% ${l}%)`;
 }
 // 帯の見た目を適用（帯にいる間ずっと持続する状態）。各チャンネルは調整欄で個別ON/OFF。
+// 引数 L は「連続の生レベル」。色は帯の整数値で段を決め、大きさ等の magnitude は整形済み連続値で滑らかに上げる。
 function applyBandVisual(L){
   const b = CONFIG.params.band, s = $("stage").style;
+  const Ls = fxShape(L);                                  // 整形済み連続レベル（滑らかな増加に使う）
+  const active = L > 0.001;
   const stageCount = Math.max(1, Math.round(b.stages || 4));
-  const st    = L > 0 ? (L - 1) % stageCount : 0;
-  const cycle = L > 0 ? Math.floor((L - 1) / stageCount) : 0;
+  const Li    = active ? Math.max(1, Math.floor(L + 1e-6)) : 0;  // 色の段は帯の整数値で決める
+  const st    = Li > 0 ? (Li - 1) % stageCount : 0;
+  const cycle = Li > 0 ? Math.floor((Li - 1) / stageCount) : 0;
   const col   = bandColor(st, cycle);
-  if (L > 0) s.setProperty("--bcol", col); else s.removeProperty("--bcol");   // 背景・ふち用（色チャンネルと独立）
-  if (b.color !== false && L > 0) s.setProperty("--bc", col); else s.removeProperty("--bc"); // 倍率の色
-  s.setProperty("--bsize",  (b.size  !== false && L > 0) ? (1 + Math.min(L,8)*0.07).toFixed(3) : "1");
-  s.setProperty("--bbg",    (b.bg    !== false && L > 0) ? Math.min(0.5, L*0.06).toFixed(3) : "0");
-  s.setProperty("--bedge",  (b.edge  !== false && L > 0) ? Math.min(16, L*2.2).toFixed(1) + "px" : "0px");
-  s.setProperty("--bshake", (b.shake !== false && L > 0) ? Math.min(28, L*2.2).toFixed(2) : "0");   // 帯にいる間の落下揺れも強く
+  if (active) s.setProperty("--bcol", col); else s.removeProperty("--bcol");   // 背景・ふち用（色チャンネルと独立）
+  if (b.color !== false && active) s.setProperty("--bc", col); else s.removeProperty("--bc"); // 倍率の色
+  s.setProperty("--bsize",  (b.size  !== false && active) ? (1 + Math.min(Ls,8)*0.06).toFixed(3) : "1");
+  s.setProperty("--bbg",    (b.bg    !== false && active) ? Math.min(0.5, Ls*0.05).toFixed(3) : "0");
+  s.setProperty("--bedge",  (b.edge  !== false && active) ? Math.min(16, Ls*2.0).toFixed(1) + "px" : "0px");
+  s.setProperty("--bshake", (b.shake !== false && active) ? Math.min(20, Ls*1.6).toFixed(2) : "0");   // 帯にいる間の落下揺れ（箱内に収まる範囲）
 }
 function bandThreshold(lvl){ const b = CONFIG.params.band; return (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), lvl - 1); }
 
@@ -1448,7 +1460,7 @@ function crossBands(fromL, toL){
     const pause = (CONFIG.params.band.pause != null ? CONFIG.params.band.pause : 0.20) * 1000;  // 爆発直前の無音の溜め
     animTimers.push(setTimeout(() => {
       if (myGen !== genToken) return;
-      bandLevelCur = L; applyBandVisual(L);         // その帯を確定（見た目も1段ずつ）
+      bandLevelCur = L; applyBandVisual(fxLevelRaw());  // その帯を確定（見た目は連続レベルで滑らかに）
       burstBand(L);                                 // 溜めのあと爆発
       if (reachActive && bandThreshold(L) >= reachTarget - 1e-6) endReach();  // 予告に届いた＝リーチ成功
       stepOne(k + 1);                               // 次の段へ（順に確定）
@@ -1462,20 +1474,23 @@ function burstBand(L){
   if (bandPeak < L) bandPeak = L;
   const bu = CONFIG.params.fx.bandup || {};
   const up = (CONFIG.params.band.up) || {};
-  const stage = Math.max(1, Math.min(5, L));            // 5段階
+  const maxStage = fxStages();                          // 段階数は調整欄で増やせる（5→10+）
+  // バーストの大きさは離散段でなく「連続の整形済みレベル」で決める＝跨ぐたびに滑らかに大きくなる。
+  const t = Math.max(0, Math.min(maxStage, fxL()));
+  const topStage = t >= maxStage - 0.5;                 // 最上段付近＝特別（衝撃波を強く）
   const value = Math.round(bandThreshold(L));
-  const dur = bu.on === false ? 0.6 : Math.min(bu.durMax || 2.2, (bu.durBase || 0.8) * Math.pow(bu.durStep || 1.45, stage - 1));
-  const amp = Math.min(bu.ampMax || 3.0, (bu.ampBase || 1.4) * Math.pow(bu.ampStep || 1.18, stage - 1));
-  const spots = Math.max(1, Math.min(8, Math.round((bu.spotsBase || 1) + (stage - 1))));   // 段階で複数箇所同時
+  const dur = bu.on === false ? 0.6 : Math.min(bu.durMax || 2.2, (bu.durBase || 0.8) * Math.pow(bu.durStep || 1.45, t));
+  const amp = Math.min(bu.ampMax || 3.0, (bu.ampBase || 1.4) * Math.pow(bu.ampStep || 1.18, t));
+  const spots = Math.max(1, Math.min(8, Math.round((bu.spotsBase || 1) + t)));   // 連続で複数箇所同時
   const W = $("stage").clientWidth;
   multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");   // 倍率は右上の累計だけを弾く
   animTimers.push(setTimeout(() => multMeterEl.classList.remove("cel"), Math.min(1500, dur*1000*0.7)));
   // 文字は出さない。非テキストの衝撃波リングを複数箇所で出す（拡大は amp まで・速く出てゆっくり消える）。
   if (!reduced) for (let s = 0; s < spots; s++){
     const el = document.createElement("div");
-    el.className = "shockwave" + (stage >= 5 ? " insane" : "");
+    el.className = "shockwave" + (topStage ? " insane" : "");
     el.style.setProperty("--bdur", dur.toFixed(2) + "s");
-    el.style.setProperty("--bamp", (amp * (60 + 30*stage)).toFixed(0) + "px");    // リングの最大半径（段階で大きく）
+    el.style.setProperty("--bamp", Math.min(150, amp * (55 + 22*t)).toFixed(0) + "px");   // リング半径（箱内に収める上限つき）
     el.style.left = (spots > 1 ? (12 + 76*(s + 0.5)/spots) : 50).toFixed(1) + "%";
     el.style.top  = (spots > 1 ? (30 + Math.random()*30) : 46).toFixed(1) + "%";
     $("stage").appendChild(el);
@@ -1490,20 +1505,22 @@ function burstBand(L){
     for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 90 + Math.random()*70, s%2 ? "juice" : "sesame", 1.8*amp);
     cameraZoom(amp); hitstop(amp);
   }
-  if (upSound > 0) Sound.bandUp(upSound, stage);        // 層を重ねた音（帯が上がるほど層が押し寄せる・低音も）
+  if (upSound > 0) Sound.bandUp(upSound, t);            // 層を重ねた音（連続レベルで層が押し寄せる・低音も）
 }
 
-// 完成の演出：そのバーガーで到達した最高帯（bandPeak）で強くなる。最上段(5)は特別。
+// 完成の演出：そのバーガーで到達した最高帯（bandPeak）で強くなる。最上段は特別。
 function celebrateComplete(){
   const cc = CONFIG.params.fx.complete || {}; if (cc.on === false) return;
-  const stage = Math.max(0, Math.min(5, bandPeak));
-  const amp = (cc.base || 1) * Math.pow(cc.scale || 1.3, stage);
-  const W = $("stage").clientWidth, spots = 1 + stage;
-  const save = fxForceBand; fxForceBand = bandPeak;     // 完成の演出の強さは「最高帯」基準にする
+  const maxStage = fxStages();
+  const save = fxForceBand; fxForceBand = bandPeak;     // 完成の演出の強さは「最高帯」基準（連続で整形）にする
+  const t = Math.max(0, Math.min(maxStage, fxL()));     // 整形済み連続レベル
+  const amp = (cc.base || 1) * Math.pow(cc.scale || 1.3, t);
+  const W = $("stage").clientWidth, spots = 1 + Math.round(t);
+  const topStage = t >= maxStage - 0.5;
   for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 110 + Math.random()*60, s%2 ? "steam" : "sesame", 1.6*amp);
-  if (stage >= 5 && !reduced){                            // 最上段：文字は出さず、強さで示す（衝撃波＋大量の破片）
+  if (topStage && !reduced){                              // 最上段：文字は出さず、強さで示す（衝撃波＋大量の破片）
     const el = document.createElement("div"); el.className = "shockwave insane";
-    el.style.setProperty("--bdur","1.6s"); el.style.setProperty("--bamp","260px"); el.style.left="50%"; el.style.top="46%";
+    el.style.setProperty("--bdur","1.6s"); el.style.setProperty("--bamp","150px"); el.style.left="50%"; el.style.top="46%";
     $("stage").appendChild(el); animTimers.push(setTimeout(() => el.remove(), 1800));
     spawnParticles(W/2, 150, "cheese", 4*amp); spawnParticles(W/2, 120, "juice", 4*amp);
   }
@@ -1571,12 +1588,13 @@ function screenFlash(mul, durMs){
   el.style.setProperty("--flashdur", ((durMs || 280) / 1000).toFixed(2) + "s");
   el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
 }
-// 帯アップ用の強い揺れ。振幅 mul（上限 fx.shake.ampMax まで＝現行の2〜3倍）、持続 durMs、減衰の形 fx.shake.decay。
+// 帯アップ用の強い揺れ。振幅 = gain×mul（上限 fx.shake.ampMax）、持続 durMs、減衰の形 fx.shake.decay。
+// #stage は overflow:hidden なので、振幅を上げても箱の外へは出ず、固定バー（連打ボタン）に波及しない。
 function strongShake(mul, durMs){
   const stg = stageShake, d = durMs || 360;         // 揺れは内側レイヤーだけ。枠・メーター・得点表示・固定バーは動かさない。
   const sc = (CONFIG.params.fx && CONFIG.params.fx.shake) || {};
-  const ampMax = Math.max(20, sc.ampMax || 180), decay = sc.decay || "settle";
-  stg.style.setProperty("--bigshake", Math.min(ampMax, 12 * (mul || 1.5)).toFixed(1) + "px");   // 係数を上げて既定から強く（上限 ampMax まで）
+  const gain = sc.gain != null ? sc.gain : 5, ampMax = Math.max(8, sc.ampMax || 44), decay = sc.decay || "settle";
+  stg.style.setProperty("--bigshake", Math.min(ampMax, gain * (mul || 1.5)).toFixed(1) + "px");   // 箱に収まる範囲で強く（上限 ampMax）
   stg.style.setProperty("--bigdur", (d / 1000).toFixed(2) + "s");
   stg.classList.remove("bigshake","decay-settle","decay-hard","decay-long"); void stg.offsetWidth;
   stg.classList.add("bigshake", "decay-" + decay);
@@ -1589,7 +1607,41 @@ function strongShake(mul, durMs){
    最大まで上げても破綻しないよう各値をクランプする。
    ========================================================================= */
 let fxForceBand = null;                                  // デバッグ：帯レベルを強制（演出確認用。null=通常）
-function fxL(){ return Math.max(0, fxForceBand != null ? fxForceBand : (bandLevelCur || 0)); }
+function fxStages(){ const s = (CONFIG.params.fx.scaling || {}).stages; return Math.max(1, Math.min(30, Math.round(s || 5))); }
+// いまの乗算の積が、現在帯の中で次の帯へどれだけ進んだか（0..1）。段階の「間」を補間するのに使う。
+function fracToNext(){
+  const b = CONFIG.params.band; if (!(b.start > 0)) return 0;
+  const m = runMult || 1, lv = bandLevelOf(m);
+  const lo = lv >= 1 ? bandThreshold(lv) : 0;            // 現在帯の下端（帯0なら0）
+  const hi = bandThreshold(lv + 1);                      // 次帯の下端
+  if (!(hi > lo)) return 0;
+  return Math.max(0, Math.min(1, (m - lo) / (hi - lo)));
+}
+// 演出強度の連続レベル（整形前）。跨いだ瞬間だけ上げず、確定済みの最終到達帯へ向けて段を積むほど滑らかに上げる。
+function fxLevelRaw(){
+  if (fxForceBand != null) return Math.max(0, fxForceBand);   // デバッグ：指定値をそのまま
+  const hon = (bandLevelCur || 0) + fracToNext();            // 正直な現在値（帯レベル＋次帯への進捗）
+  let look = 0;
+  if (plan && plan.final){                                   // 先読み：最終到達帯（計算層で確定）へ段の進捗で近づける
+    const n = plan.steps ? plan.steps.length : 0;
+    const prog = n > 0 ? Math.max(0, Math.min(1, revealed / n)) : 1;
+    look = (plan.final.band || 0) * prog;
+  }
+  return Math.max(hon, look);                               // 正直な現在値を下回らせない
+}
+// 強度カーブ：連続レベル L(0..stages) を選択カーブで整形して実効レベル(0..stages)にする。
+//   log/smooth は上位の急変を抑え、exp は上位を派手にする。両端(0, stages)は不変で、途中の上がり方だけ変わる。
+function fxShape(L){
+  const st = fxStages(), u = Math.max(0, Math.min(1, L / st));
+  const c = (CONFIG.params.fx.scaling || {}).curve || "log";
+  let s;
+  if (c === "linear") s = u;
+  else if (c === "exp") s = u * u;                          // 下は緩く、上で急（従来寄り・上位が派手）
+  else if (c === "smooth") s = u * u * (3 - 2 * u);         // S字：両端緩やか・中央急
+  else s = Math.sqrt(u);                                    // log：下で一気・上は緩やか（上位の急変を抑える＝既定）
+  return s * st;
+}
+function fxL(){ return fxShape(fxLevelRaw()); }             // 既存の呼び出しはこの「連続・整形済み」レベルを使う
 function fxAmt(base, scale, L, cap){ const v = (base || 0) * Math.pow(scale || 1, L); return cap != null ? Math.min(cap, v) : v; }
 
 // ---- パーティクル（rAF で更新。数・速さ・寿命・重力・色を指定） ----
@@ -2222,6 +2274,12 @@ function renderSettings(){
   // 演出の基本要素（juice）。各要素 ON/OFF・base（帯0の強さ）・scale（帯レベル1つごとの倍率）。方針転換で強め・最大は桁違い。
   const fx = CONFIG.params.fx;
   const fxNum = (obj,key,step)=>numInput(()=>obj[key], v=>obj[key]=v, step);
+
+  g = group("演出：強度カーブ（連続・滑らかに上げる）");
+  const CURVES = ["linear","exp","log","smooth"];
+  gridRow(g, "カーブ(linear/exp/log/S字)", selectInput(CURVES, ()=>Math.max(0,CURVES.indexOf(fx.scaling.curve)), v=>{ fx.scaling.curve=CURVES[v]; }));
+  gridRow(g, "段階数(5〜。増やせる)", numInput(()=>fx.scaling.stages, v=>fx.scaling.stages=Math.max(1,Math.min(30,Math.round(v))), 1));
+
   g = group("演出：パーティクル（着地/コンボ/完成の破片）");
   gridRow(g, "ON", boolInput(()=>fx.particles.on, v=>fx.particles.on=v));
   gridRow(g, "数(base)", fxNum(fx.particles,"count",1));
@@ -2246,9 +2304,10 @@ function renderSettings(){
   gridRow(g, "強さ(base)", fxNum(fx.complete,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.complete,"scale",0.05));
 
-  g = group("演出：揺れ（帯アップの大揺れ）");
+  g = group("演出：揺れ（バーガー本体だけ・箱の中に限定）");
   gridRow(g, "帯アップの揺れ強さ", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
-  gridRow(g, "振幅の上限(px)", numInput(()=>fx.shake.ampMax, v=>fx.shake.ampMax=Math.max(20,v), 10));
+  gridRow(g, "振幅の係数(gain)", numInput(()=>fx.shake.gain, v=>fx.shake.gain=Math.max(0,v), 0.5));
+  gridRow(g, "振幅の上限(px)", numInput(()=>fx.shake.ampMax, v=>fx.shake.ampMax=Math.max(8,v), 4));
   gridRow(g, "減衰の形", selectInput(["settle","hard","long"], ()=>Math.max(0,["settle","hard","long"].indexOf(fx.shake.decay)), v=>{ fx.shake.decay=["settle","hard","long"][v]; }));
 
   g = group("演出：得点をバーガーに重ねる大表示");
