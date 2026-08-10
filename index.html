@@ -60,7 +60,17 @@
        box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out}
   .cfx.add{background:var(--good); color:#06251a}
   @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
-  @media (prefers-reduced-motion: reduce){ .flowpop, .cfx, #multMeter.bump, #baseMeter.bump { animation:none !important } }
+  /* 累計マイルストーン：乗算の積が閾値(×3など)を超えた瞬間の大演出。中央に大きく出す＋メーターが弾ける。 */
+  .milestone{position:absolute; left:50%; top:42%; z-index:9; transform:translate(-50%,-50%);
+    font-weight:900; font-size:1.9rem; color:#fff; white-space:nowrap; pointer-events:none;
+    text-shadow:0 0 14px var(--accent), 0 2px 6px #000; animation:msin .45s ease-out}
+  .milestone.big{font-size:2.6rem}
+  .milestone.out{opacity:0; transform:translate(-50%,-72%); transition:opacity .28s ease, transform .28s ease}
+  @keyframes msin{0%{opacity:0; transform:translate(-50%,-30%) scale(.6)}45%{opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+  #multMeter.cel{animation:mcel .6s ease-out}
+  @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.5); filter:brightness(1.7)}100%{transform:scale(1)}}
+  .grid input.txtinp{width:140px}
+  @media (prefers-reduced-motion: reduce){ .flowpop, .cfx, .milestone, #multMeter.bump, #baseMeter.bump, #multMeter.cel { animation:none !important } }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
           width:236px; height:14px; border-radius:50%; background:rgba(0,0,0,.35); filter:blur(1px)}
   .hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -394,6 +404,8 @@ const DEFAULTS = {
     // C：コンボ数ボーナス。1バーガーでコンボが threshold 件以上成立したら、全体にさらに倍率。
     //   追加倍率 = 1 + perCombo × (成立件数 − (threshold−1))。既定 perCombo:0 ＝ 無効（得点不変）。
     comboBonus: { threshold: 2, perCombo: 0 },
+    // 累計マイルストーン：乗算の積（×N.NN）がこの値を跨いだ瞬間に大演出。積み上げ中に効く。
+    milestones: [3, 5, 8, 12, 20],
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
@@ -581,6 +593,7 @@ let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
 let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
+let milestoneFired = 0; // 累計マイルストーンをどこまで越えたか
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
@@ -625,7 +638,7 @@ function startBurger(){
   $("msg").textContent = "";
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
   revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
-  runMult = 1; runBase = 0; awaitingCollect = false; hitMeta = computeGrades();
+  runMult = 1; runBase = 0; milestoneFired = 0; awaitingCollect = false; hitMeta = computeGrades();
   genToken++; clearTimers();
   hintEl.style.display = "none";
   stageInner.innerHTML = ""; comboFeedEl.innerHTML = "";
@@ -747,6 +760,25 @@ function revealHits(r){
 function tierY(r){ return layout.bottoms[r] + layout.effs[r]/2; }
 function ruleShortName(label){ return label && label.includes("：") ? label.split("：")[0] : (label || ""); }
 
+// 累計マイルストーン：乗算の積がしきい値を跨いだ瞬間に大演出（越えた最上位ひとつを祝う）。
+function checkMilestones(){
+  const ms = CONFIG.params.milestones || [];
+  let hit = -1;
+  while (milestoneFired < ms.length && runMult >= ms[milestoneFired]){ hit = milestoneFired; milestoneFired++; }
+  if (hit >= 0) celebration(ms[hit], hit);
+}
+function celebration(value, index){
+  multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");
+  animTimers.push(setTimeout(() => multMeterEl.classList.remove("cel"), 700));
+  const b = document.createElement("div");
+  b.className = "milestone" + (index >= 2 ? " big" : "");
+  b.textContent = "×" + value + "!";
+  $("stage").appendChild(b);
+  animTimers.push(setTimeout(() => b.classList.add("out"), 600));
+  animTimers.push(setTimeout(() => b.remove(), 900));
+  if (!reduced) screenFlash();
+}
+
 // 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
 function pushCombo(h){
   const cap = Math.max(1, Math.round(CONFIG.params.flow.feedCap || 3));
@@ -761,7 +793,7 @@ function pushCombo(h){
 //  ×N は「具材の隣（右）」にただの値として一瞬出す（バッジなし）。大きい発動だけ画面も反応。
 function present(i){
   const h = sc.hits[i], m = hitMeta[i] || { grade:0 };
-  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); }
+  if (h.kind === "mult"){ runMult *= h.mult; multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl); checkMilestones(); }
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
   popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
   pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
@@ -951,6 +983,12 @@ function miniNum(prefix, get, set, step){
   const inp = numInput(get, set, step); inp.classList.add("mininp");
   wrap.append(t, inp); return wrap;
 }
+// テキスト入力（カンマ区切りの数値リストなど）
+function textInput(get, set){
+  const inp = document.createElement("input"); inp.type = "text"; inp.className = "txtinp"; inp.value = get();
+  inp.addEventListener("change", () => set(inp.value));
+  return inp;
+}
 function renderSettings(){
   const host = $("settings"); host.innerHTML = "";
   const group = (title) => { const g = document.createElement("div"); g.className="setgroup";
@@ -967,6 +1005,12 @@ function renderSettings(){
   gridRow(g, "+N の残る時間(秒)", numInput(()=>CONFIG.params.flow.baseLife, v=>CONFIG.params.flow.baseLife=Math.max(0.05,v), 0.1));
   gridRow(g, "×N の残る時間(秒)", numInput(()=>CONFIG.params.flow.comboLife, v=>CONFIG.params.flow.comboLife=Math.max(0.05,v), 0.1));
   gridRow(g, "右上コンボ履歴 件数", numInput(()=>CONFIG.params.flow.feedCap, v=>CONFIG.params.flow.feedCap=Math.max(1,Math.round(v)), 1));
+
+  // 累計マイルストーン（乗算の積がこの値を跨いだ瞬間に大演出）
+  g = group("累計マイルストーン（×の積がこの値を超えたら大演出）");
+  gridRow(g, "しきい値(×・カンマ区切り)", textInput(
+    ()=>CONFIG.params.milestones.join(", "),
+    v=>{ CONFIG.params.milestones = v.split(",").map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x)&&x>0).sort((a,b)=>a-b); }));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。大で画面反応・発光の強さに使う。
   g = group("演出の等級（相対しきい値・大で画面反応）");
