@@ -93,22 +93,41 @@
     12%{opacity:1; transform:translate(-50%,-50%) scale(var(--bamp,1.4))}
     55%{opacity:.95; transform:translate(-50%,-52%) scale(calc(var(--bamp,1.4)*.9))}
     100%{opacity:.85; transform:translate(-50%,-58%) scale(calc(var(--bamp,1.4)*.8))}}
-  /* バーガー画面内を上へ流れる数字（接触面から湧く。強さ --rs） */
-  .risenum{position:absolute; z-index:9; font-weight:900; white-space:nowrap; pointer-events:none;
-    font-size:calc(.8rem + .5rem*var(--rs,1)); color:var(--accent); transform:translate(-50%,0);
-    text-shadow:0 1px 4px #000, 0 0 8px rgba(0,0,0,.6); animation:risenum 1.1s cubic-bezier(.05,.8,.1,1) forwards}
-  .risenum.base{color:#eaf4ff} .risenum.add{color:var(--good)} .risenum.band{color:#fff; font-weight:900}
-  .risenum.count{color:#ffe0a0; font-size:calc(.7rem + .3rem*var(--rs,1))}
-  @keyframes risenum{0%{opacity:0; transform:translate(-50%,6px) scale(.6)}
-    15%{opacity:1; transform:translate(-50%,-2px) scale(1)}
-    100%{opacity:0; transform:translate(calc(-50% + var(--rx,0)),-70px) scale(1)}}
+  /* 飛ばす数字は「段の基礎点」だけ（小さく短命）。接触面から少し上へ流れて消える。 */
+  .risenum{position:absolute; z-index:9; font-weight:800; white-space:nowrap; pointer-events:none;
+    font-size:.9rem; color:#eaf4ff; transform:translate(-50%,0);
+    text-shadow:0 1px 4px #000, 0 0 6px rgba(0,0,0,.6); animation:risenum .65s cubic-bezier(.05,.8,.1,1) forwards}
+  @keyframes risenum{0%{opacity:0; transform:translate(-50%,4px) scale(.7)}
+    22%{opacity:1; transform:translate(-50%,-2px) scale(1)}
+    100%{opacity:0; transform:translate(calc(-50% + var(--rx,0)),-34px) scale(.95)}}
+  /* 帯アップの非テキスト演出：広がる衝撃波リング（直径は --bamp の2倍まで） */
+  .shockwave{position:absolute; z-index:8; border-radius:50%; pointer-events:none; transform:translate(-50%,-50%);
+    width:10px; height:10px; border:3px solid rgba(255,235,180,.9);
+    animation:shock var(--bdur,.6s) cubic-bezier(.05,.8,.1,1) forwards}
+  .shockwave.insane{border-width:5px; border-color:rgba(255,246,214,.95); box-shadow:0 0 34px rgba(255,220,140,.7)}
+  @keyframes shock{0%{width:10px; height:10px; opacity:.95; border-width:4px}
+    100%{width:calc(var(--bamp,120px)*2); height:calc(var(--bamp,120px)*2); opacity:0; border-width:1px}}
   #multMeter.cel{animation:mcel .6s ease-out}
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.6); filter:brightness(1.9)}100%{transform:scale(1)}}
-  /* 帯アップの強い揺れ（振幅 --bigshake・持続 --bigdur） */
-  #stage.bigshake{animation:bigshake var(--bigdur,.34s) ease-out}
-  @keyframes bigshake{0%,100%{transform:translate(0,0)}
-    15%{transform:translate(calc(var(--bigshake,4px)*-1),0)}40%{transform:translate(var(--bigshake,4px),0)}
-    65%{transform:translate(calc(var(--bigshake,4px)*-.6),0)}85%{transform:translate(calc(var(--bigshake,4px)*.4),0)}}
+  /* 帯アップの強い揺れ（振幅 --bigshake・持続 --bigdur・減衰の形は decay-* で切替） */
+  #stage.bigshake{animation-duration:var(--bigdur,.34s); animation-timing-function:cubic-bezier(.2,.8,.3,1); animation-fill-mode:both}
+  #stage.bigshake.decay-settle{animation-name:shakeSettle}
+  #stage.bigshake.decay-hard{animation-name:shakeHard}
+  #stage.bigshake.decay-long{animation-name:shakeLong}
+  @keyframes shakeSettle{0%,100%{transform:translate(0,0)}
+    12%{transform:translate(calc(var(--bigshake,4px)*-1),calc(var(--bigshake,4px)*.3))}
+    30%{transform:translate(var(--bigshake,4px),calc(var(--bigshake,4px)*-.2))}
+    52%{transform:translate(calc(var(--bigshake,4px)*-.6),0)}
+    74%{transform:translate(calc(var(--bigshake,4px)*.4),0)}90%{transform:translate(calc(var(--bigshake,4px)*-.2),0)}}
+  @keyframes shakeHard{0%{transform:translate(0,0)}
+    8%{transform:translate(calc(var(--bigshake,4px)*-1),calc(var(--bigshake,4px)*.5))}
+    18%{transform:translate(var(--bigshake,4px),calc(var(--bigshake,4px)*-.4))}
+    30%{transform:translate(calc(var(--bigshake,4px)*-.3),0)}42%,100%{transform:translate(0,0)}}
+  @keyframes shakeLong{0%,100%{transform:translate(0,0)}
+    6%{transform:translate(calc(var(--bigshake,4px)*-1),0)}18%{transform:translate(var(--bigshake,4px),calc(var(--bigshake,4px)*-.3))}
+    30%{transform:translate(calc(var(--bigshake,4px)*-.8),0)}42%{transform:translate(calc(var(--bigshake,4px)*.7),0)}
+    55%{transform:translate(calc(var(--bigshake,4px)*-.55),0)}68%{transform:translate(calc(var(--bigshake,4px)*.45),0)}
+    80%{transform:translate(calc(var(--bigshake,4px)*-.3),0)}92%{transform:translate(calc(var(--bigshake,4px)*.15),0)}}
   /* 予告（リーチ）：残り数段で次の帯に届きそうなときに出す。中央下に「あと ×N で ×M帯」 */
   #reach{position:absolute; left:50%; bottom:64px; z-index:9; transform:translateX(-50%) scale(.9);
     font-weight:900; font-size:1.05rem; color:#fff; white-space:nowrap; pointer-events:none; opacity:0;
@@ -163,7 +182,8 @@
     #reach.show{opacity:1}   /* 予告は状態として残す（明滅だけ止める） */
     #multMeter, .bandbg, #stageInner { transition:none !important }
     #particles .particle{display:none}                /* パーティクルは省く（数字は残す） */
-    .risenum{animation:none !important; opacity:1}     /* 上昇数字は出すが動かさない */
+    .risenum{animation:none !important; opacity:1}     /* 基礎点は出すが動かさない */
+    .shockwave{display:none}                           /* 衝撃波は省く */
     .tier.trailing .food{filter:none !important}      /* トレイルは省く */
   }
   .ground{position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
@@ -609,8 +629,8 @@ const DEFAULTS = {
       shake: true,  // 段が落ちるときの揺れ
       edge:  true,  // バーガーのふちの光り
       pause: 0.20,  // 帯が上がる瞬間、爆発の直前に置く無音の溜め(秒)
-      // 帯アップ時の演出強度（方針転換で強めの既定。fx.bandup の段階化と掛かる）
-      up: { sound: 1.6, flash: 1.7, shake: 1.9 }
+      // 帯アップ時の演出強度（方針転換でさらに強めの既定。fx.bandup の段階化と掛かる）
+      up: { sound: 1.8, flash: 1.7, shake: 3.0 }
     },
     // 予告（リーチ）：残り数段で次の帯に届きそうなときに表示。届いた/届かなかったで演出を分ける。
     reach: { on: true, maxTiers: 2, window: 2.5 },   // maxTiers=残り何段から / window=あと何倍以内なら予告
@@ -618,14 +638,16 @@ const DEFAULTS = {
     //   方針：色の派手さでなく「揺れ・光・音の量と持続」で押す。既定は控えめにせず、最大は桁違いまで取れる。
     //   スケーリングの基準は「帯レベル」。得点/乗算の絶対値ではなく帯に紐づけ、青天井でも破綻しないようにする。実効値(L)=base×scale^L（上限クランプ）。
     fx: {
-      particles: { on:true, count:14, scale:1.35, speed:120, life:0.9, gravity:340, spread:0.7, max:600 }, // maxは総数上限（調整欄で〜2000）
+      particles: { on:true, count:22, scale:1.4, speed:150, life:1.0, gravity:360, spread:0.75, max:800 }, // 文字を減らした分、密度は破片で確保。maxは総数上限（〜2000）
       hitstop:   { on:true, base:0.03, scale:1.35 },   // 大コンボ/帯上昇で画面停止 base×scale^L 秒（上限0.45s）
       trail:     { on:true, base:0.35, scale:1.25 },   // 落下段の残像（尾）の濃さ
       zoom:      { on:true, base:0.05, scale:1.20, dur:0.35 }, // 大発動でカメラが寄る（上限+60%）
-      number:    { on:true, base:0.7,  scale:1.25 },   // 得点/数字の演出（跳ね/拡大/色/回転）の強さ
-      // 帯アップの段階化（5段階）。上に行くほど大げさ・長く続く。最上段は常識外れ。実効は帯レベル(=stage)で決まる。
-      bandup:    { on:true, durBase:0.8, durStep:1.45, durMax:2.2, ampBase:1.4, ampStep:1.18, ampMax:3.0, spotsBase:1, layers:4 },
-      // 完成の演出：その回の最高帯レベルで強くなる（stage5=特別）。
+      number:    { on:true, base:0.7,  scale:1.25 },   // 完成の合計の跳ね/拡大/色の強さ
+      // 揺れ：振幅の上限を大きく（現行の2〜3倍まで）取れる。減衰の形(decay)も選べる。
+      shake:     { ampMax:180, decay:"settle" },       // ampMax=振幅の上限px / decay: settle(減衰)・hard(一撃)・long(長く尾を引く)
+      // 帯アップの段階化（5段階）。上に行くほど大げさ・長く続く・複数箇所・音が層に。実効は帯レベル(=stage)で決まる。
+      bandup:    { on:true, durBase:0.9, durStep:1.45, durMax:2.4, ampBase:1.5, ampStep:1.2, ampMax:3.2, spotsBase:2, layers:5 },
+      // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。
       complete:  { on:true, base:1.0, scale:1.30 },
       easing:    { drop:"softbounce", number:"outslow" }  // 数字は「速く出てゆっくり消える(outslow)」を既定に
     },
@@ -655,8 +677,8 @@ const DEFAULTS = {
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
     // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。scheme=音のパターン番号（0=標準/現行）。
     sound: { on: false, volume: 0.4, scheme: 0,
-             // 低音（「ドン」）：帯アップ/完成で鳴らす。量(gain)と歪み(drive)を調整可。効果が分からないので既定OFF。
-             bass: { on:false, gain:0.7, drive:0.4 } },
+             // 低音（「ドン」）：帯アップ/完成で鳴らす。量(gain)と歪み(drive)を調整可。既定ON・量多め。
+             bass: { on:true, gain:1.3, drive:0.5 } },
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
     offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。スキップは「デッキから1枚取り除く」に変更。
     tierBonus: { every: 10 }, // 段数ボーナス：N個作るごとに「具材枠+1／ソース枠+1」を選ぶ（区切り＝ノルマは未実装の暫定）。既定10。
@@ -819,14 +841,18 @@ const Sound = (() => {
     combo(grade){ const C = scheme().combo, w = C.wave || bandWave(), d = bandDetune();
       const semis = grade >= 2 ? C.big : grade >= 1 ? C.mid : C.small;
       chord(C.root, semis, { type: w, detune: d, dur: grade >= 2 ? 0.26 : 0.15, gain: grade >= 2 ? 0.24 : 0.18, stagger: grade >= 2 ? 0.02 : 0 }); },
-    // 帯アップ：層を重ねる（3〜5音）。stage が上がるほど層と長さが増す。
+    // 帯アップ：音を層にして押し寄せる。stage と fx.bandup.layers が上がるほど層と長さが増す。
     bandUp(mul, stage){ const U = scheme().up, w = U.wave || bandWave(), st = Math.max(1, stage || 1);
-      const gain = 0.20 * (mul || 1), dur = 0.15 + 0.06 * st;
-      chord(U.root, U.semis, { type: w, detune: bandDetune(), dur, gain, stagger: 0.04 });        // 層1：本体
-      chord(U.root * 2, U.semis, { type: w, detune: bandDetune(), dur: dur*0.8, gain: gain*0.6, stagger: 0.03 }); // 層2：オクターブ上
-      if (st >= 2) chord(U.root / 2, [0, 7], { type: "triangle", dur: dur*1.3, gain: gain*0.8, stagger: 0.02 });  // 層3：下支え
-      if (st >= 3) noise({ gain: 0.10 * st, dur: 0.05 + 0.02*st, hp: 2000 });                     // 層4：ノイズの当たり
-      if (CONFIG.params.sound.bass && CONFIG.params.sound.bass.on) bass(0.7 + 0.15*st);            // 層5：低音「ドン」
+      const layers = Math.max(2, Math.round(((CONFIG.params.fx.bandup && CONFIG.params.fx.bandup.layers) || 4) + st));
+      const gain = 0.22 * (mul || 1), dur = 0.18 + 0.08 * st;
+      chord(U.root, U.semis, { type: w, detune: bandDetune(), dur, gain, stagger: 0.04 });                        // 本体
+      chord(U.root * 2, U.semis, { type: w, detune: bandDetune(), dur: dur*0.8, gain: gain*0.6, stagger: 0.03 }); // オクターブ上
+      chord(U.root / 2, [0, 7, 12], { type: "triangle", dur: dur*1.3, gain: gain*0.85, stagger: 0.02 });          // 下支え
+      // さらに層を重ねて押し寄せさせる（アルペジオで時間差に鳴らす）
+      for (let k = 3; k < layers; k++){ const semi = U.semis[k % U.semis.length] + 12*((k/ U.semis.length)|0);
+        osc(U.root * Math.pow(2, semi/12), { type: w, detune: bandDetune(), dur: dur*0.7, gain: gain*0.5, delay: 0.03*k }); }
+      noise({ gain: 0.10 * st, dur: 0.05 + 0.02*st, hp: 2000 });                                                  // ノイズの当たり
+      if (CONFIG.params.sound.bass && CONFIG.params.sound.bass.on) bass(0.9 + 0.2*st);                            // 低音「ドン」（量多め）
     },
     bass,
     // 完成音：到達した高さ(topIdx)から続けて鳴らし、帯レベル(L)で音色が変わる（固定で下がって聞こえる問題の対策）。
@@ -1153,8 +1179,7 @@ function skipToEnd(){
   baseMeterEl.textContent = "基礎 " + plan.sc.base;
   multMeterEl.textContent = "×" + plan.sc.mult.toFixed(2);
   applyBandVisual(plan.final.band);                  // 帯の見た目は最終段位（planで確定）
-  comboFeedEl.innerHTML = "";
-  for (const h of plan.sc.hits) pushCombo(h);        // コンボ履歴は直近数件が残る（cap）
+  comboFeedEl.innerHTML = "";                         // コンボ履歴（×N の羅列）は廃止：倍率は右上の累計に集約
   complete();                                        // 完成（合計表示・回収待ち）へ
 }
 // スキップボタン：演出中なら最終へ飛ぶ。停止中（未開始）なら1個作って即結果表示。
@@ -1338,9 +1363,8 @@ function applyStep(r){
   runBase = step.runBase;
   baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
   Sound.land(r);                                    // 着地音（段が上がると音程が上がる・帯で音色が変わる）
-  popFlow("base", tierY(r), "+" + step.base);       // 置いた具材の左隣に +N（バッジなし）
-  { const p = stageXY(r); spawnParticles(p.x, p.y, partKind(step.item), 0.7);     // 着地の破片（食材に応じた見た目）
-    riseNum(p.x - 30, p.y, "+" + step.base, "base"); }                            // 基礎点を接触面から上へ流す
+  { const p = stageXY(r); spawnParticles(p.x, p.y, partKind(step.item), 0.8);     // 着地の破片（食材に応じた見た目）
+    basePop(p.x, p.y, step.base); }                                               // 飛ばす数字は「段の基礎点」だけ（小さく短命）
   if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる
     const stg = $("stage"); stg.classList.remove("shake"); void stg.offsetWidth; stg.classList.add("shake");
     animTimers.push(setTimeout(() => stg.classList.remove("shake"), 150));
@@ -1387,7 +1411,7 @@ function applyBandVisual(L){
   s.setProperty("--bsize",  (b.size  !== false && L > 0) ? (1 + Math.min(L,8)*0.07).toFixed(3) : "1");
   s.setProperty("--bbg",    (b.bg    !== false && L > 0) ? Math.min(0.5, L*0.06).toFixed(3) : "0");
   s.setProperty("--bedge",  (b.edge  !== false && L > 0) ? Math.min(16, L*2.2).toFixed(1) + "px" : "0px");
-  s.setProperty("--bshake", (b.shake !== false && L > 0) ? Math.min(7, L*0.9).toFixed(2) : "0");
+  s.setProperty("--bshake", (b.shake !== false && L > 0) ? Math.min(28, L*2.2).toFixed(2) : "0");   // 帯にいる間の落下揺れも強く
 }
 function bandThreshold(lvl){ const b = CONFIG.params.band; return (b.start || 3) * Math.pow(Math.max(1.0001, b.ratio || 1.6), lvl - 1); }
 
@@ -1427,32 +1451,29 @@ function burstBand(L){
   const amp = Math.min(bu.ampMax || 3.0, (bu.ampBase || 1.4) * Math.pow(bu.ampStep || 1.18, stage - 1));
   const spots = Math.max(1, Math.min(8, Math.round((bu.spotsBase || 1) + (stage - 1))));   // 段階で複数箇所同時
   const W = $("stage").clientWidth;
-  multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");
+  multMeterEl.classList.remove("cel"); void multMeterEl.offsetWidth; multMeterEl.classList.add("cel");   // 倍率は右上の累計だけを弾く
   animTimers.push(setTimeout(() => multMeterEl.classList.remove("cel"), Math.min(1500, dur*1000*0.7)));
-  // 複数箇所のバースト「×value!」（拡大は amp まで振れる。イージングは速く出てゆっくり消える）
-  for (let s = 0; s < spots; s++){
+  // 文字は出さない。非テキストの衝撃波リングを複数箇所で出す（拡大は amp まで・速く出てゆっくり消える）。
+  if (!reduced) for (let s = 0; s < spots; s++){
     const el = document.createElement("div");
-    el.className = "milestone" + (stage >= 3 ? " big" : "") + (stage >= 5 ? " insane" : "");
-    el.textContent = "×" + value + "!";
+    el.className = "shockwave" + (stage >= 5 ? " insane" : "");
     el.style.setProperty("--bdur", dur.toFixed(2) + "s");
-    el.style.setProperty("--bamp", amp.toFixed(2));
-    if (spots > 1){ el.style.left = (12 + 76*(s + 0.5)/spots).toFixed(1) + "%"; el.style.top = (26 + Math.random()*34).toFixed(1) + "%"; }
+    el.style.setProperty("--bamp", (amp * (60 + 30*stage)).toFixed(0) + "px");    // リングの最大半径（段階で大きく）
+    el.style.left = (spots > 1 ? (12 + 76*(s + 0.5)/spots) : 50).toFixed(1) + "%";
+    el.style.top  = (spots > 1 ? (30 + Math.random()*30) : 46).toFixed(1) + "%";
     $("stage").appendChild(el);
-    animTimers.push(setTimeout(() => el.classList.add("out"), dur*1000*0.6));
     animTimers.push(setTimeout(() => el.remove(), dur*1000 + 220));
   }
-  const upSound = up.sound != null ? up.sound : 1.6;
+  const upSound = up.sound != null ? up.sound : 1.8;
   const upFlash = up.flash != null ? up.flash : 1.7;
-  const upShake = up.shake != null ? up.shake : 1.9;
+  const upShake = up.shake != null ? up.shake : 3.0;
   if (!reduced){
     if (upFlash > 0) screenFlash(upFlash * amp, dur*1000*0.7);
-    if (upShake > 0) strongShake(upShake * amp, Math.min(1400, dur*1000*0.6));
-    for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 90 + Math.random()*70, s%2 ? "juice" : "sesame", 1.4*amp);
+    if (upShake > 0) strongShake(upShake * amp, Math.min(1600, dur*1000*0.7));
+    for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 90 + Math.random()*70, s%2 ? "juice" : "sesame", 1.8*amp);
     cameraZoom(amp); hitstop(amp);
   }
-  numberJuice(amp);
-  riseNum(W/2, 130, "×" + value + " 帯", "band");
-  if (upSound > 0) Sound.bandUp(upSound, stage);        // 層を重ねた音（3〜5音・低音も）
+  if (upSound > 0) Sound.bandUp(upSound, stage);        // 層を重ねた音（帯が上がるほど層が押し寄せる・低音も）
 }
 
 // 完成の演出：そのバーガーで到達した最高帯（bandPeak）で強くなる。最上段(5)は特別。
@@ -1461,16 +1482,16 @@ function celebrateComplete(){
   const stage = Math.max(0, Math.min(5, bandPeak));
   const amp = (cc.base || 1) * Math.pow(cc.scale || 1.3, stage);
   const W = $("stage").clientWidth, spots = 1 + stage;
-  const save = fxForceBand; fxForceBand = bandPeak;     // 完成の破片密度は「最高帯」基準にする
-  for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 110 + Math.random()*60, s%2 ? "steam" : "sesame", 1.3*amp);
-  if (stage >= 5){                                       // 最上段：特別演出
-    const el = document.createElement("div"); el.className = "milestone insane special";
-    el.textContent = "★ 最高帯 到達 ★"; el.style.setProperty("--bdur","1.8s"); el.style.setProperty("--bamp","2.4");
-    $("stage").appendChild(el); animTimers.push(setTimeout(() => el.remove(), 2000));
-    spawnParticles(W/2, 150, "cheese", 3*amp); spawnParticles(W/2, 120, "juice", 3*amp);
+  const save = fxForceBand; fxForceBand = bandPeak;     // 完成の演出の強さは「最高帯」基準にする
+  for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 110 + Math.random()*60, s%2 ? "steam" : "sesame", 1.6*amp);
+  if (stage >= 5 && !reduced){                            // 最上段：文字は出さず、強さで示す（衝撃波＋大量の破片）
+    const el = document.createElement("div"); el.className = "shockwave insane";
+    el.style.setProperty("--bdur","1.6s"); el.style.setProperty("--bamp","260px"); el.style.left="50%"; el.style.top="46%";
+    $("stage").appendChild(el); animTimers.push(setTimeout(() => el.remove(), 1800));
+    spawnParticles(W/2, 150, "cheese", 4*amp); spawnParticles(W/2, 120, "juice", 4*amp);
   }
-  if (!reduced){ screenFlash(1.2*amp, 520); strongShake(1.1*amp, 480); cameraZoom(0.7*amp); }
-  numberJuice(1.3*amp);
+  if (!reduced){ screenFlash(1.3*amp, 560); strongShake(1.4*amp, 560); cameraZoom(0.8*amp); }
+  numberJuice(1.4*amp);                                  // 完成の「合計点」の文字だけは大きく弾く
   fxForceBand = save;
 }
 
@@ -1496,28 +1517,14 @@ function clearBandTransients(){
   reachActive = false; reachTarget = 0;
 }
 
-// 右上のコンボ履歴：名前＋倍率を最新順に出し、件数を超えたら古いものと入れ替える。
-function pushCombo(h){
-  const cap = Math.max(1, Math.round(CONFIG.params.flow.feedCap || 3));
-  const chip = document.createElement("div");
-  chip.className = "cfx" + (h.kind === "add" ? " add" : "");
-  chip.textContent = ruleShortName(h.label) + " " + h.effect;
-  comboFeedEl.prepend(chip);
-  while (comboFeedEl.children.length > cap) comboFeedEl.lastChild.remove();
-}
-
-// 発動（コンボ）の再生。SHIYOU §5：接触面が光り、その場に倍率が出る。倍率の積算はしない（planで確定済み）。
-//  ×N は「具材の隣（右）」にただの値として一瞬出す（バッジなし）。大きい発動だけ画面も反応。
+// 発動（コンボ）の再生。文字（×N）は飛ばさない＝倍率は右上の累計表示に集約する。
+//  ここでは「接触面が光る／破片が飛ぶ／大きい発動は画面が反応する」＝演出の強さだけで伝える。
 function presentHit(i){
   const h = plan.sc.hits[i], m = plan.grades[i] || { grade:0 };
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
-  popFlow("combo" + (h.kind === "add" ? " add" : ""), y, h.effect); // 具材の右隣に ×N（バッジなし）
-  pushCombo(h);                                     // 右上のコンボ履歴（3件で入れ替え）
   Sound.combo(m.grade);                             // コンボ音（等級で変える）
   { const cy = 14 + y * (layout && layout.total ? Math.min(1,(250-14-8)/layout.total) : 1), W = $("stage").clientWidth;
-    spawnParticles(W/2, cy, partKind(stack[h.idx[0]]), m.grade>=2 ? 1.4 : 0.9);   // コンボの破片
-    riseNum(W/2 + 24, cy, h.effect, h.kind==="add" ? "add" : "combo");            // 発動した接触面から倍率/加算が湧いて上へ
-    if (m.grade >= 2){ riseNum(W/2 - 20, cy+10, h.effect, "combo"); riseNum(W/2 + 40, cy-6, h.effect, "combo"); } }  // 大は数字を増やして密度を上げる
+    spawnParticles(W/2, cy, partKind(stack[h.idx[0]]), m.grade>=2 ? 2.0 : 1.2); }  // コンボの破片（文字を減らした分、密度は破片で）
   if (reduced) return;                              // reduced-motion：発光・画面反応は省く
   const glowMs = CONFIG.params.grade.glowMs * 1000; // 接触面が一瞬光る（大は強く）
   for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
@@ -1546,13 +1553,16 @@ function screenFlash(mul, durMs){
   el.style.setProperty("--flashdur", ((durMs || 280) / 1000).toFixed(2) + "s");
   el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
 }
-// 帯アップ用の強い揺れ。振幅 mul、持続 durMs（段階で長く）。
+// 帯アップ用の強い揺れ。振幅 mul（上限 fx.shake.ampMax まで＝現行の2〜3倍）、持続 durMs、減衰の形 fx.shake.decay。
 function strongShake(mul, durMs){
   const stg = $("stage"), d = durMs || 360;
-  stg.style.setProperty("--bigshake", Math.min(60, 2.4 * (mul || 1.5)).toFixed(2) + "px");   // 振幅は上限クランプ
+  const sc = (CONFIG.params.fx && CONFIG.params.fx.shake) || {};
+  const ampMax = Math.max(20, sc.ampMax || 180), decay = sc.decay || "settle";
+  stg.style.setProperty("--bigshake", Math.min(ampMax, 12 * (mul || 1.5)).toFixed(1) + "px");   // 係数を上げて既定から強く（上限 ampMax まで）
   stg.style.setProperty("--bigdur", (d / 1000).toFixed(2) + "s");
-  stg.classList.remove("bigshake"); void stg.offsetWidth; stg.classList.add("bigshake");
-  animTimers.push(setTimeout(() => stg.classList.remove("bigshake"), d + 20));
+  stg.classList.remove("bigshake","decay-settle","decay-hard","decay-long"); void stg.offsetWidth;
+  stg.classList.add("bigshake", "decay-" + decay);
+  animTimers.push(setTimeout(() => stg.classList.remove("bigshake","decay-"+decay), d + 20));
 }
 
 /* =========================================================================
@@ -1650,19 +1660,16 @@ function numberJuice(intensity){
 }
 
 // ---- バーガー画面内を上へ流れる数字（発動した接触面から湧いて上昇）。得点を視線内に集約させない。 ----
+// 飛ばす数字は「段の基礎点」だけ。小さく短命。倍率(×N)や文言は一切飛ばさない（右上の累計に集約）。
 let riseCount = 0;
-function riseNum(cx, cy, text, cls){
-  const cfg = CONFIG.params.fx.number; if (!cfg || cfg.on === false) return;
-  const host = $("particles"); if (!host || riseCount > 80) return;   // 総数の暴走を防ぐ簡易上限
-  const el = document.createElement("div"); el.className = "risenum " + (cls || "");
-  el.textContent = text;
+function basePop(cx, cy, n){
+  const host = $("particles"); if (!host || riseCount > 40) return;
+  const el = document.createElement("div"); el.className = "risenum base";
+  el.textContent = "+" + n;
   el.style.left = cx.toFixed(0) + "px"; el.style.bottom = cy.toFixed(0) + "px";
-  const s = Math.min(4, fxAmt(cfg.base, cfg.scale, fxL()) + 0.6);
-  el.style.setProperty("--rs", s.toFixed(2));
-  el.style.setProperty("--rx", ((Math.random()*2-1)*18).toFixed(0) + "px");   // 少し横に散る
+  el.style.setProperty("--rx", ((Math.random()*2-1)*10).toFixed(0) + "px");
   host.appendChild(el); riseCount++;
-  const life = reduced ? 260 : 1100;
-  animTimers.push(setTimeout(() => { el.remove(); riseCount = Math.max(0, riseCount-1); }, life));
+  animTimers.push(setTimeout(() => { el.remove(); riseCount = Math.max(0, riseCount-1); }, reduced ? 240 : 650));  // 短命
 }
 
 // ---- 残像（トレイル）：落下する段に尾を付ける。濃さ base×scale^L ----
@@ -1703,11 +1710,7 @@ function complete(){
   collectLocked = true;                             // 完成後しばらく入力を受け付けない（点数を必ず見せる）
   animTimers.push(setTimeout(() => { collectLocked = false; }, (CONFIG.params.completeLock || 0.30) * 1000));
   updateProgress();
-  celebrateComplete();                              // 最高帯に応じた完成演出（stage5=特別）
-  // 完成時：得点の内訳（基礎・加算・乗算・合計）も画面内に別々の数字として湧かせる（数字を集約しない）
-  { const W = $("stage").clientWidth;
-    const parts = [["基礎 "+sc.base,"base"], ["+"+sc.add,"add"], ["×"+sc.mult.toFixed(2),"combo"], ["= "+sc.total,"band"]];
-    parts.forEach((pr, i) => animTimers.push(setTimeout(() => riseNum(W*(0.3 + 0.13*i), 120 + i*10, pr[0], pr[1]), 60*i))); }
+  celebrateComplete();                              // 最高帯に応じた完成演出（文字は出さず強さで示す）
   const my = genToken;
   const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); scoreEl.classList.add("done"); numberJuice(1.4); countUp(sc.total, my); };  // 得点の文字の演出
   if (reduced || CONFIG.params.landPause <= 0) run();
@@ -1880,14 +1883,12 @@ function countUp(target, token){                    // 点数は最後に数え�
     if (token !== genToken) return;                 // 次のバーガー開始で中断
     const t = Math.min(1, (now - start) / dur);
     scoreEl.textContent = Math.round(target * t);
-    // 数え上げ中も演出を出し続ける（無音・無演出の時間を作らない）：破片＋上昇数字を間欠で（複数）
+    // 数え上げ中も演出を出し続ける（無音・無演出の時間を作らない）：文字は増やさず、破片だけを間欠で
     if (now - lastFx > 55){ lastFx = now;
-      spawnParticles(W*(0.3 + Math.random()*0.4), 110 + Math.random()*80, Math.random()<0.5?"sesame":"cheese", 0.6);
-      riseNum(W*(0.35 + Math.random()*0.3), 90 + Math.random()*70, "+" + Math.round(target*t/ Math.max(2,dur/55)), "count");
-      riseNum(W*(0.45 + Math.random()*0.3), 100 + Math.random()*60, "＋", "count");
+      spawnParticles(W*(0.28 + Math.random()*0.44), 100 + Math.random()*80, Math.random()<0.5?"sesame":"cheese", 0.8);
     }
     if (t < 1) requestAnimationFrame(step);
-    else if (bandPeak >= 1) numberJuice(1.2);        // 数え終わりにもう一度弾く
+    else if (bandPeak >= 1) numberJuice(1.2);        // 数え終わりに合計をもう一度弾く
   }
   requestAnimationFrame(step);
 }
@@ -2199,10 +2200,15 @@ function renderSettings(){
   gridRow(g, "拡大の上限", fxNum(fx.bandup,"ampMax",0.1));
   gridRow(g, "音の層数(base)", fxNum(fx.bandup,"layers",1));
 
-  g = group("演出：完成（最高帯で強くなる／stage5=特別）");
+  g = group("演出：完成（最高帯で強くなる・文字は出さない）");
   gridRow(g, "ON", boolInput(()=>fx.complete.on, v=>fx.complete.on=v));
   gridRow(g, "強さ(base)", fxNum(fx.complete,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.complete,"scale",0.05));
+
+  g = group("演出：揺れ（帯アップの大揺れ）");
+  gridRow(g, "帯アップの揺れ強さ", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
+  gridRow(g, "振幅の上限(px)", numInput(()=>fx.shake.ampMax, v=>fx.shake.ampMax=Math.max(20,v), 10));
+  gridRow(g, "減衰の形", selectInput(["settle","hard","long"], ()=>Math.max(0,["settle","hard","long"].indexOf(fx.shake.decay)), v=>{ fx.shake.decay=["settle","hard","long"][v]; }));
 
   g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
   gridRow(g, "ON", boolInput(()=>fx.hitstop.on, v=>fx.hitstop.on=v));
