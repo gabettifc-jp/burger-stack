@@ -38,7 +38,9 @@
 
   /* ===== 1. バーガー表示（高さ固定・演出でレイアウトを動かさない） ===== */
   #stage{position:relative; width:100%; height:250px; margin:0 auto; display:block; overflow:visible}
-  #stage.shake{animation:bshake .13s ease-out}   /* 帯にいる間、段が落ちるたびに揺れる（強さは帯で変わる） */
+  /* 揺れはこの内側レイヤーだけに適用する。#stage（枠・背景・メーター）や画面下の固定バーは一切動かさない。 */
+  #stageShake{position:absolute; inset:0; z-index:2; pointer-events:none}
+  #stageShake.shake{animation:bshake .13s ease-out}   /* 帯にいる間、段が落ちるたびに揺れる（強さは帯で変わる） */
   @keyframes bshake{0%,100%{transform:translate(0,0)}30%{transform:translate(0,calc(var(--bshake,0)*1px))}70%{transform:translate(0,calc(var(--bshake,0)*-1px))}}
   #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%) scale(calc(var(--fit,1) * var(--zoom,1))); transform-origin:50% 100%; width:230px; height:0;
     filter:drop-shadow(0 0 var(--bedge,0px) var(--bcol,transparent)); transition:filter .3s ease, transform .18s ease}  /* 帯：ふちの光り／--zoom=カメラ寄り */
@@ -56,14 +58,23 @@
   .bandbg{position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:12px;
     background:radial-gradient(120% 95% at 50% 62%, var(--bcol,#fff), transparent 70%);
     opacity:var(--bbg,0); mix-blend-mode:screen; transition:opacity .4s ease, background .4s ease}
-  /* 上部の計器：基礎点(左)・乗算の積(右)。常時表示で積み上げ中に増えていく */
-  .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:space-between; pointer-events:none}
-  #baseMeter,#multMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px}
-  #baseMeter{color:#cfe4ff}
+  /* 上部の計器：乗算の積（右上）。常時表示で積み上げ中に増えていく。基礎点はバーガーに重ねて出す（#burgerScore）。 */
+  .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:flex-end; pointer-events:none}
+  #multMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px}
   /* 帯：乗算表示の色と大きさ（帯にいる間ずっと持続） */
   #multMeter{color:var(--bc,var(--accent)); font-size:calc(1.05rem * var(--bsize,1)); transition:color .3s ease, font-size .3s ease}
-  #baseMeter.bump,#multMeter.bump{animation:mbump .18s ease-out}
+  #multMeter.bump{animation:mbump .18s ease-out}
   @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
+  /* 得点をバーガーに重ねて大きく表示。位置(--bsx/--bsy)・大きさ(--bss)・不透明度(--bso)は調整欄から変える。 */
+  #burgerScore{position:absolute; left:var(--bsx,50%); top:var(--bsy,52%); z-index:10; pointer-events:none;
+    transform:translate(-50%,-50%); font-weight:900; line-height:1; letter-spacing:-.02em; white-space:nowrap;
+    color:#fff; opacity:var(--bso,.95); text-shadow:0 2px 10px #000, 0 0 22px rgba(0,0,0,.75);
+    font-size:calc(2.0rem * var(--bss,1)); transition:opacity .18s ease}
+  #burgerScore.running{font-size:calc(1.9rem * var(--bss,1)); color:#eaf4ff}     /* 積み中：基礎点 */
+  #burgerScore.total{font-size:calc(3.6rem * var(--bss,1)); color:#fff; text-shadow:0 3px 16px #000, 0 0 30px rgba(255,220,120,.6)}  /* 完成：合計（大きく） */
+  #burgerScore.empty{opacity:0}
+  #burgerScore.pop{animation:bscorepop .5s cubic-bezier(.2,1.5,.35,1)}
+  @keyframes bscorepop{0%{transform:translate(-50%,-50%) scale(.4)}60%{transform:translate(-50%,-50%) scale(1.12)}100%{transform:translate(-50%,-50%) scale(1)}}
   /* 具材の隣に出る + と ×（バッジなし・ただの値）。積むたびに、その具材の高さに一瞬出て消える。
      + は具材の左、× は具材の右。演出はレイアウトを動かさない（絶対配置・固定高さのステージ内）。 */
   .flowpop{position:absolute; z-index:7; font-weight:800; font-size:.85rem; white-space:nowrap; pointer-events:none;
@@ -110,10 +121,10 @@
   #multMeter.cel{animation:mcel .6s ease-out}
   @keyframes mcel{0%{transform:scale(1)}30%{transform:scale(1.6); filter:brightness(1.9)}100%{transform:scale(1)}}
   /* 帯アップの強い揺れ（振幅 --bigshake・持続 --bigdur・減衰の形は decay-* で切替） */
-  #stage.bigshake{animation-duration:var(--bigdur,.34s); animation-timing-function:cubic-bezier(.2,.8,.3,1); animation-fill-mode:both}
-  #stage.bigshake.decay-settle{animation-name:shakeSettle}
-  #stage.bigshake.decay-hard{animation-name:shakeHard}
-  #stage.bigshake.decay-long{animation-name:shakeLong}
+  #stageShake.bigshake{animation-duration:var(--bigdur,.34s); animation-timing-function:cubic-bezier(.2,.8,.3,1); animation-fill-mode:both}
+  #stageShake.bigshake.decay-settle{animation-name:shakeSettle}
+  #stageShake.bigshake.decay-hard{animation-name:shakeHard}
+  #stageShake.bigshake.decay-long{animation-name:shakeLong}
   @keyframes shakeSettle{0%,100%{transform:translate(0,0)}
     12%{transform:translate(calc(var(--bigshake,4px)*-1),calc(var(--bigshake,4px)*.3))}
     30%{transform:translate(var(--bigshake,4px),calc(var(--bigshake,4px)*-.2))}
@@ -177,8 +188,8 @@
   .remove-row.off{opacity:.4; cursor:default}       /* その山の最後の1枚（取り除けない） */
   .remove-row.off:active{transform:none}
   @media (prefers-reduced-motion: reduce){
-    .flowpop, .cfx, .milestone, .missnote, #multMeter.bump, #baseMeter.bump, #multMeter.cel,
-    #stage.shake, #stage.bigshake, #stage.tense, #reach.show, #score.juice { animation:none !important }
+    .flowpop, .cfx, .milestone, .missnote, #multMeter.bump, #multMeter.cel,
+    #stageShake.shake, #stageShake.bigshake, #stage.tense, #reach.show, #score.juice, #burgerScore.pop { animation:none !important }
     #reach.show{opacity:1}   /* 予告は状態として残す（明滅だけ止める） */
     #multMeter, .bandbg, #stageInner { transition:none !important }
     #particles .particle{display:none}                /* パーティクルは省く（数字は残す） */
@@ -432,7 +443,6 @@
     <div id="stage">
       <div class="bandbg"></div>
       <div class="meters">
-        <div id="baseMeter">基礎 0</div>
         <div id="multMeter">×1.00</div>
       </div>
       <div id="comboFeed"></div>
@@ -440,8 +450,13 @@
       <div id="offer"></div>
       <div class="ground"></div>
       <div class="hint" id="hint">ボタンを押してバーガーを作る</div>
-      <div id="stageInner"></div>
+      <!-- 揺れる内側レイヤー（バーガー本体だけ）。枠・メーター・破片・得点表示は外に置き、揺らさない。 -->
+      <div id="stageShake">
+        <div id="stageInner"></div>
+      </div>
       <div id="particles"></div>
+      <!-- 得点をバーガーに重ねて大きく表示（積み中は基礎点、完成時は合計）。揺れの外なので常に読める。 -->
+      <div id="burgerScore" class="empty"></div>
     </div>
   </section>
 
@@ -647,6 +662,8 @@ const DEFAULTS = {
       shake:     { ampMax:180, decay:"settle" },       // ampMax=振幅の上限px / decay: settle(減衰)・hard(一撃)・long(長く尾を引く)
       // 帯アップの段階化（5段階）。上に行くほど大げさ・長く続く・複数箇所・音が層に。実効は帯レベル(=stage)で決まる。
       bandup:    { on:true, durBase:0.9, durStep:1.45, durMax:2.4, ampBase:1.5, ampStep:1.2, ampMax:3.2, spotsBase:2, layers:5 },
+      // 得点をバーガーに重ねて大きく表示。size=大きさ倍率 / opacity=不透明度 / x,y=バーガー内の表示位置(%)。
+      burgerScore: { on:true, size:1.0, opacity:0.95, x:50, y:52 },
       // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。
       complete:  { on:true, base:1.0, scale:1.30 },
       easing:    { drop:"softbounce", number:"outslow" }  // 数字は「速く出てゆっくり消える(outslow)」を既定に
@@ -1050,7 +1067,8 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
-const baseMeterEl = $("baseMeter"), cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed"), offerEl = $("offer");
+const stageShake = $("stageShake"), burgerScoreEl = $("burgerScore");
+const cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed"), offerEl = $("offer");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
 const barsEl = $("bars"), barnote = $("barnote");
@@ -1176,7 +1194,6 @@ function skipToEnd(){
   }
   revealed = n; wantDrop = n; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   runBase = plan.final.base; runMult = plan.final.mult; bandLevelCur = plan.final.band;   // 最終値を反映
-  baseMeterEl.textContent = "基礎 " + plan.sc.base;
   multMeterEl.textContent = "×" + plan.sc.mult.toFixed(2);
   applyBandVisual(plan.final.band);                  // 帯の見た目は最終段位（planで確定）
   comboFeedEl.innerHTML = "";                         // コンボ履歴（×N の羅列）は廃止：倍率は右上の累計に集約
@@ -1210,7 +1227,7 @@ function startBurger(){
   scoreEl.textContent = "–"; scoreEl.classList.remove("done"); scoreEl.classList.add("building");
   fBase.textContent = "–"; fAdd.textContent = "–"; fMult.textContent = "–"; fTotal.textContent = "–";
   firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
-  multMeterEl.textContent = "×1.00"; baseMeterEl.textContent = "基礎 0";
+  multMeterEl.textContent = "×1.00"; burgerScoreClear();
   return true;
 }
 
@@ -1361,13 +1378,13 @@ function bump(el){ if (reduced) return; el.classList.remove("bump"); void el.off
 function applyStep(r){
   const step = plan.steps[r];
   runBase = step.runBase;
-  baseMeterEl.textContent = "基礎 " + runBase; bump(baseMeterEl);
+  burgerScoreShow(String(runBase), "running");      // 積み中の基礎点をバーガーに重ねて大きく（左上メーターは廃止）
   Sound.land(r);                                    // 着地音（段が上がると音程が上がる・帯で音色が変わる）
   { const p = stageXY(r); spawnParticles(p.x, p.y, partKind(step.item), 0.8);     // 着地の破片（食材に応じた見た目）
     basePop(p.x, p.y, step.base); }                                               // 飛ばす数字は「段の基礎点」だけ（小さく短命）
-  if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる
-    const stg = $("stage"); stg.classList.remove("shake"); void stg.offsetWidth; stg.classList.add("shake");
-    animTimers.push(setTimeout(() => stg.classList.remove("shake"), 150));
+  if (!reduced && CONFIG.params.band.shake !== false && bandLevelCur > 0){   // 帯にいる間、落下で揺れる（内側レイヤーだけ）
+    stageShake.classList.remove("shake"); void stageShake.offsetWidth; stageShake.classList.add("shake");
+    animTimers.push(setTimeout(() => stageShake.classList.remove("shake"), 150));
   }
   if (r > 0 && tierEls[r-1]){                       // 着地で下段が一瞬縮む（重さの表現）
     const below = tierEls[r-1];
@@ -1512,7 +1529,8 @@ function endReach(){                                   // 予告の解除（届�
 function clearBandTransients(){
   $("stage").querySelectorAll(".milestone,.missnote").forEach(e => e.remove());
   multMeterEl.classList.remove("cel");
-  $("stage").classList.remove("shake","bigshake","tense");
+  stageShake.classList.remove("shake","bigshake","decay-settle","decay-hard","decay-long");
+  $("stage").classList.remove("tense");
   const rl = $("reach"); if (rl) rl.classList.remove("show");
   reachActive = false; reachTarget = 0;
 }
@@ -1555,7 +1573,7 @@ function screenFlash(mul, durMs){
 }
 // 帯アップ用の強い揺れ。振幅 mul（上限 fx.shake.ampMax まで＝現行の2〜3倍）、持続 durMs、減衰の形 fx.shake.decay。
 function strongShake(mul, durMs){
-  const stg = $("stage"), d = durMs || 360;
+  const stg = stageShake, d = durMs || 360;         // 揺れは内側レイヤーだけ。枠・メーター・得点表示・固定バーは動かさない。
   const sc = (CONFIG.params.fx && CONFIG.params.fx.shake) || {};
   const ampMax = Math.max(20, sc.ampMax || 180), decay = sc.decay || "settle";
   stg.style.setProperty("--bigshake", Math.min(ampMax, 12 * (mul || 1.5)).toFixed(1) + "px");   // 係数を上げて既定から強く（上限 ampMax まで）
@@ -1672,6 +1690,25 @@ function basePop(cx, cy, n){
   animTimers.push(setTimeout(() => { el.remove(); riseCount = Math.max(0, riseCount-1); }, reduced ? 240 : 650));  // 短命
 }
 
+// ---- バーガーに重ねる大きな得点表示（積み中＝基礎点 / 完成＝合計）。位置・大きさ・不透明度は調整欄から。 ----
+function applyBurgerScoreVars(){
+  const c = (CONFIG.params.fx && CONFIG.params.fx.burgerScore) || {};
+  const s = burgerScoreEl.style;
+  s.setProperty("--bss", (c.size != null ? c.size : 1));
+  s.setProperty("--bso", (c.opacity != null ? c.opacity : 0.95));
+  s.setProperty("--bsx", (c.x != null ? c.x : 50) + "%");
+  s.setProperty("--bsy", (c.y != null ? c.y : 52) + "%");
+}
+function burgerScoreShow(text, mode){                 // mode: "running"（積み中の基礎点）/ "total"（完成の合計）
+  const c = (CONFIG.params.fx && CONFIG.params.fx.burgerScore) || {};
+  if (c.on === false){ burgerScoreClear(); return; }
+  applyBurgerScoreVars();
+  burgerScoreEl.textContent = text;
+  burgerScoreEl.className = mode;                      // running / total（empty を外す）
+  if (!reduced){ burgerScoreEl.classList.remove("pop"); void burgerScoreEl.offsetWidth; burgerScoreEl.classList.add("pop"); }
+}
+function burgerScoreClear(){ burgerScoreEl.className = "empty"; burgerScoreEl.textContent = ""; }
+
 // ---- 残像（トレイル）：落下する段に尾を付ける。濃さ base×scale^L ----
 function applyTrail(el){
   const cfg = CONFIG.params.fx.trail; if (reduced || !cfg || cfg.on === false) return;
@@ -1702,7 +1739,6 @@ function applyEasing(){
 function complete(){
   showBreakdown(sc);                                // 4行と一覧を確定表示
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
-  baseMeterEl.textContent = "基礎 " + sc.base;
   wantDrop = revealed;                              // 予約された入力はここで破棄
   bandPeak = Math.max(bandPeak, plan.final.band);   // 到達した最高帯（完成演出の基準）
   Sound.complete(plan.stack.length - 1, plan.final.band);   // 到達した高さから続けて鳴らす＋帯で音色
@@ -1712,7 +1748,9 @@ function complete(){
   updateProgress();
   celebrateComplete();                              // 最高帯に応じた完成演出（文字は出さず強さで示す）
   const my = genToken;
-  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); scoreEl.classList.add("done"); numberJuice(1.4); countUp(sc.total, my); };  // 得点の文字の演出
+  const run = () => { if (my !== genToken) return; scoreEl.classList.remove("building"); scoreEl.classList.add("done"); numberJuice(1.4);
+    burgerScoreShow("0", "total");                   // 完成：合計をバーガーに大きく重ねる（一部隠れてよい）。数え上げは countUp が両方を更新
+    countUp(sc.total, my); };  // 得点の文字の演出
   if (reduced || CONFIG.params.landPause <= 0) run();
   else animTimers.push(setTimeout(run, CONFIG.params.landPause * 1000));
 }
@@ -1875,14 +1913,17 @@ function animateCum(delta){
 }
 
 function countUp(target, token){                    // 点数は最後に数え上がる
+  const onBurger = burgerScoreEl.classList.contains("total");   // 完成の合計はバーガー上の大きい表示も一緒に数える
   const dur = CONFIG.params.countUp * 1000;
-  if (reduced || dur <= 0){ scoreEl.textContent = target; return; }
+  if (reduced || dur <= 0){ scoreEl.textContent = target; if (onBurger) burgerScoreEl.textContent = target; return; }
   const start = performance.now(); let lastFx = 0;
   const W = $("stage").clientWidth;
   function step(now){
     if (token !== genToken) return;                 // 次のバーガー開始で中断
     const t = Math.min(1, (now - start) / dur);
-    scoreEl.textContent = Math.round(target * t);
+    const v = Math.round(target * t);
+    scoreEl.textContent = v;
+    if (onBurger) burgerScoreEl.textContent = v;
     // 数え上げ中も演出を出し続ける（無音・無演出の時間を作らない）：文字は増やさず、破片だけを間欠で
     if (now - lastFx > 55){ lastFx = now;
       spawnParticles(W*(0.28 + Math.random()*0.44), 100 + Math.random()*80, Math.random()<0.5?"sesame":"cheese", 0.8);
@@ -1922,7 +1963,7 @@ function resetBurger(){
   scoreEl.classList.remove("building","done"); scoreEl.textContent = "0";
   fBase.textContent = "0"; fAdd.textContent = "0"; fMult.textContent = "×1.00"; fTotal.textContent = "0";
   firedRules.innerHTML = ""; comboCount.textContent = "（0件）";
-  multMeterEl.textContent = "×1.00"; baseMeterEl.textContent = "基礎 0";
+  multMeterEl.textContent = "×1.00"; burgerScoreClear();
   hintEl.style.display = "";
   updateProgress();
 }
@@ -2209,6 +2250,14 @@ function renderSettings(){
   gridRow(g, "帯アップの揺れ強さ", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
   gridRow(g, "振幅の上限(px)", numInput(()=>fx.shake.ampMax, v=>fx.shake.ampMax=Math.max(20,v), 10));
   gridRow(g, "減衰の形", selectInput(["settle","hard","long"], ()=>Math.max(0,["settle","hard","long"].indexOf(fx.shake.decay)), v=>{ fx.shake.decay=["settle","hard","long"][v]; }));
+
+  g = group("演出：得点をバーガーに重ねる大表示");
+  const bsApply = ()=>{ if (typeof applyBurgerScoreVars === "function") applyBurgerScoreVars(); };
+  gridRow(g, "ON", boolInput(()=>fx.burgerScore.on, v=>fx.burgerScore.on=v));
+  gridRow(g, "大きさ(倍率)", numInput(()=>fx.burgerScore.size, v=>{ fx.burgerScore.size=Math.max(0.2,v); bsApply(); }, 0.1));
+  gridRow(g, "不透明度(0-1)", numInput(()=>fx.burgerScore.opacity, v=>{ fx.burgerScore.opacity=Math.max(0,Math.min(1,v)); bsApply(); }, 0.05));
+  gridRow(g, "横位置(%・50=中央)", numInput(()=>fx.burgerScore.x, v=>{ fx.burgerScore.x=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
+  gridRow(g, "縦位置(%・上=0)", numInput(()=>fx.burgerScore.y, v=>{ fx.burgerScore.y=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
 
   g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
   gridRow(g, "ON", boolInput(()=>fx.hitstop.on, v=>fx.hitstop.on=v));
