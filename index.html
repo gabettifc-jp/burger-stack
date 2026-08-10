@@ -684,12 +684,13 @@ const DEFAULTS = {
       bandup:    { on:true, durBase:0.35, durStep:1.12, durMax:0.6, ampBase:1.2, ampStep:1.12, ampMax:2.0, spotsBase:1, layers:4 },
       // 得点をバーガーに重ねて大きく表示。size=大きさ倍率 / opacity=不透明度 / x,y=バーガー内の表示位置(%)。
       burgerScore: { on:true, size:1.0, opacity:0.95, x:50, y:52 },
-      // 回収：売上（お金）をコインで受け取る。バーガーから価格表示へ飛び、到達したら消える（積もりは残さない）。
-      //   非ブロッキング＝飛行中も操作可。飛行は短く（speed小さめ）、さっさと消える。
+      // 回収：売上（お金）をコインで受け取る。周囲から集まって「収束先」に重なり、到達したら消える（積もりは残さない）。
+      //   target=収束先（"price"=バーガー上の価格の数字〈既定〉／"cum"=売上累計／"score"=得点欄）。
+      //   spread=コインが湧く範囲(px。target の右側に湧いて左へ収束する)。非ブロッキング＝飛行中も操作可。
       //   見た目：per=何点で1枚 / min,max=枚数の下限上限 / speed=飛ぶ時間(秒・短め) / arc=軌道の山(px) / stagger=発射間隔(秒)。
       //   音：点数に比例させない。回数は soundMin〜soundMax（既定8〜12）、鳴る時間は soundDur(秒)で一定。
       //       点数の大きさは「音程の高さ・厚み・回数(8〜12の範囲)」で表す。pitchSpan=連鎖で上がる音程幅(半音)。
-      coins: { on:true, per:8, min:4, max:24, speed:0.4, arc:90, stagger:0.03,
+      coins: { on:true, target:"price", spread:150, per:8, min:4, max:24, speed:0.4, arc:60, stagger:0.03,
                soundMin:8, soundMax:12, soundDur:0.7, pitchSpan:12 },
       // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。1個に1回なので長めでよい。
       //   dur=完成演出の長さ(秒。閃光・揺れ・衝撃波の持続の基準)。調整欄で伸ばせる。
@@ -871,18 +872,20 @@ const Sound = (() => {
   let shaper = null;                                     // 歪み（drive）用の WaveShaper（低音の「ドン」を太く）
   function shaperCurve(drive){ const k = Math.max(0, drive) * 60 + 1, n = 256, c = new Float32Array(n);
     for (let i = 0; i < n; i++){ const x = i*2/n - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)); } return c; }
-  // 低音（「ドン」）：低いサイン＋短い打撃。量(gain)・歪み(drive)は調整可。ON/OFFは呼び出し側で判定。
+  // 低音（「ドン」）：到達音程の2オクターブ下（和音として成立する高さ）を基準に鳴らす。固定Hzにしない。
+  //  重さは音程の低さではなく「音量(gain)と減衰(dur)」で出す。打撃の張りは基音への短い下降グライドで付ける（相対）。
   function bass(mul){
     const bcfg = (CONFIG.params.sound && CONFIG.params.sound.bass) || {}; if (!ready()) return;
     try {
       const t = ctx.currentTime, dur = 0.5, peak = Math.max(0.0002, (bcfg.gain || 0.7) * (mul || 1));
+      const bf = reachedFreq(-24);                       // 到達音程の2オクターブ下（音階の上に乗る低音）
       const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(peak, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      g.gain.exponentialRampToValueAtTime(peak, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);  // 重さは音量＋減衰で
       let node = g;
       if ((bcfg.drive || 0) > 0){ const ws = ctx.createWaveShaper(); ws.curve = shaperCurve(bcfg.drive); g.connect(ws); node = ws; }
       node.connect(master);
-      const s = ctx.createOscillator(); s.type = "sine"; s.frequency.setValueAtTime(120, t); s.frequency.exponentialRampToValueAtTime(48, t + 0.18); // ピッチが落ちる「ドン」
-      const s2 = ctx.createOscillator(); s2.type = "triangle"; s2.frequency.setValueAtTime(60, t); s2.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+      const s = ctx.createOscillator(); s.type = "sine"; s.frequency.setValueAtTime(bf * 1.5, t); s.frequency.exponentialRampToValueAtTime(bf, t + 0.16); // 基音へ短く下降＝ドンの張り（相対）
+      const s2 = ctx.createOscillator(); s2.type = "triangle"; s2.frequency.setValueAtTime(bf, t); s2.frequency.exponentialRampToValueAtTime(bf * 0.5, t + 0.22); // 下のオクターブで body
       s.connect(g); s2.connect(g); s.start(t); s2.start(t); s.stop(t + dur + 0.05); s2.stop(t + dur + 0.05);
     } catch(e){}
   }
@@ -930,7 +933,7 @@ const Sound = (() => {
       osc(f * 2, { type: "sine", dur: 0.05, gain: 0.05 * (1 + th), atk: 0.001 });                 // 上の倍音でキラッと
       if (th > 0.4) osc(f * 1.5, { type: "triangle", dur: 0.06, gain: 0.05 * th, atk: 0.001 }); },  // 厚み（第5音）
     tense(){ osc(reachedFreq(12), { type: "sine", dur: 0.07, gain: 0.07, atk: 0.01 }); },        // 予告中の緊張の短い音（到達音程の上）
-    reachFail(){ osc(scheme().land.root * 0.75, { type: "sawtooth", dur: 0.30, gain: 0.13, atk: 0.02 }); } // 届かなかった下降音
+    reachFail(){ osc(reachedFreq(-5), { type: "sawtooth", dur: 0.30, gain: 0.13, atk: 0.02 }); } // 届かなかった音も到達音程基準（相対の下降）
   };
 })();
 
@@ -1908,8 +1911,9 @@ function complete(){
 // 回収：完成した点を銀行に入れ（統計・グラフ更新）、累計に加算する演出を出して次を始める。
 function collect(){
   const total = sc.total, prod = sc.mult;
-  // 得点表示は「売上」としてコインに変わって飛ぶ。バーガーの数字はこの瞬間に消す（次の場面へ持ち越さない）。
-  const coinFrom = (burgerScoreEl.classList.contains("total") ? burgerScoreEl : $("stage")).getBoundingClientRect();
+  const bandNorm = Math.min(1, (bandPeak || 0) / Math.max(1, fxStages()));   // 点数の大きさ（帯基準）→ コイン音の音程・厚み・回数
+  flyCoins(total, bandNorm);                        // コインが収束先（既定＝価格の数字）へ集まって消える（非ブロッキング／音は固定回数・時間）
+  // 価格表示は「売上」としてコインに変わって消す（次の場面〈3択〉へ数字を持ち越さない）。収束先の位置は #stage 基準で決まる。
   burgerScoreClear();
   history.push(total);
   recentProducts.push(prod);                        // 次回以降の相対しきい値の基準
@@ -1917,8 +1921,6 @@ function collect(){
   if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
   updateStats(); renderBars();
   animateCum(total);                                // 累計に加算される演出
-  const bandNorm = Math.min(1, (bandPeak || 0) / Math.max(1, fxStages()));   // 点数の大きさ（帯基準）→ コイン音の音程・厚み・回数
-  flyCoins(total, coinFrom, bandNorm);              // コインが飛んで累計へ積もる（非ブロッキング／音は固定回数・時間）
   // 時間軸系：もち等、完成のたびに基礎点が育つ（デッキに在る間だけ）。
   for (const nm of catalogNames()){ const e = CONFIG.items[nm].effect;
     if (e && e.id === "mochiGrow" && CONFIG.items[nm].count > 0) temporalBonus[nm] = (temporalBonus[nm] || 0) + (e.per || 0); }
@@ -2056,18 +2058,31 @@ function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 //    次のバーガーを始めても、飛行中のコインは rAF で勝手に飛び続けて着地して消える（回収の完了を待たせない）。
 let coinTimers = [];
 function clearCoinTimers(){ coinTimers.forEach(clearTimeout); coinTimers = []; }
-function flyCoins(total, fromRect, bandNorm){
+// コインの収束先の画面座標。既定は「バーガー上の価格の数字」の位置（数字がクリア済みでも #stage 内の x%,y% で決まる）。
+function coinTargetRect(){
+  const t = (CONFIG.params.fx.coins || {}).target || "price";
+  if (t === "cum" && cumTotalEl) return cumTotalEl.getBoundingClientRect();
+  if (t === "score" && scoreEl) return scoreEl.getBoundingClientRect();
+  const s = $("stage").getBoundingClientRect(), bs = CONFIG.params.fx.burgerScore || {};   // "price"
+  const x = s.left + s.width * ((bs.x != null ? bs.x : 50) / 100);
+  const y = s.top + s.height * ((bs.y != null ? bs.y : 52) / 100);
+  return { left: x, top: y, width: 0, height: 0 };
+}
+function flyCoins(total, bandNorm){
   const cfg = CONFIG.params.fx.coins || {};
   if (cfg.on === false || !coinLayerEl) { Sound.collect(); return 0; }   // OFF時は従来の一発の回収音
   const nrm = Math.max(0, Math.min(1, bandNorm || 0));
   // 見た目の枚数は点数比例（上限あり）。音の回数はこれとは切り離す（下記）。
   const n = Math.max(cfg.min || 1, Math.min(cfg.max || 40, Math.round((total || 0) / Math.max(1, cfg.per || 8))));
-  const to = cumTotalEl.getBoundingClientRect();
-  const fx = fromRect.left + fromRect.width / 2, fy = fromRect.top + fromRect.height * 0.55;
-  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;
-  const dur = Math.max(0.1, cfg.speed || 0.7), arc = cfg.arc != null ? cfg.arc : 120, stag = Math.max(0, cfg.stagger != null ? cfg.stagger : 0.05);
+  const to = coinTargetRect();
+  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;                 // 収束先（価格の数字など）
+  const spread = cfg.spread != null ? cfg.spread : 150;
+  const dur = Math.max(0.1, cfg.speed || 0.7), arc = cfg.arc != null ? cfg.arc : 60, stag = Math.max(0, cfg.stagger != null ? cfg.stagger : 0.05);
   for (let i = 0; i < n; i++){
-    coinTimers.push(setTimeout(() => launchCoin(fx, fy, tx, ty, dur, arc), i * stag * 1000));   // 1枚ずつ順に発射（非ブロッキング・到達で消える）
+    const ang = (-Math.PI/2) + Math.random() * Math.PI;                          // 収束先の右半分(-90〜+90°)に湧く＝左へ収束
+    const rad = spread * (0.45 + Math.random() * 0.7);
+    const sx = tx + Math.cos(ang) * rad, sy = ty + Math.sin(ang) * rad;          // cos>=0 → 右側から
+    coinTimers.push(setTimeout(() => launchCoin(sx, sy, tx, ty, dur, arc), i * stag * 1000));   // 1枚ずつ順に発射（非ブロッキング・到達で消える）
   }
   // 音：点数に比例させない。回数は soundMin..soundMax（点数の大きさで 8→12 の範囲）、鳴る時間は soundDur で一定。
   //   点数の大きさは「音程の高さ・厚み・回数(8〜12)」で表す（延々と鳴り続けない）。
@@ -2479,6 +2494,9 @@ function renderSettings(){
 
   g = group("演出：回収コイン（売上を受け取る）");
   gridRow(g, "ON", boolInput(()=>fx.coins.on, v=>fx.coins.on=v));
+  { const TGT=["price","cum","score"], TGTJA=["価格の数字","売上累計","得点欄"];
+    gridRow(g, "収束先(target)", selectInput(TGTJA, ()=>Math.max(0,TGT.indexOf(fx.coins.target)), v=>{ fx.coins.target=TGT[v]; })); }
+  gridRow(g, "湧く範囲(px・spread)", numInput(()=>fx.coins.spread, v=>fx.coins.spread=Math.max(0,v), 10));
   gridRow(g, "何点で1枚(per)", numInput(()=>fx.coins.per, v=>fx.coins.per=Math.max(1,v), 1));
   gridRow(g, "枚数の下限(min)", numInput(()=>fx.coins.min, v=>fx.coins.min=Math.max(0,Math.round(v)), 1));
   gridRow(g, "枚数の上限(max)", numInput(()=>fx.coins.max, v=>fx.coins.max=Math.max(1,Math.round(v)), 1));
