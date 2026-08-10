@@ -112,8 +112,11 @@
     padding:8px 4px; text-align:center; color:var(--text); cursor:pointer; touch-action:manipulation; user-select:none}
   .offer-card:active{transform:translateY(1px); border-color:var(--accent)}
   .offer-card .pl{font-size:.62rem; color:var(--muted)}
+  .offer-card .pl .ct{display:inline-block; margin-left:4px; padding:0 5px; border-radius:999px;
+    background:#3a3020; color:#ffd98c; font-weight:800; font-size:.6rem}   /* 軸(cuisine)のチップ */
   .offer-card .nm{font-weight:800; font-size:.9rem; margin:3px 0 2px}
   .offer-card .bs{font-size:.64rem; color:var(--muted)}
+  .offer-card .ef{font-size:.6rem; color:var(--muted); margin-top:4px; line-height:1.25; min-height:1.2em}  /* 効果の文章（必ず読める） */
   .offer-skip{background:#20242b; border:1px dashed var(--line); border-radius:10px; padding:9px; color:var(--muted);
     font-weight:700; font-size:.82rem; text-align:center; cursor:pointer; touch-action:manipulation; user-select:none}
   .offer-skip:active{transform:translateY(1px)}
@@ -226,10 +229,20 @@
   .food[data-item="ケチャップ"]{background:var(--ketchup)}
   .food[data-item="マスタード"]{background:var(--mustard)}
   .food[data-item="マヨネーズ"]{background:var(--mayo)}
-  .food[data-type="sauce"]::before{content:""; position:absolute; left:8px; right:8px; top:-3px; height:6px;
+  .food[data-type="sauce"]:not([data-ph="1"])::before{content:""; position:absolute; left:8px; right:8px; top:-3px; height:6px;
     background:inherit; border-radius:6px;
     -webkit-mask:radial-gradient(circle at 6px 6px, #000 5px, transparent 6px) repeat-x; mask:radial-gradient(circle at 6px 6px,#000 5px,transparent 6px) repeat-x;
     -webkit-mask-size:12px 6px; mask-size:12px 6px}
+  /* 仮カード（専用の絵をまだ持たない新軸カード）：汎用タイル＋名前ラベル。軸(cuisine)で色分けして見分ける。 */
+  .food[data-ph="1"]{background:linear-gradient(var(--phc1,#6b7280),var(--phc2,#4b5563));
+    border-radius:9px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+  .food[data-ph="1"] .phlabel{font-size:.6rem; font-weight:800; color:#fff; letter-spacing:.02em;
+    text-shadow:0 1px 2px #000, 0 0 4px rgba(0,0,0,.6); white-space:nowrap; pointer-events:none; overflow:hidden; max-width:96%}
+  .food[data-ph="1"][data-cuisine="wa"]{--phc1:#e0996b; --phc2:#b56a3c}       /* 和：朱土 */
+  .food[data-ph="1"][data-cuisine="chuka"]{--phc1:#d4574e; --phc2:#9c2f2a}    /* 中華：紅 */
+  .food[data-ph="1"][data-cuisine="kaisen"]{--phc1:#5aa6c9; --phc2:#2f6f97}   /* 海鮮：青 */
+  .food[data-ph="1"][data-cuisine="kokyu"]{--phc1:#a887d4; --phc2:#6f4ca0}    /* 高級：紫 */
+  .food[data-ph="1"][data-cuisine="agemono"]{--phc1:#e0b45f; --phc2:#b58630}  /* 揚げ物：きつね色 */
 
   /* ===== 2. 得点と内訳（4行固定表示。コンボ一覧は畳んでおく） ===== */
   .scorehead{position:relative; display:flex; align-items:baseline; gap:4px}
@@ -300,6 +313,7 @@
   .row{display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px dashed #2c333d}
   .row .nm{flex:1; font-size:.9rem}
   .row .tag{font-size:.66rem; color:var(--muted); background:#2b313a; padding:1px 6px; border-radius:6px}
+  .row .tag.cui{color:#ffd98c; background:#3a3020}   /* 軸(cuisine)のタグ */
   .stepper{display:flex; align-items:center; gap:6px}
   .stepper button{width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:#2b313a; color:var(--text); font-size:1.1rem; cursor:pointer; touch-action:manipulation}
   .stepper .c{min-width:20px; text-align:center; font-weight:700}
@@ -436,25 +450,61 @@
    - 数値だけ触れば調整できる。ルールは1件=1オブジェクトで追加可能。
    ========================================================================= */
 const DEFAULTS = {
-  // 食材カタログ：基礎点・系統・初期枚数・所属する山・効果欄(バンズ用、今は空)・固定等級tier(今は空)
-  //   tier: 発動時の演出の固定等級（0=小/1=中/2=大）。null は自動判定に任せる。今は全て null。
+  // 食材カタログ：基礎点・系統(type)・軸(cuisine)・初期枚数・所属する山・効果欄(effect)・固定等級tier
+  //   type    : 既存の系統（meat=肉 / dairy=乳 / veg=野菜 / sauce / bun）。軸とは別。1枚が両方を持つ。
+  //   cuisine : 軸。none=無印（初期デッキ・軸なし） / wa=和 / chuka=中華 / kaisen=海鮮 / kokyu=高級 / agemono=揚げ物。
+  //   effect  : 効果欄（今は未実装。データだけ用意）。{ kind, text }。kind=効果の型（KENTO.md 参照。今は null）、
+  //             text=プレイヤーが選択時に読む説明文（必須要件。今は空）。将来、倍率などのパラメータもここに足す。
+  //   tier    : 発動時の演出の固定等級（0=小/1=中/2=大）。null は自動判定。今は全て null。
+  //   ph      : true のカードは専用の絵をまだ持たない仮カード（描画は汎用タイル＋名前ラベルで代用）。
   items: {
-    "パティ":            { pile:"ingredient", type:"meat",  base:20, count:2, tier:null },
-    "チーズ":            { pile:"ingredient", type:"dairy", base:10, count:2, tier:null },
-    "レタス":            { pile:"ingredient", type:"veg",   base:8,  count:2, tier:null },
-    "トマト":            { pile:"ingredient", type:"veg",   base:8,  count:1, tier:null },
-    "オニオン":          { pile:"ingredient", type:"veg",   base:6,  count:1, tier:null },
-    "ピクルス":          { pile:"ingredient", type:"veg",   base:4,  count:1, tier:null },
+    // ── 無印（初期デッキ／軸なし）。SHOKUZAI 第1段階（定番）を含む。 ──
+    "パティ":            { pile:"ingredient", type:"meat",  cuisine:"none", base:20, count:2, tier:null, effect:{kind:null,text:""} },
+    "チーズ":            { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:2, tier:null, effect:{kind:null,text:""} },
+    "レタス":            { pile:"ingredient", type:"veg",   cuisine:"none", base:8,  count:2, tier:null, effect:{kind:null,text:""} },
+    "トマト":            { pile:"ingredient", type:"veg",   cuisine:"none", base:8,  count:1, tier:null, effect:{kind:null,text:""} },
+    "オニオン":          { pile:"ingredient", type:"veg",   cuisine:"none", base:6,  count:1, tier:null, effect:{kind:null,text:""} },
+    "ピクルス":          { pile:"ingredient", type:"veg",   cuisine:"none", base:4,  count:1, tier:null, effect:{kind:null,text:""} },
     // SHOKUZAI 第1段階（定番）の残り。初期デッキには入れず count:0（3択で足せる）。数値・系統は暫定。
-    "ベーコン":          { pile:"ingredient", type:"meat",  base:14, count:0, tier:null },
-    "たまご":            { pile:"ingredient", type:"dairy", base:12, count:0, tier:null },   // 系統は暫定（乳）
-    "きゅうり":          { pile:"ingredient", type:"veg",   base:6,  count:0, tier:null },
-    "ケチャップ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
-    "マスタード":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
-    "マヨネーズ":        { pile:"sauce", type:"sauce", base:2, count:1, tier:null },
-    "ゴマバンズ":            { pile:"bun", type:"bun", base:5,  count:2, effect:null, tier:null },
-    "イングリッシュマフィン": { pile:"bun", type:"bun", base:5,  count:1, effect:null, tier:null },
-    "メロンパン":            { pile:"bun", type:"bun", base:12, count:1, effect:null, tier:null }
+    "ベーコン":          { pile:"ingredient", type:"meat",  cuisine:"none", base:14, count:0, tier:null, effect:{kind:null,text:""} },
+    "たまご":            { pile:"ingredient", type:"dairy", cuisine:"none", base:12, count:0, tier:null, effect:{kind:null,text:""} },
+    "きゅうり":          { pile:"ingredient", type:"veg",   cuisine:"none", base:6,  count:0, tier:null, effect:{kind:null,text:""} },
+    "ケチャップ":        { pile:"sauce", type:"sauce", cuisine:"none", base:2, count:1, tier:null, effect:{kind:null,text:""} },
+    "マスタード":        { pile:"sauce", type:"sauce", cuisine:"none", base:2, count:1, tier:null, effect:{kind:null,text:""} },
+    "マヨネーズ":        { pile:"sauce", type:"sauce", cuisine:"none", base:2, count:1, tier:null, effect:{kind:null,text:""} },
+    "ゴマバンズ":            { pile:"bun", type:"bun", cuisine:"none", base:5,  count:2, tier:null, effect:{kind:null,text:""} },
+    "イングリッシュマフィン": { pile:"bun", type:"bun", cuisine:"none", base:5,  count:1, tier:null, effect:{kind:null,text:""} },
+    "メロンパン":            { pile:"bun", type:"bun", cuisine:"none", base:12, count:1, tier:null, effect:{kind:null,text:""} },
+
+    // ── 和（wa）── SHOKUZAI 由来。数値・効果は暫定・空。各軸に バンズ／具材／ソース を用意。
+    "ライスバンズ":      { pile:"bun",        type:"bun",  cuisine:"wa", base:6,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "もち":              { pile:"ingredient", type:"veg",  cuisine:"wa", base:10, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "きんぴら":          { pile:"ingredient", type:"veg",  cuisine:"wa", base:8,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "テリヤキソース":    { pile:"sauce",      type:"sauce",cuisine:"wa", base:3,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+
+    // ── 中華（chuka）──
+    "マントウ":          { pile:"bun",        type:"bun",  cuisine:"chuka", base:6,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "ぎょうざ":          { pile:"ingredient", type:"meat", cuisine:"chuka", base:16, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "チンジャオロース":  { pile:"ingredient", type:"meat", cuisine:"chuka", base:18, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "オイスターソース":  { pile:"sauce",      type:"sauce",cuisine:"chuka", base:3,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+
+    // ── 海鮮（kaisen）── 魚介は暫定で系統=肉(たんぱく質)に寄せる（魚系統の新設は未決／SHOKUZAI §6）。
+    "シャリバンズ":      { pile:"bun",        type:"bun",  cuisine:"kaisen", base:6,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "えび":              { pile:"ingredient", type:"meat", cuisine:"kaisen", base:14, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "ツナ":              { pile:"ingredient", type:"meat", cuisine:"kaisen", base:12, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "タルタルソース":    { pile:"sauce",      type:"sauce",cuisine:"kaisen", base:3,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+
+    // ── 高級（kokyu）──
+    "ブリオッシュ":      { pile:"bun",        type:"bun",  cuisine:"kokyu", base:8,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "トリュフ":          { pile:"ingredient", type:"veg",  cuisine:"kokyu", base:30, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "和牛サーロイン":    { pile:"ingredient", type:"meat", cuisine:"kokyu", base:40, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "デミグラスソース":  { pile:"sauce",      type:"sauce",cuisine:"kokyu", base:6,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+
+    // ── 揚げ物（agemono）──
+    "揚げパン":          { pile:"bun",        type:"bun",  cuisine:"agemono", base:7,  count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "とんかつ":          { pile:"ingredient", type:"meat", cuisine:"agemono", base:22, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "コロッケ":          { pile:"ingredient", type:"veg",  cuisine:"agemono", base:14, count:0, tier:null, effect:{kind:null,text:""}, ph:true },
+    "とんかつソース":    { pile:"sauce",      type:"sauce",cuisine:"agemono", base:3,  count:0, tier:null, effect:{kind:null,text:""}, ph:true }
   },
   // ルール（データとして定義。1行足せば1ルール追加）
   rules: [
@@ -525,6 +575,8 @@ const DEFAULTS = {
     sound: { on: false, volume: 0.4, scheme: 0 },
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
     offer: { every: 1, skipReward: 10 },   // every=何個ごとに出すか（既定 毎回）/ skipReward=スキップ報酬（暫定・累計へ）
+    // デバッグ：3択の候補に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込み用。
+    offerCuisines: { none:true, wa:true, chuka:true, kaisen:true, kokyu:true, agemono:true },
     countUp:     0.18,  // 点数の数え上げ時間(秒)
     squash:      0.12,  // 着地時に下段が縮む時間(秒)
     biteDefault: 12,    // 既定の食い込み量(px)
@@ -551,6 +603,13 @@ const ORDER = ["パティ","チーズ","レタス","トマト","オニオン","�
                "ゴマバンズ","イングリッシュマフィン","メロンパン"];
 const TYPE_JA = { meat:"肉", dairy:"乳", veg:"野菜", sauce:"ソース", bun:"バンズ" };
 const PILE_JA = { bun:"バンズ", ingredient:"具材", sauce:"ソース" };
+// 軸（cuisine）。系統(type)とは別の第2のタグ。1枚が「系統」と「軸」の両方を持つ。
+const CUISINE_JA = { none:"無印", wa:"和", chuka:"中華", kaisen:"海鮮", kokyu:"高級", agemono:"揚げ物" };
+const CUISINE_ORDER = ["none","wa","chuka","kaisen","kokyu","agemono"];
+const catalogNames = () => {                     // 全カード名。ORDER の順を優先し、残り（新軸カード）を後ろに。
+  const rest = Object.keys(CONFIG.items).filter(n => !ORDER.includes(n));
+  return ORDER.concat(rest);
+};
 
 let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
@@ -670,7 +729,7 @@ const Sound = (() => {
    ロジック（生成・得点）
    ========================================================================= */
 function pick(pileKey){
-  const entries = ORDER
+  const entries = catalogNames()                    // 全カタログ（新軸カードも count>0 なら引ける）
     .filter(n => CONFIG.items[n].pile === pileKey && CONFIG.items[n].count > 0)
     .map(n => [n, CONFIG.items[n].count]);
   let tot = 0; for (const [,c] of entries) tot += c;
@@ -758,7 +817,11 @@ function evaluate(stack){
 /* =========================================================================
    レイアウト計算（食い込みで重ねる。上の段ほど手前）
    ========================================================================= */
-function effHeight(name, pos){ return VIS_H[name] + (pos === "top" ? TOP_BUN_EXTRA : 0); }
+function effHeight(name, pos){
+  let h = VIS_H[name];                                       // 専用の絵がある基本カードは既定の高さ
+  if (h == null){ const it = CONFIG.items[name]; h = (it && it.pile === "bun") ? 28 : 18; }  // 仮カードは汎用の高さ
+  return h + (pos === "top" ? TOP_BUN_EXTRA : 0);
+}
 function biteOf(name){ const b = CONFIG.params.bite[name]; return (b == null ? CONFIG.params.biteDefault : b); }
 function posOf(i, len){ return i === 0 ? "bottom" : (i === len - 1 ? "top" : "mid"); }
 
@@ -830,9 +893,16 @@ function makeTier(name, i){
   tier.className = "tier";
   const food = document.createElement("div");
   food.className = "food";
+  const it = CONFIG.items[name];
   food.dataset.item = name;
-  food.dataset.type = CONFIG.items[name].type;
+  food.dataset.type = it.type;
   food.dataset.pos = pos;
+  if (it.ph){                                        // 専用の絵をまだ持たない仮カード：汎用タイル＋名前ラベル＋軸で色分け
+    food.dataset.ph = "1";
+    food.dataset.cuisine = it.cuisine || "none";
+    const lb = document.createElement("span"); lb.className = "phlabel"; lb.textContent = name;
+    food.appendChild(lb);
+  }
   food.style.height = effHeight(name, pos) + "px";
   tier.appendChild(food);
   return tier;
@@ -1293,10 +1363,17 @@ function sample(arr, n){
   for (let k = 0; k < n && a.length; k++){ out.push(a.splice(Math.floor(Math.random()*a.length), 1)[0]); }
   return out;
 }
+// 3択の候補プール：デバッグの軸ON/OFF（offerCuisines）で有効な軸のカードだけを対象にする。
+function offerPool(){
+  const oc = CONFIG.params.offerCuisines || {};
+  return catalogNames().filter(n => { const c = CONFIG.items[n].cuisine || "none"; return oc[c] !== false; });
+}
 function showOffer(){
   offering = true;
   wantDrop = revealed;                             // 3択が出た時点で予約を破棄（選択後に勝手に次が始まらないように）
-  const picks = sample(ORDER.slice(), 3);          // 候補は現在のカード（＝SHOKUZAI 第1段階/定番）
+  const pool = offerPool();
+  if (pool.length === 0){ offering = false; resetBurger(); return; }  // 全軸OFFなら3択を出さずに待機へ
+  const picks = sample(pool, 3);                   // 有効な軸のカードから抽選（軸ごとにON/OFF可）
   offerEl.innerHTML = "";
   const title = document.createElement("div"); title.className = "offer-title";
   title.textContent = "どれか1枚をデッキに足す（タップで即決）"; offerEl.appendChild(title);
@@ -1305,7 +1382,11 @@ function showOffer(){
     const it = CONFIG.items[name];
     const card = document.createElement("div"); card.className = "offer-card";
     const sysTag = (it.type !== "sauce" && it.type !== "bun") ? "・" + TYPE_JA[it.type] : "";
-    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}</div><div class="nm">${name}</div><div class="bs">基礎${it.base}${sysTag}</div>`;
+    const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : "";
+    // 効果は文章でカードに明示（プレイヤーが選択時に読める）。今は未実装＝空欄なら「効果なし（暫定）」。
+    const eff = it.effect && it.effect.text ? it.effect.text : "効果なし（暫定）";
+    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTag}</div><div class="nm">${name}</div>`
+                   + `<div class="bs">基礎${it.base}${sysTag}</div><div class="ef">${eff}</div>`;
     card.addEventListener("click", () => chooseOffer(name));
     row.appendChild(card);
   }
@@ -1421,7 +1502,8 @@ function renderPiles(){
   const host = $("piles"); host.innerHTML = "";
   const piles = [["ingredient","具材山"],["sauce","ソース山"],["bun","バンズ山"]];
   for (const [key, title] of piles){
-    const names = ORDER.filter(n => CONFIG.items[n].pile === key);
+    // 基本カード（ORDER）は常に表示。新軸カードは山に入っている（count>0）ときだけ表示（普段は畳む）。
+    const names = catalogNames().filter(n => CONFIG.items[n].pile === key && (ORDER.includes(n) || CONFIG.items[n].count > 0));
     let tot = 0; names.forEach(n => tot += CONFIG.items[n].count);
     const box = document.createElement("div"); box.className = "pile";
     const h = document.createElement("h3"); h.innerHTML = `${title} <span>計 ${tot} 枚</span>`;
@@ -1430,7 +1512,8 @@ function renderPiles(){
       const it = CONFIG.items[n];
       const row = document.createElement("div"); row.className = "row";
       const tag = it.type === "bun" || it.type === "sauce" ? "" : `<span class="tag">${TYPE_JA[it.type]}</span>`;
-      row.innerHTML = `<span class="nm">${n}</span>${tag}<span class="tag">基礎${it.base}</span>`;
+      const cui = it.cuisine && it.cuisine !== "none" ? `<span class="tag cui">${CUISINE_JA[it.cuisine]}</span>` : "";
+      row.innerHTML = `<span class="nm">${n}</span>${cui}${tag}<span class="tag">基礎${it.base}</span>`;
       const st = document.createElement("div"); st.className = "stepper";
       const minus = document.createElement("button"); minus.textContent = "−";
       const c = document.createElement("span"); c.className = "c"; c.textContent = it.count;
@@ -1495,6 +1578,12 @@ function renderSettings(){
   g = group("完成ごとの3択（第1層・デッキに足す）");
   gridRow(g, "何個ごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
   gridRow(g, "スキップ報酬(累計+)", numInput(()=>CONFIG.params.offer.skipReward, v=>CONFIG.params.offer.skipReward=Math.max(0,Math.round(v)), 1));
+
+  // デバッグ：3択に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込みができる。
+  g = group("3択に出す軸（デバッグ・既定 全ON）");
+  for (const c of CUISINE_ORDER){
+    gridRow(g, CUISINE_JA[c], boolInput(()=>CONFIG.params.offerCuisines[c] !== false, v=>CONFIG.params.offerCuisines[c]=v));
+  }
 
   // 具材の隣に出る +N / ×N の残る時間、右上コンボ履歴の件数
   g = group("具材の隣の表示・右上のコンボ履歴");
