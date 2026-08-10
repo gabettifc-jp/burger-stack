@@ -350,6 +350,16 @@
   #screenFlash.strong{background:radial-gradient(circle at 50% 42%, rgba(255,240,200,.7), rgba(255,210,110,0) 85%)}
   #screenFlash.strong.go{animation:sflash var(--flashdur,.42s) cubic-bezier(.05,.8,.1,1)}
   @keyframes sflash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+  /* 回収のコイン：画面全体をまたぐ固定レイヤー。1枚ずつ飛んで累計へ積もる（積もりは残す） */
+  #coinLayer{position:fixed; inset:0; pointer-events:none; z-index:48}
+  .coin{position:absolute; left:0; top:0; width:16px; height:16px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff2b0, #ffcf3f 45%, #d99a1e 78%, #a9750f);
+    box-shadow:0 0 5px rgba(255,200,80,.65), inset 0 -2px 2px rgba(150,90,0,.5), inset 0 2px 2px rgba(255,255,255,.6);
+    border:1px solid #b6820f; will-change:transform}
+  .coin::after{content:"¥"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:900; color:#a9750f; opacity:.75}
+  .coin.piled{transition:transform .18s ease-out}
+  @media (prefers-reduced-motion: reduce){ .coin{transition:none !important} }
 
   /* ===== 3. 連打ボタン（画面下に固定。演出では絶対に動かない） ===== */
   .actionbar{position:fixed; left:0; right:0; bottom:0; z-index:50;
@@ -527,6 +537,9 @@
 <!-- 大の演出：画面全体が一瞬反応する固定オーバーレイ -->
 <div id="screenFlash"></div>
 
+<!-- 回収のコイン：バーガーから累計へ飛んで積もる（画面全体をまたぐので固定配置） -->
+<div id="coinLayer"></div>
+
 <!-- 連打ボタンは画面下に固定：演出でレイアウトが動いても位置は不変 -->
 <div class="actionbar">
   <div class="actionbar-in">
@@ -671,10 +684,16 @@ const DEFAULTS = {
       bandup:    { on:true, durBase:0.9, durStep:1.45, durMax:2.4, ampBase:1.5, ampStep:1.2, ampMax:3.2, spotsBase:2, layers:5 },
       // 得点をバーガーに重ねて大きく表示。size=大きさ倍率 / opacity=不透明度 / x,y=バーガー内の表示位置(%)。
       burgerScore: { on:true, size:1.0, opacity:0.95, x:50, y:52 },
+      // 回収：売上（お金）をコインで受け取る。バーガーから飛び出し累計へ飛んで積もる。
+      //   per=何点で1枚 / min,max=枚数の下限上限 / speed=飛ぶ時間(秒) / arc=軌道の山の高さ(px) /
+      //   stagger=1枚ごとの間隔(秒。音の連鎖にもなる) / pileMax=積もりの最大枚数（超えたら古いものから消す）。
+      coins: { on:true, per:8, min:4, max:36, speed:0.7, arc:120, stagger:0.05, pileMax:60 },
       // 完成の演出：その回の最高帯レベルで強くなる（文字は出さず、強さで示す）。
       complete:  { on:true, base:1.0, scale:1.30 },
       easing:    { drop:"softbounce", number:"outslow" }  // 数字は「速く出てゆっくり消える(outslow)」を既定に
     },
+    // デバッグ：点数（帯レベル）を段階的に上げて演出だけを確認するモード。rampMax=到達帯 / rampStep=刻み / rampInterval=間隔(秒)。
+    debug: { rampMax: 14, rampStep: 1, rampInterval: 0.7 },
     // 発動（コンボ）の等級判定。しきい値は相対値：直近の乗算の積の中央値との比で決める。
     grade: {
       floor:      0.40,  // 相対比の分母の下限（序盤=基準が低いとき暴れないための床）
@@ -691,7 +710,7 @@ const DEFAULTS = {
       feedCap:   3      // 右上コンボ履歴の件数
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
-    fallDur:     0.14,  // 1段の落下アニメ時間(秒)
+    fallDur:     0.30,  // 1段の落下アニメ時間(秒)
     perClick:    0,     // 1クリックで落とす段数（0=全段〈既定〉／1〜=その段数）。複数でも必ず1段ずつ順に落ちる。
     dropGap:     0.12,  // 段が落ちてから次の段が落ちるまでの間隔(秒)
     fastForward: true,  // 落下中のクリックで落下を速める「早送り」。既定ON
@@ -862,13 +881,16 @@ const Sound = (() => {
     land(i){ const S = scheme(), L = S.land, sc = L.scale, f = L.root * Math.pow(2, sc[Math.min(i, sc.length - 1)] / 12);
       osc(f, { type: bandWave(), detune: bandDetune(), detune2: L.detune2, fifth: L.fifth, dur: L.dur, gain: L.gain, atk: L.atk });
       if (S.noise) noise({ gain: 0.12 * S.noise, dur: 0.04, hp: 3000 }); },
-    combo(grade){ const C = scheme().combo, w = C.wave || bandWave(), d = bandDetune();
+    // コンボ音：等級で和音を変え、さらに連鎖数 chain が増えるほど音程を上げる（連鎖の長さが耳で分かる）。
+    combo(grade, chain){ const C = scheme().combo, w = C.wave || bandWave(), d = bandDetune();
       const semis = grade >= 2 ? C.big : grade >= 1 ? C.mid : C.small;
-      chord(C.root, semis, { type: w, detune: d, dur: grade >= 2 ? 0.26 : 0.15, gain: grade >= 2 ? 0.24 : 0.18, stagger: grade >= 2 ? 0.02 : 0 }); },
+      const rise = Math.min(24, (chain || 0) * 1);    // 連鎖1つにつき半音上げる（上限2オクターブ）
+      chord(C.root * Math.pow(2, rise / 12), semis, { type: w, detune: d, dur: grade >= 2 ? 0.26 : 0.15, gain: grade >= 2 ? 0.24 : 0.18, stagger: grade >= 2 ? 0.02 : 0 }); },
     // 帯アップ：音を層にして押し寄せる。stage と fx.bandup.layers が上がるほど層と長さが増す。
     bandUp(mul, stage){ const U = scheme().up, w = U.wave || bandWave(), st = Math.max(1, stage || 1);
-      const layers = Math.max(2, Math.round(((CONFIG.params.fx.bandup && CONFIG.params.fx.bandup.layers) || 4) + st));
-      const gain = 0.22 * (mul || 1), dur = 0.18 + 0.08 * st;
+      const spill = (typeof fxSpill === "function" ? fxSpill() : 0);   // 視覚が飽和した分を音の層数・持続へ回す
+      const layers = Math.max(2, Math.min(28, Math.round(((CONFIG.params.fx.bandup && CONFIG.params.fx.bandup.layers) || 4) + st + spill * 2)));
+      const gain = 0.22 * (mul || 1), dur = 0.18 + 0.08 * st + 0.06 * spill;
       chord(U.root, U.semis, { type: w, detune: bandDetune(), dur, gain, stagger: 0.04 });                        // 本体
       chord(U.root * 2, U.semis, { type: w, detune: bandDetune(), dur: dur*0.8, gain: gain*0.6, stagger: 0.03 }); // オクターブ上
       chord(U.root / 2, [0, 7, 12], { type: "triangle", dur: dur*1.3, gain: gain*0.85, stagger: 0.02 });          // 下支え
@@ -886,6 +908,11 @@ const Sound = (() => {
       chord(cont/2, [0, 7], { type: "triangle", dur: 0.6, gain: 0.16, stagger: 0.03 });            // 下支え
       if (CONFIG.params.sound.bass && CONFIG.params.sound.bass.on) bass(0.8 + 0.1*(L||0)); },
     collect(){ const K = scheme().coin; chord(K.root, K.semis, { type: K.wave || "square", dur: K.dur || 0.1, gain: 0.20, stagger: 0.06 }); },
+    // 回収コイン：1枚ごとに1回鳴らす（連鎖）。枚数 i が進むほど少しずつ音程が上がり、受け取りの積み上がりが耳で分かる。
+    coin(i){ const K = scheme().coin, n = i || 0;
+      const semi = K.semis[n % K.semis.length] + Math.min(24, Math.floor(n / K.semis.length) * 3 + n * 0.6);
+      osc(K.root * Math.pow(2, semi / 12), { type: K.wave || "square", dur: 0.08, gain: 0.15, atk: 0.002 });
+      osc(K.root * 2 * Math.pow(2, semi / 12), { type: "sine", dur: 0.05, gain: 0.06, atk: 0.001 }); },  // 上の倍音でキラッと
     tense(){ osc(scheme().land.root * 2, { type: "sine", dur: 0.07, gain: 0.07, atk: 0.01 }); },        // 予告中の緊張の短い音
     reachFail(){ osc(scheme().land.root * 0.75, { type: "sawtooth", dur: 0.30, gain: 0.13, atk: 0.02 }); } // 届かなかった下降音
   };
@@ -1074,7 +1101,7 @@ function computeLayout(stack){
    ========================================================================= */
 const $ = id => document.getElementById(id);
 const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
-const stageShake = $("stageShake"), burgerScoreEl = $("burgerScore");
+const stageShake = $("stageShake"), burgerScoreEl = $("burgerScore"), coinLayerEl = $("coinLayer");
 const cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed"), offerEl = $("offer");
 const scoreEl = $("score"), fBase = $("fBase"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
 const firedRules = $("firedRules"), comboCount = $("comboCount");
@@ -1110,6 +1137,7 @@ let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
 let runBase = 0;        // 積み上げ中の基礎点の累計（1段ごとに増える）
 let bandLevelCur = 0;   // いま見えている帯レベル（音色・揺れの判定に使う）。plan由来で進み、状態はタイマーが持たない
 let bandPeak = 0;       // このバーガーで到達した最高帯レベル（完成演出をこれに応じて変える）
+let comboChain = 0;     // このバーガーで発動したコンボの連鎖数（連鎖ごとに音程を上げる）。バーガー開始でリセット
 let reachActive = false;  // 予告（リーチ）表示中か（確定planから設定／届いた段で解除。タイマーは進めない）
 let reachTarget = 0;      // 予告している帯のしきい値（この値に届く段で解除）
 let plan = null;          // 計算層：クリック時に確定した1個ぶんの結果。演出はこれを再生するだけ
@@ -1221,7 +1249,7 @@ function startBurger(){
   plan = p; stack = p.stack; sc = p.sc; layout = p.layout; hitMeta = p.grades;   // 演出はこのplanを再生
   revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = new Array(stack.length);
-  runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; awaitingCollect = false;
+  runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; comboChain = 0; awaitingCollect = false;
   applyBandVisual(0); clearBandTransients();        // 帯の見た目と一時演出（バースト等）をリセット
   genToken++; clearTimers();
   hintEl.style.display = "none";
@@ -1499,8 +1527,9 @@ function burstBand(L){
   const upSound = up.sound != null ? up.sound : 1.8;
   const upFlash = up.flash != null ? up.flash : 1.7;
   const upShake = up.shake != null ? up.shake : 3.0;
+  const spill = fxSpill();                              // 視覚が飽和したら、あふれ分を画面全体の変化（閃光の強さ・持続）へ回す
   if (!reduced){
-    if (upFlash > 0) screenFlash(upFlash * amp, dur*1000*0.7);
+    if (upFlash > 0) screenFlash(upFlash * amp * (1 + 0.25*spill), dur*1000*0.7 * (1 + 0.35*spill));
     if (upShake > 0) strongShake(upShake * amp, Math.min(1600, dur*1000*0.7));
     for (let s = 0; s < spots; s++) spawnParticles(W*(0.2 + 0.6*(s + 0.5)/spots), 90 + Math.random()*70, s%2 ? "juice" : "sesame", 1.8*amp);
     cameraZoom(amp); hitstop(amp);
@@ -1527,6 +1556,39 @@ function celebrateComplete(){
   if (!reduced){ screenFlash(1.3*amp, 560); strongShake(1.4*amp, 560); cameraZoom(0.8*amp); }
   numberJuice(1.4*amp);                                  // 完成の「合計点」の文字だけは大きく弾く
   fxForceBand = save;
+}
+
+// デバッグ：点数（帯レベル）を低→極端まで段階的に上げ、実プレイなしで演出を確認する。速さと刻みは調整欄から。
+let rampToken = 0, rampTimer = null;
+function stopScoreRamp(){ rampToken++; if (rampTimer){ clearTimeout(rampTimer); rampTimer = null; }
+  fxForceBand = null; bandLevelCur = 0; bandPeak = 0; comboChain = 0;   // デバッグ再生を止めて待機の見た目へ戻す
+  clearBandTransients(); applyBandVisual(0); burgerScoreClear(); multMeterEl.textContent = "×1.00"; }
+function runScoreRamp(){
+  stopScoreRamp();
+  const d = CONFIG.params.debug || {};
+  const maxBand = Math.max(1, Math.round(d.rampMax || 12));
+  const step = Math.max(0.25, d.rampStep || 1);
+  const iv = Math.max(0.05, d.rampInterval || 0.7) * 1000;
+  Sound.unlock();
+  const my = ++rampToken;
+  let L = step;
+  const tick = () => {
+    if (my !== rampToken) return;
+    fxForceBand = L; bandLevelCur = Math.floor(L); bandPeak = Math.max(bandPeak, Math.round(L));
+    applyBandVisual(L);
+    const thr = bandThreshold(Math.max(1, Math.round(L)));
+    multMeterEl.textContent = "×" + thr.toFixed(2);
+    burgerScoreShow(String(Math.round(thr * 10)), "running");   // 合成の点数（帯しきい値ベース）をバーガーに表示
+    burstBand(Math.max(1, Math.round(L)));                      // その帯のバースト演出を再生（連続レベルで大きさが決まる）
+    if (L < maxBand - 1e-6){ L = Math.min(maxBand, L + step); rampTimer = setTimeout(tick, iv); }
+    else {                                                      // 到達＝完成演出でしめる
+      rampTimer = setTimeout(() => { if (my !== rampToken) return;
+        bandPeak = maxBand; burgerScoreShow(String(Math.round(bandThreshold(maxBand) * 10)), "total"); celebrateComplete();
+        rampTimer = setTimeout(() => { if (my === rampToken){ fxForceBand = null; applyBandVisual(0); burgerScoreClear(); multMeterEl.textContent = "×1.00"; } }, 1800);
+      }, iv);
+    }
+  };
+  tick();
 }
 
 // 予告（リーチ）：本当に届く回だけ plan.steps[r].reach として立つ。ここは表示だけ。
@@ -1557,7 +1619,7 @@ function clearBandTransients(){
 function presentHit(i){
   const h = plan.sc.hits[i], m = plan.grades[i] || { grade:0 };
   const y = h.idx.reduce((a,k)=>a + tierY(k), 0) / h.idx.length;   // 接触面の高さ
-  Sound.combo(m.grade);                             // コンボ音（等級で変える）
+  Sound.combo(m.grade, comboChain++);               // コンボ音（等級で変える＋連鎖ごとに音程を上げる）
   { const cy = 14 + y * (layout && layout.total ? Math.min(1,(250-14-8)/layout.total) : 1), W = $("stage").clientWidth;
     spawnParticles(W/2, cy, partKind(stack[h.idx[0]]), m.grade>=2 ? 2.0 : 1.2); }  // コンボの破片（文字を減らした分、密度は破片で）
   if (reduced) return;                              // reduced-motion：発光・画面反応は省く
@@ -1642,6 +1704,9 @@ function fxShape(L){
   return s * st;
 }
 function fxL(){ return fxShape(fxLevelRaw()); }             // 既存の呼び出しはこの「連続・整形済み」レベルを使う
+// 飽和のあふれ分：段階上限（stages）を超えたレベル。視覚（揺れ・光・破片）は上限で頭打ちなので、
+// この超過分を「上限のないチャンネル」＝音の層数・持続、画面全体の変化へ回す（上位で横ばいにならないように）。
+function fxSpill(){ return Math.max(0, fxLevelRaw() - fxStages()); }
 function fxAmt(base, scale, L, cap){ const v = (base || 0) * Math.pow(scale || 1, L); return cap != null ? Math.min(cap, v) : v; }
 
 // ---- パーティクル（rAF で更新。数・速さ・寿命・重力・色を指定） ----
@@ -1810,13 +1875,16 @@ function complete(){
 // 回収：完成した点を銀行に入れ（統計・グラフ更新）、累計に加算する演出を出して次を始める。
 function collect(){
   const total = sc.total, prod = sc.mult;
+  // 得点表示は「売上」としてコインに変わって飛ぶ。バーガーの数字はこの瞬間に消す（次の場面へ持ち越さない）。
+  const coinFrom = (burgerScoreEl.classList.contains("total") ? burgerScoreEl : $("stage")).getBoundingClientRect();
+  burgerScoreClear();
   history.push(total);
   recentProducts.push(prod);                        // 次回以降の相対しきい値の基準
   const w = CONFIG.params.grade.recentWindow || 20;
   if (recentProducts.length > w * 2) recentProducts = recentProducts.slice(-w);
   updateStats(); renderBars();
   animateCum(total);                                // 累計に加算される演出
-  Sound.collect();                                  // 回収音（チャリン）
+  flyCoins(total, coinFrom);                        // コインが飛んで累計へ積もる（音は枚数ぶん連鎖・OFF時は一発の回収音）
   // 時間軸系：もち等、完成のたびに基礎点が育つ（デッキに在る間だけ）。
   for (const nm of catalogNames()){ const e = CONFIG.items[nm].effect;
     if (e && e.id === "mochiGrow" && CONFIG.items[nm].count > 0) temporalBonus[nm] = (temporalBonus[nm] || 0) + (e.per || 0); }
@@ -1949,6 +2017,49 @@ function afterTierBonus(){ updateProgress(); if (tuningOpen()) renderSettings();
 function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
+// 回収：売上（お金）をコインで受け取る。バーガー（得点表示）から累計へ1枚ずつ飛び、積もる。音は1枚ごとに連鎖。
+let piledCoins = [];
+function flyCoins(total, fromRect){
+  const cfg = CONFIG.params.fx.coins || {};
+  if (cfg.on === false || !coinLayerEl) { Sound.collect(); return 0; }   // OFF時は従来の一発の回収音
+  const n = Math.max(cfg.min || 1, Math.min(cfg.max || 40, Math.round((total || 0) / Math.max(1, cfg.per || 8))));   // 得点が大きいほど枚数が増える
+  const to = cumTotalEl.getBoundingClientRect();
+  const fx = fromRect.left + fromRect.width / 2, fy = fromRect.top + fromRect.height * 0.55;
+  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;
+  const dur = Math.max(0.1, cfg.speed || 0.7), arc = cfg.arc != null ? cfg.arc : 120, stag = Math.max(0, cfg.stagger != null ? cfg.stagger : 0.05);
+  for (let i = 0; i < n; i++){
+    animTimers.push(setTimeout(() => launchCoin(fx, fy, tx, ty, dur, arc, i), i * stag * 1000));   // 1枚ずつ順に発射（受け取りに時間をかける）
+  }
+  return n;
+}
+function launchCoin(fx, fy, tx, ty, dur, arc, i){
+  if (reduced || !coinLayerEl){ Sound.coin(i); pileCoin(tx, ty); return; }   // reduced：飛ばさず音と積もりだけ
+  const el = document.createElement("div"); el.className = "coin";
+  coinLayerEl.appendChild(el);
+  const jx = (Math.random()*2 - 1) * 22;                                       // 軌道を少しばらす
+  const cx = (fx + tx) / 2 + jx, cy = Math.min(fy, ty) - arc * (0.6 + Math.random()*0.7);   // 制御点＝山なりの頂点
+  const s0 = performance.now(), D = dur * 1000, spin = 360 + Math.random()*360;
+  function step(now){
+    const t = Math.min(1, (now - s0) / D), u = 1 - t;
+    const x = u*u*fx + 2*u*t*cx + t*t*tx, y = u*u*fy + 2*u*t*cy + t*t*ty;      // 二次ベジェの弧
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(t*spin).toFixed(0)}deg)`;
+    if (t < 1) requestAnimationFrame(step);
+    else { el.remove(); Sound.coin(i); pileCoin(tx, ty); }                     // 到着＝1枚ぶんの音＋積もる
+  }
+  requestAnimationFrame(step);
+}
+function pileCoin(tx, ty){
+  if (!coinLayerEl) return;
+  const cfg = CONFIG.params.fx.coins || {};
+  const el = document.createElement("div"); el.className = "coin piled";
+  const jx = (Math.random()*2 - 1) * 16, jy = 2 - Math.random() * (10 + piledCoins.length % 8);   // 累計の近くに少し散らして積む
+  el.style.transform = `translate(${(tx + jx).toFixed(1)}px, ${(ty + jy).toFixed(1)}px)`;
+  coinLayerEl.appendChild(el); piledCoins.push(el);
+  const cap = Math.max(0, Math.round(cfg.pileMax || 60));
+  while (piledCoins.length > cap){ const old = piledCoins.shift(); if (old) old.remove(); }        // 超えたら古いものから消す
+}
+function clearPiledCoins(){ for (const c of piledCoins) c.remove(); piledCoins = []; if (coinLayerEl) coinLayerEl.innerHTML = ""; }
+
 function animateCum(delta){
   const from = cumTotalValue, to = cumTotalValue + delta; cumTotalValue = to;
   const pop = document.createElement("div"); pop.className = "cumpop"; pop.textContent = "+" + delta;
@@ -1967,7 +2078,8 @@ function animateCum(delta){
 function countUp(target, token){                    // 点数は最後に数え上がる
   const onBurger = burgerScoreEl.classList.contains("total");   // 完成の合計はバーガー上の大きい表示も一緒に数える
   const dur = CONFIG.params.countUp * 1000;
-  if (reduced || dur <= 0){ scoreEl.textContent = target; if (onBurger) burgerScoreEl.textContent = target; return; }
+  const onB = () => onBurger && burgerScoreEl.classList.contains("total");   // 回収でクリアされたら以後は触らない
+  if (reduced || dur <= 0){ scoreEl.textContent = target; if (onB()) burgerScoreEl.textContent = target; return; }
   const start = performance.now(); let lastFx = 0;
   const W = $("stage").clientWidth;
   function step(now){
@@ -1975,7 +2087,7 @@ function countUp(target, token){                    // 点数は最後に数え�
     const t = Math.min(1, (now - start) / dur);
     const v = Math.round(target * t);
     scoreEl.textContent = v;
-    if (onBurger) burgerScoreEl.textContent = v;
+    if (onB()) burgerScoreEl.textContent = v;
     // 数え上げ中も演出を出し続ける（無音・無演出の時間を作らない）：文字は増やさず、破片だけを間欠で
     if (now - lastFx > 55){ lastFx = now;
       spawnParticles(W*(0.28 + Math.random()*0.44), 100 + Math.random()*80, Math.random()<0.5?"sesame":"cheese", 0.8);
@@ -2008,7 +2120,7 @@ function resetBurger(){
   clearTimers(); genToken++;
   stack = null; plan = null; revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = [];
-  runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; awaitingCollect = false; collectLocked = false; offering = false;
+  runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; comboChain = 0; awaitingCollect = false; collectLocked = false; offering = false;
   applyBandVisual(0); clearBandTransients(); clearParticles();
   offerEl.classList.remove("show"); offerEl.innerHTML = "";
   stageInner.innerHTML = ""; stageInner.style.setProperty("--fit","1"); stageInner.style.setProperty("--zoom","1"); comboFeedEl.innerHTML = "";
@@ -2318,6 +2430,16 @@ function renderSettings(){
   gridRow(g, "横位置(%・50=中央)", numInput(()=>fx.burgerScore.x, v=>{ fx.burgerScore.x=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
   gridRow(g, "縦位置(%・上=0)", numInput(()=>fx.burgerScore.y, v=>{ fx.burgerScore.y=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
 
+  g = group("演出：回収コイン（売上を受け取る）");
+  gridRow(g, "ON", boolInput(()=>fx.coins.on, v=>fx.coins.on=v));
+  gridRow(g, "何点で1枚(per)", numInput(()=>fx.coins.per, v=>fx.coins.per=Math.max(1,v), 1));
+  gridRow(g, "枚数の下限(min)", numInput(()=>fx.coins.min, v=>fx.coins.min=Math.max(0,Math.round(v)), 1));
+  gridRow(g, "枚数の上限(max)", numInput(()=>fx.coins.max, v=>fx.coins.max=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "飛ぶ時間(秒・speed)", numInput(()=>fx.coins.speed, v=>fx.coins.speed=Math.max(0.05,v), 0.05));
+  gridRow(g, "軌道の山(px・arc)", numInput(()=>fx.coins.arc, v=>fx.coins.arc=Math.max(0,v), 10));
+  gridRow(g, "1枚ごとの間隔(秒・stagger)", numInput(()=>fx.coins.stagger, v=>fx.coins.stagger=Math.max(0,v), 0.01));
+  gridRow(g, "積もりの最大枚数(pileMax)", numInput(()=>fx.coins.pileMax, v=>fx.coins.pileMax=Math.max(0,Math.round(v)), 5));
+
   g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
   gridRow(g, "ON", boolInput(()=>fx.hitstop.on, v=>fx.hitstop.on=v));
   gridRow(g, "停止(秒・base)", fxNum(fx.hitstop,"base",0.005));
@@ -2358,6 +2480,19 @@ function renderSettings(){
     const note=document.createElement("p"); note.className="barnote"; note.textContent="※ 帯レベルを強制すると演出のスケールがその帯基準になる。最大（例:12）で破綻しないか確認する。";
     g.parentElement.appendChild(note);
   }
+
+  // デバッグ：点数を段階的に上げるモード（実プレイなしで低→極端まで演出を確認）。
+  g = group("演出テスト：点数ランプ（段階的に上げる）");
+  gridRow(g, "到達帯(rampMax)", numInput(()=>CONFIG.params.debug.rampMax, v=>CONFIG.params.debug.rampMax=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "刻み(rampStep)", numInput(()=>CONFIG.params.debug.rampStep, v=>CONFIG.params.debug.rampStep=Math.max(0.25,v), 0.25));
+  gridRow(g, "間隔(秒・rampInterval)", numInput(()=>CONFIG.params.debug.rampInterval, v=>CONFIG.params.debug.rampInterval=Math.max(0.05,v), 0.1));
+  { const rowr = document.createElement("div"); rowr.className="btnrow";
+    const r1=document.createElement("button"); r1.textContent="▶ ランプ再生"; r1.onclick=()=>runScoreRamp();
+    const r2=document.createElement("button"); r2.textContent="■ 停止"; r2.onclick=()=>stopScoreRamp();
+    g.parentElement.appendChild(rowr); rowr.append(r1,r2);
+    const note2=document.createElement("p"); note2.className="barnote"; note2.textContent="※ 低い帯から到達帯まで刻みで上げ、各段の帯アップ演出→最後に完成演出を再生する。上位で飽和せず盛り上がるか確認できる。";
+    g.parentElement.appendChild(note2);
+  }
 }
 
 /* ===== 起動・イベント ===== */
@@ -2391,7 +2526,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; temporalBonus = {}; completedCount = 0; resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; temporalBonus = {}; renderPiles(); updateStats(); renderBars(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; temporalBonus = {}; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
