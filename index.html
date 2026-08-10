@@ -512,6 +512,9 @@ const DEFAULTS = {
     },
     fallPerTier: 0.08,  // （旧・自動積み上げ用の段間隔。1クリック=1段の現行では未使用）
     fallDur:     0.14,  // 1段の落下アニメ時間(秒)
+    perClick:    1,     // 1クリックで落とす段数（1=現行〜全段）。複数でも必ず1段ずつ順に落ちる。
+    dropGap:     0.12,  // 段が落ちてから次の段が落ちるまでの間隔(秒)
+    fastForward: true,  // 落下中のクリックで落下を速める「早送り」。既定ON
     landPause:   0.10,  // 最終段の完成から数え上げまでの間(秒)
     completeLock:0.30,  // 完成後、入力を受け付けない時間(秒)。連打でも点数を必ず見せる
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
@@ -794,7 +797,11 @@ let revealed = 0;       // 置いた段数
 let tierEls = [];
 let shown = new Set();  // 表示済みヒットのindex
 let dropping = false;   // 段が落下中か
-let queued = 0;         // 予約数（reserve時）
+let wantDrop = 0;       // これまでのクリックで要求された「落とす段数」の合計（0..総段数）。revealedがこれに追いつくまで1段ずつ落とす
+let dropTimer = null;   // 現在落下中の段の着地タイマー（早送りで貼り替える）
+let dropEl = null;      // 現在落下中の段の要素
+let dropIdx = -1;       // 現在落下中の段のindex
+let ffUsed = false;     // この段で早送りを使ったか（次の間隔も詰める）
 let genToken = 0;       // 数え上げ中断用（バーガー世代）
 let hitMeta = [];       // ヒットごとの等級情報（コンボ）
 let runMult = 1;        // 積み上げ中の乗算の積（溜まる数字）
@@ -832,19 +839,41 @@ function onTap(){
   if (offering) return;                          // 3択の選択中はボタンを無視（カードをタップして選ぶ）
   if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
   if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
-  if (dropping){                                 // 落下中のクリック
-    if (mode === "reserve" && stack && revealed + queued < stack.length){ queued++; updateProgress(); }
-    return;                                       // ignore時・満杯時は無視（演出を上書きしない）
+  if (midSequence()){                            // 落下中／段間の待ち中：新規に始めず、早送り＋（予約）
+    if (dropping && CONFIG.params.fastForward !== false) fastForward(); // 早送り：落下中の段を速める（既定ON）
+    if (mode === "reserve") requestDrops();      // 予約：さらに段を要求（ignore時は無視）
+    return;                                       // 演出は上書きしない（必ず1段ずつ）
   }
-  advance();
-}
-
-function advance(){
   if (stack === null){ if (!startBurger()) return; }   // 未開始なら新しいバーガー
-  const r = revealed;
-  revealed++;
+  requestDrops();                                // 1クリックぶん（＝perClick段）を要求
+  pump();                                         // シーケンサ始動（1段ずつ順に落とす）
+}
+// 進行中（落下中、または段間の待ちで次段が控えている）か。新規クリック扱いにしないための判定。
+function midSequence(){ return dropping || (!!stack && revealed < wantDrop && revealed < stack.length); }
+
+// 1クリックで要求する段数（1〜全段）。複数でも落ちるのは必ず1段ずつ。
+function tiersPerClick(){
+  const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
+  return Math.max(1, Math.min(total, Math.round(CONFIG.params.perClick || 1)));
+}
+// クリック＝「落とす段数」の要求を増やす。実際の落下はpump()が1段ずつ処理する。
+function requestDrops(){
+  if (!stack) return;
+  wantDrop = Math.min(stack.length, wantDrop + tiersPerClick());
   updateProgress();
-  dropTier(r);                                    // 1クリック=1段
+}
+// シーケンサ：落下中でなく、要求（wantDrop）が残っていれば次の1段だけ落とす。
+function pump(){
+  if (dropping || !stack) return;
+  if (revealed >= wantDrop || revealed >= stack.length) return;
+  const r = revealed; revealed++; updateProgress();
+  dropTier(r);
+}
+// 回収／スキップ後に次のバーガーを始める（そのタップ1回ぶんの段を落とす）。
+function beginNext(){
+  stack = null;
+  if (!startBurger()) return;
+  requestDrops(); pump();
 }
 
 function startBurger(){
@@ -852,7 +881,8 @@ function startBurger(){
   if (!b){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
   $("msg").textContent = "";
   stack = b.stack; sc = evaluate(stack); layout = computeLayout(stack);
-  revealed = 0; queued = 0; shown = new Set(); tierEls = new Array(stack.length);
+  revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
+  shown = new Set(); tierEls = new Array(stack.length);
   runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; hitMeta = computeGrades();
   applyBandVisual(0); clearBandTransients();        // 帯の見た目と一時演出（バースト等）をリセット
   genToken++; clearTimers();
@@ -935,18 +965,39 @@ function dropTier(r){
   tierEls[r] = el;
   stageInner.appendChild(el);
 
-  if (reduced){ el.classList.add("land"); landed(r); return; }   // アニメ省略：即着地
-  dropping = true;
+  ffUsed = false;
+  if (reduced){ el.classList.add("land"); finishDrop(r); return; }   // アニメ省略：即着地→間隔をあけて次へ
+  dropping = true; dropEl = el; dropIdx = r;
   el.classList.add("drop");
   void el.offsetHeight;                             // 強制リフロー
   el.classList.remove("drop");
   el.classList.add("land");
-  animTimers.push(setTimeout(() => {
-    landed(r);
-    dropping = false;
-    // reserve：落下が終わったら予約を1つ消化して次段へ（演出の速さは1段ぶんのまま）
-    if (mode === "reserve" && r < stack.length - 1 && queued > 0){ queued--; updateProgress(); advance(); }
-  }, CONFIG.params.fallDur * 1000 + 30));
+  scheduleLand(r, CONFIG.params.fallDur);
+}
+// 着地タイマーを張る（早送りで貼り替えられるよう分離）。
+function scheduleLand(r, dur){
+  dropTimer = setTimeout(() => finishDrop(r), dur * 1000 + 30);
+  animTimers.push(dropTimer);
+}
+// 早送り：いま落下中の段の残り落下を短縮する（演出・音程・コンボはそのまま。時間だけ詰める）。
+function fastForward(){
+  if (!dropping || !dropEl || ffUsed) return;      // この段は既に早送り済み or 落下中でない
+  ffUsed = true;                                   // 次の段間隔もこの段については詰める
+  if (dropTimer){ clearTimeout(dropTimer); dropTimer = null; }
+  const fast = Math.min(CONFIG.params.fallDur, 0.05);
+  const food = dropEl.querySelector(".food");
+  if (food) food.style.transitionDuration = fast + "s";   // 途中からでも現在値→着地へ短時間で寄せる
+  scheduleLand(dropIdx, fast);
+}
+// 着地の確定＋次段の予約消化。複数要求されていても、間隔をあけて必ず1段ずつ落とす。
+function finishDrop(r){
+  landed(r);
+  dropping = false; dropEl = null; dropIdx = -1; dropTimer = null;
+  if (r >= stack.length - 1) return;               // 最終段は landed→complete() 済み
+  if (revealed < wantDrop){                        // まだ要求が残る：間隔をあけて次の段へ
+    const gap = ffUsed ? 0 : Math.max(0, CONFIG.params.dropGap != null ? CONFIG.params.dropGap : 0.12);
+    animTimers.push(setTimeout(pump, gap * 1000));
+  }
 }
 
 function bump(el){ if (reduced) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
@@ -969,7 +1020,7 @@ function landed(r){
   }
   revealHits(r);                                    // 接触面が揃ったコンボをその場で演出
   if (r < stack.length - 1) updateReach(r);         // まだ段が残るなら予告（リーチ）を判定
-  if (r === stack.length - 1){ queued = 0; complete(); }  // 最終段で完成→停止
+  if (r === stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→停止（残り要求も止める）
 }
 
 function revealHits(r){
@@ -1144,7 +1195,7 @@ function complete(){
   showBreakdown(sc);                                // 4行と一覧を確定表示
   multMeterEl.textContent = "×" + sc.mult.toFixed(2);
   baseMeterEl.textContent = "基礎 " + sc.base;
-  queued = 0;                                       // 予約された入力はここで破棄
+  wantDrop = revealed;                              // 予約された入力はここで破棄
   Sound.complete();                                 // 完成音
   awaitingCollect = true;
   collectLocked = true;                             // 完成後しばらく入力を受け付けない（点数を必ず見せる）
@@ -1170,7 +1221,7 @@ function collect(){
   completedCount++;
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
   if (completedCount % every === 0){ showOffer(); } // 第1層：3択を出す（次バーガーはまだ始めない）
-  else { stack = null; advance(); }                 // 選択なしの回は即・次のバーガー
+  else { beginNext(); }                             // 選択なしの回は即・次のバーガー
 }
 
 // 第1層：完成ごとの3択。いずれかの山に1枚足す／スキップ（小報酬）。タップで即決・確認画面なし。
@@ -1207,7 +1258,7 @@ function chooseOffer(name){
   if (name){ CONFIG.items[name].count += 1; renderPiles(); }   // 山に1枚足す（希釈が起きる層）
   else { animateCum(Math.max(0, Math.round(CONFIG.params.offer.skipReward || 0))); Sound.collect(); } // スキップ報酬（暫定・累計へ）
   offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
-  stack = null; advance();                          // 選んだら即座に次のバーガー
+  beginNext();                                      // 選んだら即座に次のバーガー
 }
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
@@ -1244,14 +1295,22 @@ function updateProgress(){
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
   if (offering){ el.textContent = "カードを1枚選ぶ（タップ）"; return; }
   if (awaitingCollect){ el.textContent = "完成！　押すと点数を回収して次へ"; return; }
-  if (stack === null){ el.textContent = `押すと1段ずつ積み上がる（${total}回で1個）`; return; }
-  const res = (mode === "reserve" && queued > 0) ? `　予約 ${queued}` : "";
+  if (stack === null){
+    const per = Math.max(1, Math.min(total, Math.round(CONFIG.params.perClick || 1)));
+    const clicks = Math.ceil(total / per);
+    el.textContent = per <= 1 ? `押すと1段ずつ積み上がる（${total}回で1個）`
+                              : `押すと${per}段ずつ落ちる（${clicks}回で1個・落下は1段ずつ）`;
+    return;
+  }
+  const pend = Math.max(0, wantDrop - revealed);    // 要求済みでまだ落ちていない段
+  const res = pend > 0 ? `　予約 ${pend}` : "";
   el.textContent = `${revealed} / ${stack.length} 段${res}`;
 }
 
 function resetBurger(){
   clearTimers(); genToken++;
-  stack = null; revealed = 0; queued = 0; dropping = false; shown = new Set(); tierEls = [];
+  stack = null; revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
+  shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; bandLevelCur = 0; awaitingCollect = false; collectLocked = false; offering = false;
   applyBandVisual(0); clearBandTransients();
   offerEl.classList.remove("show"); offerEl.innerHTML = "";
@@ -1442,7 +1501,13 @@ function renderSettings(){
   gridRow(g, "既定値", numInput(()=>CONFIG.params.biteDefault, v=>CONFIG.params.biteDefault=v, 1));
   for (const n of ORDER) gridRow(g, n, numInput(()=>biteOf(n), v=>CONFIG.params.bite[n]=v, 1));
 
-  // 演出速度（1クリック=1段なので、1段あたりの時間）
+  // 操作：1クリックで落とす段数・段の間隔・早送り（複数段でも必ず1段ずつ落ちる）
+  g = group("操作（クリックと落下）");
+  gridRow(g, "1クリックで落ちる段数", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "段が落ちる間隔(秒)", numInput(()=>CONFIG.params.dropGap, v=>CONFIG.params.dropGap=Math.max(0,v), 0.02));
+  gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
+
+  // 演出速度（1段あたりの時間）
   g = group("演出の速さ（秒・1段あたり）");
   gridRow(g, "1段の落下時間", numInput(()=>CONFIG.params.fallDur,     v=>CONFIG.params.fallDur=v,     0.01));
   gridRow(g, "完成〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
@@ -1462,7 +1527,7 @@ $("tap").addEventListener("click", onTap);
 window.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); onTap(); } });
 document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventListener("change", () => {
   mode = document.querySelector('input[name="mode"]:checked').value;
-  if (mode === "ignore") queued = 0;          // 無視に切替えたら予約は破棄
+  if (mode === "ignore") wantDrop = revealed;  // 無視に切替えたら未処理の予約は破棄
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; completedCount = 0; resetBurger(); renderPiles(); renderSettings(); });
