@@ -3019,10 +3019,18 @@ $("gear").addEventListener("click", () => {          // 調整パネルを開い
 window.RUN = {
   state: () => ({ money, moneyShown, daysSurvived, runSpins, completedCount, runActive, artifacts: artifactsOwned.slice() }),
   grantArtifact: (nm) => { if (CONFIG.artifacts[nm] && !artifactsOwned.includes(nm)) artifactsOwned.push(nm); updateRunStatus(); return artifactsOwned.slice(); },
+  setArtifacts: (arr) => { artifactsOwned = (arr||[]).filter(nm => CONFIG.artifacts[nm]); updateRunStatus(); return artifactsOwned.slice(); },
   clearArtifacts: () => { artifactsOwned = []; updateRunStatus(); },
   setMoney: (v) => { money = v; moneyShown = v; refreshMoney(false); },
+  // 時間軸系（もち・たら＝基礎の育ち／ほたて＝倍率の育ち／白バンズ・さけ＝取得後の個数）の内部状態を計測から制御する。
+  setCompleted: (v) => { completedCount = v; },
+  setTemporalBonus: (nm, v) => { temporalBonus[nm] = v; },
+  setTemporalMult: (nm, v) => { temporalMult[nm] = v; },
+  setAcquiredAt: (nm, v) => { acquiredAt[nm] = v; },
+  clearTemporal: () => { temporalBonus = {}; temporalMult = {}; acquiredAt = {}; },
   reset: () => resetRun(),
 };
+window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハーネス用に明示公開（関数宣言だが依存の明確化のため）
 
 renderPiles();
 renderSettings();
