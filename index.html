@@ -1255,6 +1255,8 @@ function applyCardEffects(stack, acc){
   const amMul = (nm, m) => 1 + (m - 1) * axisMul(cui(nm));
 
   const neigh = rawNeigh;                            // フォアグラは除外ではなく吸収に変更（item5）。除外処理は撤廃。
+  // item5 の「除外」とは別物。吸収済みの基礎点をアーティファクトが二度拾わないための重複防止。
+  const absorbedIdx = new Set();                      // フォアグラが基礎点を吸収した段（無い場合も空集合で必ず宣言）
 
   for (let i = 0; i < n; i++){
     const nm = stack[i], e = items[nm].effect; if (!e || !e.id) continue;
@@ -1291,7 +1293,7 @@ function applyCardEffects(stack, acc){
       case "deckMultMax": if (deckSize <= e.max) pushMult(nm+"：デッキ"+e.max+"以下", amMul(nm, e.mult), [i]); break;
       case "caviar":      pushMult(nm, amMul(nm, e.mult), [i]); acc.sacrificeRandom++; break;
       case "purity":      { const impure = stack.some((m,k)=> k!==i && isIngredient(m) && cui(m)!=="kokyu"); if (impure) pushAdd(nm+"：純度崩れ", -baseOf(nm), [i]); break; }
-      case "foiegras":    { const g=neigh(i); let absorbed=0; for (const j of g) absorbed += baseOf(stack[j]);   // item5：隣の基礎点を取り込む（吸収・損しない）
+      case "foiegras":    { const g=neigh(i); let absorbed=0; for (const j of g){ absorbed += baseOf(stack[j]); absorbedIdx.add(j); }   // item5：隣の基礎点を取り込む（吸収・損しない）＋吸収段を記録
                             pushAdd(nm+"：吸収", amAdd(nm, absorbed), [i, ...g]); pushMult(nm, amMul(nm, e.mult), [i, ...g]); break; }
       case "iseebi":      pushMult(nm+"：薄いほど", amMul(nm, 1 + e.per * Math.max(0, (e.refHigh||20) - deckSize)), [i]); break;
       case "demiMult":    pushAdd(nm+"：基礎0", -baseOf(nm), [i]); pushMult(nm, amMul(nm, e.mult), [i]); break;
@@ -1320,8 +1322,8 @@ function applyCardEffects(stack, acc){
   }
 
   // ── アーティファクト（第3層・盤面を希釈しない）。盤面の形に効くものはここで適用。数値は CONFIG.artifacts。 ──
-  { const a = artById("meatBase"); if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (typ(m)==="meat" && !excluded.has(i)){ s+=a.add; idx.push(i);} }); pushAdd("厨房の火力：肉", s, idx); } }
-  { const a = artById("vegBase");  if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (typ(m)==="veg"  && !excluded.has(i)){ s+=a.add; idx.push(i);} }); pushAdd("製氷機：野菜", s, idx); } }
+  { const a = artById("meatBase"); if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (typ(m)==="meat" && !absorbedIdx.has(i)){ s+=a.add; idx.push(i);} }); pushAdd("厨房の火力：肉", s, idx); } }
+  { const a = artById("vegBase");  if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (typ(m)==="veg"  && !absorbedIdx.has(i)){ s+=a.add; idx.push(i);} }); pushAdd("製氷機：野菜", s, idx); } }
   { const a = artById("hygiene");  if (a) pushAdd("衛生管理", a.add, []); }
   { const a = artById("regular");  if (a){ const hit = CUISINE_ORDER.some(c => c!=="none" && cuiInBurger(c) >= (a.need||3)); if (hit) pushMult("常連客：同軸"+(a.need||3)+"+", a.mult, []); } }
 
