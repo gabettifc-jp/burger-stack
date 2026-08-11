@@ -163,7 +163,8 @@
   select.selinp{width:150px; background:#20242b; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:3px 6px; font-size:.82rem}
   /* 第1層：完成ごとの3択（回収直後にステージ上に出す。タップで即決・確認画面なし） */
   #offer{position:absolute; inset:0; z-index:10; display:none; flex-direction:column; gap:8px;
-    align-items:stretch; justify-content:center; padding:10px; border-radius:12px; background:rgba(12,14,19,.86)}
+    align-items:stretch; justify-content:flex-start; padding:10px; border-radius:12px; background:rgba(12,14,19,.9);
+    overflow-y:auto; overflow-x:hidden}   /* 店など背の高い画面はこの中でスクロールできる（枠は #stage で固定） */
   #offer.show{display:flex}
   .offer-title{font-size:.74rem; color:var(--muted); text-align:center; margin-bottom:2px}
   .offer-cards{display:flex; gap:8px}
@@ -179,6 +180,22 @@
   .offer-skip{background:#20242b; border:1px dashed var(--line); border-radius:10px; padding:9px; color:var(--muted);
     font-weight:700; font-size:.82rem; text-align:center; cursor:pointer; touch-action:manipulation; user-select:none}
   .offer-skip:active{transform:translateY(1px)}
+  /* ラン制（家賃・店・結果）の画面 */
+  .offer-card.cant, .shopbtn.cant{opacity:.4; cursor:default}
+  .offer-card .price, .shopbtn .price{display:block; margin-top:4px; color:#ffd98c; font-weight:800; font-size:.72rem}
+  .offer-runinfo{text-align:center; font-size:.9rem; color:var(--text); font-weight:700}
+  .offer-runinfo.warn{color:#ffb0a0}
+  .offer-runinfo.big{font-size:1.3rem; font-weight:900; color:#ffd98c}
+  .offer-buy{align-self:center; min-width:60%; margin-top:2px; background:var(--accent); color:#141414; border:none;
+    border-radius:10px; padding:10px 14px; font-weight:900; font-size:.95rem; text-align:center; cursor:pointer;
+    touch-action:manipulation; user-select:none}
+  .offer-buy:active{transform:translateY(1px)}
+  .shop-acts{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+  .shopbtn{background:#2b313a; border:1px solid var(--line); border-radius:10px; padding:8px; color:var(--text);
+    font-weight:700; font-size:.78rem; cursor:pointer; touch-action:manipulation; user-select:none}
+  .shopbtn:active{transform:translateY(1px); border-color:var(--accent)}
+  .runstatus{font-size:.72rem; color:var(--muted); margin-top:4px}
+  .runstatus b{color:var(--text); font-weight:800}
   /* スキップ＝デッキから1枚取り除く：デッキ一覧 */
   .remove-list{display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; padding:2px}
   .remove-row{display:flex; align-items:center; gap:6px; background:#2b313a; border:1px solid var(--line);
@@ -428,6 +445,16 @@
   .grid input{width:84px; padding:5px 7px; background:#0f1216; border:1px solid var(--line); color:var(--text); border-radius:7px; font-size:.9rem}
   .setgroup{margin:10px 0}
   .setgroup .lbl{margin-top:8px}
+  /* 調整欄の分類（折りたたみ・既定は閉じる） */
+  .setcat{border:1px solid var(--line); border-radius:10px; margin:8px 0; background:#191d24}
+  .setcat > summary{list-style:none; cursor:pointer; padding:10px 12px; font-weight:800; font-size:.86rem; color:var(--text);
+    user-select:none; display:flex; align-items:center; gap:8px}
+  .setcat > summary::-webkit-details-marker{display:none}
+  .setcat > summary::before{content:"▶"; font-size:.7rem; color:var(--muted); transition:transform .15s ease}
+  .setcat[open] > summary::before{transform:rotate(90deg)}
+  .setcat[open] > summary{border-bottom:1px solid var(--line)}
+  .setcat > .setgroup{padding:0 12px}
+  .setcat > .setgroup:last-child{padding-bottom:10px}
   .btnrow{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
   .btnrow button{padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#2b313a; color:var(--text); cursor:pointer; font-size:.85rem}
   /* 軸の内訳（常時表示）。デッキに各軸が何枚あるか。0枚の軸は薄く表示。 */
@@ -478,7 +505,8 @@
   <section>
     <p class="lbl">このバーガーの売値（価格）</p>
     <div class="scorehead"><span class="unit">¥</span><span id="score" class="building">–</span>
-      <span class="cum">売上 ¥<b id="cumTotal">0</b></span></div>
+      <span class="cum">所持金 ¥<b id="cumTotal">0</b></span></div>
+    <div id="runStatus" class="runstatus"></div>
     <div class="breakdown4">
       <div><span>基礎点</span><b id="fBase">–</b></div>
       <div><span>加算</span><b id="fAdd">–</b></div>
@@ -730,9 +758,13 @@ const DEFAULTS = {
     collectPop:  0.35,  // 回収時に累計へ加算される演出の時間(秒)
     // 効果音（Web Audio でコード生成。音声ファイルは使わない）。既定OFF。scheme=音のパターン番号（0=標準/現行）。
     sound: { on: true, volume: 0.4, scheme: 0 },   // 既定ON（最初のタップで解錠）。低音（ドン）は廃止＝重さは音量・減衰・層数で出す。
-    // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。
-    offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。スキップは「デッキから1枚取り除く」に変更。
-    tierBonus: { every: 10 }, // 段数ボーナス：N個作るごとに「具材枠+1／ソース枠+1」を選ぶ（区切り＝ノルマは未実装の暫定）。既定10。
+    // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。無料。スキップは「見送る（何もしない）」。
+    offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。
+    // ラン制（失敗あり・仮メカニクス）。バーガー1個=1スピン。rentEvery スピンごとに家賃。払えなければラン終了。
+    run: { on: true, rentEvery: 5, rentBase: 500, rentMul: 1.5 },   // rentBase=初期家賃 / rentMul=等比の倍率
+    // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
+    shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
+            cardsShown: 3, scaleOnBuy: false, scaleMul: 1.5 },
     // デバッグ：3択の候補に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込み用。
     offerCuisines: { none:true, wa:true, chuka:true, kaisen:true, kokyu:true, agemono:true },
     countUp:     0.18,  // 点数の数え上げ時間(秒)
@@ -1141,10 +1173,16 @@ let plan = null;          // 計算層：クリック時に確定した1個ぶ�
 let recentProducts = [];// 直近バーガーの乗算の積（相対しきい値の基準）
 let awaitingCollect = false; // 完成して停止中（次のタップで回収）
 let collectLocked = false;   // 完成直後の入力ロック中
-let cumTotalValue = 0;  // セッション累計点（コインの着弾で増える）
+let money = 0;          // 所持金（真の値・即時）。売値で増え、家賃・買い物で減る。家賃判定はこれを使う
+let moneyShown = 0;     // 所持金の表示値（コインの着弾で真の値へ寄る＝旧cumTotalValue）
 let currentCollectId = 0;   // 回収の識別子。新しい回収で++。飛行中の古いコインが得点欄を書かないよう照合する
 let collectFillActive = false;  // 得点欄（このバーガーの売値）をコインで満たし中か。次バーガーの1段目着地で false
-let completedCount = 0; // 回収したバーガーの数（3択の頻度に使う）
+let completedCount = 0; // 回収したバーガーの数（統計用）
+// ラン制の状態（仮メカニクス）
+let runSpins = 0;       // このランのスピン数（バーガー数）
+let daysSurvived = 0;   // 支払った家賃の回数（＝生き残った営業日）
+let runActive = true;   // ラン継続中か（false＝終了・結果表示中）
+let shopBuys = {};      // 店の購入回数（値段スケーリング用。キー＝品目）
 let offering = false;   // 3択の選択中
 
 function makeTier(name, i){
@@ -1170,7 +1208,8 @@ function makeTier(name, i){
 
 function onTap(){
   Sound.unlock();                                // ユーザー操作の中で音を解錠（OFF時は何もしない）
-  if (offering) return;                          // 3択の選択中はボタンを無視（カードをタップして選ぶ）
+  if (!runActive) return;                        // ラン終了（結果表示中）は「最初から」ボタン以外を無視
+  if (offering) return;                          // 3択・家賃・店の最中はボタンを無視（画面内をタップして選ぶ）
   if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
   if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
   if (midSequence()){                            // 落下中／段間の待ち中：新規に始めず、早送り＋（予約）
@@ -1895,6 +1934,7 @@ function complete(){
 // 回収：得点欄（このバーガーの売値）と売上累計を、コインの着弾に同期して段階的に満たす。時間で勝手に数え上げない。
 function collect(){
   const total = sc.total, prod = sc.mult;
+  money += total;                                   // 所持金（真の値）は即時に加算＝家賃判定に使う。表示はコインで寄る。
   showBreakdown(sc);                                // 明細（基礎点/加算/乗算/合計）は回収の瞬間に出す
   const cid = ++currentCollectId; collectFillActive = true;   // この回収の識別子。以後この売値をコインで満たす
   scoreEl.classList.remove("building"); scoreEl.classList.add("done"); scoreEl.textContent = "¥0";   // 得点欄は0から着弾で増える
@@ -1915,15 +1955,16 @@ function collect(){
   }
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（もちの成長／除外を反映）
   awaitingCollect = false;
-  completedCount++;
-  // 完成の区切りで出す選択を順に積む：段数ボーナス（N個ごと）→ 3択（every個ごと）。
+  completedCount++; runSpins++;                     // バーガー1個 = 1スピン
+  updateRunStatus();
+  // 完成の区切りで出す画面を順に積む：3択（無料・毎回）→ 家賃（rentEvery ごと）→ 店。
   const q = [];
-  const tb = CONFIG.params.tierBonus;
-  if (tb && completedCount % Math.max(1, Math.round(tb.every || 10)) === 0) q.push("tier");
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
   if (completedCount % every === 0) q.push("card");
-  if (q.length){ startOfferQueue(q); }              // 選択を出す（次バーガーはまだ始めない）
-  else { beginNext(); }                             // 選択なしの回は即・次のバーガー
+  const rn = CONFIG.params.run;
+  if (rn && rn.on !== false && runSpins % Math.max(1, Math.round(rn.rentEvery || 5)) === 0){ q.push("rent"); q.push("shop"); }
+  if (q.length){ startOfferQueue(q); }              // 選択・家賃・店を出す（次バーガーはまだ始めない）
+  else { beginNext(); }                             // 何もない回は即・次のバーガー
 }
 
 // 完成の区切りで出す選択（段数ボーナス／3択）を1つずつ順に処理する。
@@ -1937,7 +1978,8 @@ function showNextOffer(){
   if (!offerQueue.length){ offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = ""; resetBurger(); return; }
   offering = true;
   const kind = offerQueue[0];
-  if (kind === "tier") showTierBonus();
+  if (kind === "rent") showRent();
+  else if (kind === "shop") showShop();
   else showOffer();
 }
 function advanceOffer(){ offerQueue.shift(); showNextOffer(); }   // 現在の選択を消化して次へ（無ければ待機）
@@ -1976,8 +2018,8 @@ function showOffer(){
   }
   offerEl.appendChild(row);
   const skip = document.createElement("div"); skip.className = "offer-skip";
-  skip.textContent = "足さずに、デッキから1枚取り除く →";   // スキップ＝削る手段（希釈を戻す）
-  skip.addEventListener("click", showRemove);
+  skip.textContent = "見送る（何もしない）";           // スキップは無料でスルーのみ。削除は店（有料）に移した。
+  skip.addEventListener("click", advanceOffer);
   offerEl.appendChild(skip);
   offerEl.classList.add("show");
   updateProgress();
@@ -1988,54 +2030,135 @@ function chooseOffer(name){
   advanceOffer();
 }
 
-// スキップ＝デッキから1枚取り除く。デッキの中身を出し、任意の1枚を選んで −1。取り除かない選択肢も残す。
-function showRemove(){
+function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
+
+/* ===== ラン制（家賃・店・失敗）＝仮メカニクス。数値はすべて調整欄から変えられる。 ===== */
+function el(cls, text){ const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; return d; }
+function cuiTagHTML(it){ return it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : ""; }
+function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived)); }
+function shopPrice(key, base){ const sh = CONFIG.params.shop || {}; const n = shopBuys[key] || 0;
+  return Math.max(0, Math.round((base || 0) * (sh.scaleOnBuy ? Math.pow(sh.scaleMul || 1.5, n) : 1))); }
+function bumpBuy(key){ if (CONFIG.params.shop && CONFIG.params.shop.scaleOnBuy) shopBuys[key] = (shopBuys[key] || 0) + 1; }
+
+// 家賃の支払い画面。払えれば店へ、払えなければラン終了。
+function showRent(){
   offerEl.innerHTML = "";
-  const title = document.createElement("div"); title.className = "offer-title";
-  title.textContent = "デッキから1枚取り除く（タップで即決／最後の1枚は残す）"; offerEl.appendChild(title);
+  const due = rentDue();
+  offerEl.appendChild(el("offer-title", `家賃の支払い（${daysSurvived + 1}営業日目）`));
+  offerEl.appendChild(el("offer-runinfo", `家賃 ¥${due}　／　所持金 ¥${money}`));
+  if (money >= due){
+    const pay = el("offer-buy", `支払う（¥${due}）`);
+    pay.addEventListener("click", () => { setMoney(money - due); daysSurvived++; Sound.coinChink(0, 0.5); updateRunStatus(); advanceOffer(); });
+    offerEl.appendChild(pay);
+  } else {
+    offerEl.appendChild(el("offer-runinfo warn", "家賃を払えません。ラン終了。"));
+    const btn = el("offer-buy", "結果を見る"); btn.addEventListener("click", () => endRun());
+    offerEl.appendChild(btn);
+  }
+  offerEl.classList.add("show"); updateProgress();
+}
+
+// 店：残った所持金で買い物。カード追加／削除（有料）／枠+1／引き直し。複製・店員は未実装。
+let shopStock = null;
+function rerollStock(){ const pool = offerPool(); shopStock = sample(pool, Math.max(1, Math.round((CONFIG.params.shop || {}).cardsShown || 3))); }
+function showShop(){
+  const sh = CONFIG.params.shop || {};
+  if (!shopStock) rerollStock();
+  offerEl.innerHTML = "";
+  offerEl.appendChild(el("offer-title", `店（所持金 ¥${money}）　残った所持金で買い物`));
+  const row = document.createElement("div"); row.className = "offer-cards";
+  const cardCost = shopPrice("card", sh.cardCost);
+  for (const name of shopStock){
+    const it = CONFIG.items[name]; const aff = money >= cardCost;
+    const card = document.createElement("div"); card.className = "offer-card shopcard" + (aff ? "" : " cant");
+    const eff = effectText(name) || "効果なし（暫定）";
+    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTagHTML(it)}</div><div class="nm">${name}</div>`
+                   + `<div class="bs">基礎${baseOf(name)}</div><div class="ef">${eff}</div><div class="price">¥${cardCost}</div>`;
+    if (aff) card.addEventListener("click", () => buyCard(name, cardCost));
+    row.appendChild(card);
+  }
+  offerEl.appendChild(row);
+  const acts = document.createElement("div"); acts.className = "shop-acts";
+  const mkbtn = (label, cost, fn, aff) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
+    b.innerHTML = `${label}<span class="price">¥${cost}</span>`; if (aff) b.addEventListener("click", fn); return b; };
+  const rc = shopPrice("remove", sh.removeCost), ic = shopPrice("ing", sh.ingredientSlotCost), scst = shopPrice("sau", sh.sauceSlotCost), rr = shopPrice("reroll", sh.rerollCost);
+  acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), money >= rc));
+  acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), money >= ic));
+  acts.appendChild(mkbtn("ソース枠 +1", scst, () => buySlot("sauces", "sau", scst), money >= scst));
+  acts.appendChild(mkbtn("品揃えの引き直し", rr, () => { setMoney(money - rr); bumpBuy("reroll"); rerollStock(); showShop(); }, money >= rr));
+  offerEl.appendChild(acts);
+  const leave = el("offer-skip", "店を出る →"); leave.addEventListener("click", () => { shopStock = null; advanceOffer(); });
+  offerEl.appendChild(leave);
+  offerEl.classList.add("show"); updateProgress();
+}
+function buyCard(name, cost){
+  if (money < cost) return;
+  setMoney(money - cost); bumpBuy("card");
+  CONFIG.items[name].count += 1; renderPiles(); renderAxisTally();
+  const i = shopStock.indexOf(name); if (i >= 0) shopStock.splice(i, 1);   // 買ったカードは棚から消える
+  Sound.coinChink(4, 0.5); showShop();
+}
+function buySlot(field, key, cost){
+  if (money < cost) return;
+  setMoney(money - cost); bumpBuy(key);
+  CONFIG.params.tiers[field] = Math.max(0, Math.round(CONFIG.params.tiers[field]) + 1);
+  updateProgress(); if (tuningOpen()) renderSettings(); Sound.coinChink(4, 0.5); showShop();
+}
+// 店の「取り除く」：有料で1枚 −1。デッキの中身を出し、任意の1枚を選ぶ（最後の1枚は残す）。
+function showShopRemove(cost){
+  offerEl.innerHTML = "";
+  offerEl.appendChild(el("offer-title", `デッキから1枚取り除く（¥${cost}・その山の最後の1枚は残す）`));
   const list = document.createElement("div"); list.className = "remove-list";
   const names = catalogNames().filter(n => CONFIG.items[n].count > 0);
   for (const name of names){
-    const it = CONFIG.items[name];
-    const last = pileTotal(it.pile) <= 1;          // その山の最後の1枚は取り除けない（作れなくなるため）
+    const it = CONFIG.items[name]; const last = pileTotal(it.pile) <= 1;
     const rowEl = document.createElement("div"); rowEl.className = "remove-row" + (last ? " off" : "");
     const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="tag cui">${CUISINE_JA[it.cuisine]}</span>` : "";
-    const sysTag = (it.type!=="sauce"&&it.type!=="bun") ? `<span class="tag">${TYPE_JA[it.type]}</span>` : "";
+    const sysTag = (it.type !== "sauce" && it.type !== "bun") ? `<span class="tag">${TYPE_JA[it.type]}</span>` : "";
     rowEl.innerHTML = `<span class="nm">${name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}<span class="ct2">×${it.count}</span>`;
-    if (!last) rowEl.addEventListener("click", () => removeCard(name));
+    if (!last) rowEl.addEventListener("click", () => { setMoney(money - cost); bumpBuy("remove"); CONFIG.items[name].count -= 1; renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
     list.appendChild(rowEl);
   }
   offerEl.appendChild(list);
-  const keep = document.createElement("div"); keep.className = "offer-skip";
-  keep.textContent = "取り除かない（何もしない）";
-  keep.addEventListener("click", advanceOffer);
-  offerEl.appendChild(keep);
+  const back = el("offer-skip", "← 店に戻る（取り除かない）"); back.addEventListener("click", () => showShop());
+  offerEl.appendChild(back);
   offerEl.classList.add("show");
 }
-function removeCard(name){
-  if (!offering) return;
-  if (CONFIG.items[name] && CONFIG.items[name].count > 0){ CONFIG.items[name].count -= 1; renderPiles(); renderAxisTally(); Sound.collect(); }
-  advanceOffer();
-}
-
-// 段数ボーナス：N個ごとに「具材枠+1／ソース枠+1」を選ぶ（区切り＝ノルマは未実装の暫定）。
-function showTierBonus(){
+// ラン終了：結果を出して「最初から」。メタ進行はまだ無し。
+function endRun(){
+  runActive = false; offering = false; offerQueue = [];
   offerEl.innerHTML = "";
-  const t = CONFIG.params.tiers;
-  const ing = Math.round(t.ingredients), sau = Math.round(t.sauces);
-  const title = document.createElement("div"); title.className = "offer-title";
-  title.textContent = "段数ボーナス：どちらかを選ぶ（枠が1つ増える）"; offerEl.appendChild(title);
-  const row = document.createElement("div"); row.className = "offer-cards";
-  const mk = (label, sub, fn) => { const c=document.createElement("div"); c.className="offer-card";
-    c.innerHTML = `<div class="nm">${label}</div><div class="bs">${sub}</div>`; c.addEventListener("click", fn); return c; };
-  row.appendChild(mk("具材枠 +1", `${ing} → ${ing+1} 枚`, () => { CONFIG.params.tiers.ingredients = ing + 1; afterTierBonus(); }));
-  row.appendChild(mk("ソース枠 +1", `${sau} → ${sau+1} 枚`, () => { CONFIG.params.tiers.sauces = sau + 1; afterTierBonus(); }));
-  offerEl.appendChild(row);
-  offerEl.classList.add("show");
-  updateProgress();
+  offerEl.appendChild(el("offer-title", "ラン終了"));
+  offerEl.appendChild(el("offer-runinfo big", `${daysSurvived}営業日 生き残った`));
+  offerEl.appendChild(el("offer-runinfo", `総スピン ${runSpins}　／　払えなかった家賃 ¥${rentDue()}　／　所持金 ¥${money}`));
+  const btn = el("offer-buy", "最初から"); btn.addEventListener("click", () => resetRun());
+  offerEl.appendChild(btn);
+  offerEl.classList.add("show"); updateProgress();
 }
-function afterTierBonus(){ updateProgress(); if (tuningOpen()) renderSettings(); advanceOffer(); }
-function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
+// ランを最初から（デッキ・段数・所持金・スピンを初期化。演出/音の調整は保持。メタ進行は無し）。
+function restoreDefaultDeck(){
+  for (const nm of Object.keys(CONFIG.items)){ if (DEFAULTS.items[nm]) CONFIG.items[nm].count = DEFAULTS.items[nm].count; }
+  CONFIG.params.tiers.ingredients = DEFAULTS.params.tiers.ingredients;
+  CONFIG.params.tiers.sauces = DEFAULTS.params.tiers.sauces;
+}
+function resetRun(){
+  restoreDefaultDeck();
+  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null;
+  history = []; recentProducts = []; completedCount = 0; temporalBonus = {};
+  refreshMoney(false); clearPiledCoins();
+  offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
+  updateStats(); renderBars(); renderPiles(); renderAxisTally(); updateRunStatus();
+  resetBurger();
+}
+// 画面上の常時ラン表示（営業日・所持金・次の家賃）。
+function updateRunStatus(){
+  const e = $("runStatus"); if (!e) return;
+  const rn = CONFIG.params.run || {}; const every = Math.max(1, Math.round(rn.rentEvery || 5));
+  if (rn.on === false){ e.textContent = ""; e.style.display = "none"; return; }
+  e.style.display = "";
+  const toRent = (every - (runSpins % every)) % every; const nspin = toRent === 0 ? every : toRent;
+  e.innerHTML = `<b>${daysSurvived + 1}営業日目</b>　次の家賃 <b>¥${rentDue()}</b>（あと ${nspin} スピン）`;
+}
 
 // 累計への加算演出（数字が増える＋「+N」がふわっと出る）
 // 回収：売上（お金）をコインで受け取る。バーガー（価格表示）から価格の表示へ飛び、到達したら消える（積もりは残さない）。
@@ -2081,12 +2204,15 @@ function flyCoins(total, bandNorm, cid){
   }
   return n;
 }
-// コイン1枚の着弾：売上累計を +delta（常時）、得点欄をその回収の途中合計に（同じ回収なら）。音＋小さな跳ね。
+// コイン1枚の着弾：所持金の表示を +delta（真の money へ寄せる・常時）、得点欄をその回収の途中合計に（同じ回収なら）。音＋跳ね。
 function coinArrive(cid, scoreAfter, delta, pitchSemi, thick, sound){
-  cumTotalValue += delta; if (cumTotalEl){ cumTotalEl.textContent = cumTotalValue; numBounce(cumTotalEl); }   // 累計は常に増える（非ブロッキング）
+  moneyShown = Math.min(money, moneyShown + delta); refreshMoney(true);   // 表示は真の所持金を超えない（非ブロッキング）
   if (collectFillActive && cid === currentCollectId){ scoreEl.textContent = "¥" + scoreAfter; numBounce(scoreEl); }  // このバーガーの売値（同じ回収の間だけ）
   if (sound) Sound.coinChink(pitchSemi, thick);      // 着弾ごとに音（到達音程の上で連鎖上昇）
 }
+// 所持金の表示更新。snap=true のときだけ着弾の跳ねを出す。金額が減った時は表示を即真値へ。
+function refreshMoney(bounce){ if (!cumTotalEl) return; cumTotalEl.textContent = moneyShown; if (bounce) numBounce(cumTotalEl); }
+function setMoney(v){ money = Math.max(0, Math.round(v)); moneyShown = money; refreshMoney(false); }   // 家賃・買い物で即時に増減
 function launchCoin(fx, fy, tx, ty, dur, arc, onArrive){
   if (reduced || !coinLayerEl){ if (onArrive) onArrive(); return; }             // reduced：飛ばさず着弾処理だけ
   const el = document.createElement("div"); el.className = "coin";
@@ -2276,46 +2402,65 @@ function textInput(get, set){
 }
 function renderSettings(){
   const host = $("settings"); host.innerHTML = "";
-  const group = (title) => { const g = document.createElement("div"); g.className="setgroup";
+  // 分類：それぞれ折りたためる（<details>）。既定はすべて閉じた状態。group() は第2引数の分類に入る。
+  const cats = {};
+  const CATS = [["run","進行（ラン・家賃・店・3択）"], ["board","盤面（段数・傾斜）"], ["cards","カードの数値（基礎点・各カードの効果）"],
+                ["fx","演出・見た目（落下速度・帯・パーティクル・揺れ・カメラ・数字）"], ["sound","音"],
+                ["debug","デバッグ操作（帯レベル強制・点数ランプ・演出を試す）"]];
+  for (const [k, t] of CATS){ const d = document.createElement("details"); d.className = "setcat";
+    const s = document.createElement("summary"); s.textContent = t; d.appendChild(s); host.appendChild(d); cats[k] = d; }
+  const group = (title, cat) => { const g = document.createElement("div"); g.className="setgroup";
     const p=document.createElement("p"); p.className="lbl"; p.textContent=title; g.appendChild(p);
-    const grid=document.createElement("div"); grid.className="grid"; g.appendChild(grid); host.appendChild(g); return grid; };
+    const grid=document.createElement("div"); grid.className="grid"; g.appendChild(grid); (cats[cat]||host).appendChild(g); return grid; };
 
-  // 段構成（テスト用に段数を変えられる。総段数 = 2 + 具材 + ソース）
-  let g = group("段構成（上下バンズは常に各1枚）");
-  gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
-  gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
-  // 段数ボーナス：N個作るごとに「具材枠+1／ソース枠+1」を選ぶ（ゲーム内機構）。区切り＝ノルマは未実装のため個数で代用。
-  gridRow(g, "段数ボーナス：何個ごと", numInput(()=>CONFIG.params.tierBonus.every, v=>CONFIG.params.tierBonus.every=Math.max(1,Math.round(v)), 1));
-  { // 手動デバッグ用の即時＋1ボタン（機構とは別に、その場で枠を増やせる）
-    const rowb = document.createElement("div"); rowb.className = "btnrow";
-    const bi = document.createElement("button"); bi.textContent = "具材枠 +1";
-    bi.onclick = () => { CONFIG.params.tiers.ingredients = Math.max(0, Math.round(CONFIG.params.tiers.ingredients) + 1); updateProgress(); renderSettings(); };
-    const bs = document.createElement("button"); bs.textContent = "ソース枠 +1";
-    bs.onclick = () => { CONFIG.params.tiers.sauces = Math.max(0, Math.round(CONFIG.params.tiers.sauces) + 1); updateProgress(); renderSettings(); };
-    g.parentElement.appendChild(rowb); rowb.append(bi, bs);
-    const note = document.createElement("p"); note.className = "barnote";
-    note.textContent = "※ 段数ボーナスは N個作るごとに完成の区切りで自動的に選択が出る（既定10個）。上のボタンはその場で試す用。";
-    g.parentElement.appendChild(note);
-  }
+  // ── 進行：ラン・家賃 ──
+  let g = group("ラン制：家賃（失敗あり・仮メカニクス）", "run");
+  gridRow(g, "ラン ON", boolInput(()=>CONFIG.params.run.on!==false, v=>{CONFIG.params.run.on=v; updateRunStatus();}));
+  gridRow(g, "家賃は何スピンごと(rentEvery)", numInput(()=>CONFIG.params.run.rentEvery, v=>{CONFIG.params.run.rentEvery=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
+  gridRow(g, "初期家賃(rentBase)", numInput(()=>CONFIG.params.run.rentBase, v=>{CONFIG.params.run.rentBase=Math.max(0,Math.round(v)); updateRunStatus();}, 50));
+  gridRow(g, "家賃の倍率(rentMul・等比)", numInput(()=>CONFIG.params.run.rentMul, v=>{CONFIG.params.run.rentMul=Math.max(1,v); updateRunStatus();}, 0.05));
 
-  // 第1層：完成ごとの3択（デッキに足す／スキップで1枚取り除く）
-  g = group("完成ごとの3択（第1層・足す／取り除く）");
-  gridRow(g, "何個ごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
+  // ── 進行：店 ──
+  g = group("店（家賃後に開く・値段は購入回数で上げるか切替）", "run");
+  const sh = CONFIG.params.shop;
+  gridRow(g, "カード追加の値段", numInput(()=>sh.cardCost, v=>sh.cardCost=Math.max(0,Math.round(v)), 10));
+  gridRow(g, "取り除きの値段", numInput(()=>sh.removeCost, v=>sh.removeCost=Math.max(0,Math.round(v)), 10));
+  gridRow(g, "具材枠+1の値段", numInput(()=>sh.ingredientSlotCost, v=>sh.ingredientSlotCost=Math.max(0,Math.round(v)), 10));
+  gridRow(g, "ソース枠+1の値段", numInput(()=>sh.sauceSlotCost, v=>sh.sauceSlotCost=Math.max(0,Math.round(v)), 10));
+  gridRow(g, "引き直しの値段", numInput(()=>sh.rerollCost, v=>sh.rerollCost=Math.max(0,Math.round(v)), 10));
+  gridRow(g, "店に並ぶカード枚数", numInput(()=>sh.cardsShown, v=>sh.cardsShown=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "購入回数で値上げする", boolInput(()=>sh.scaleOnBuy, v=>sh.scaleOnBuy=v));
+  gridRow(g, "値上げの倍率(scaleMul)", numInput(()=>sh.scaleMul, v=>sh.scaleMul=Math.max(1,v), 0.05));
 
-  // デバッグ：3択に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込みができる。
-  g = group("3択に出す軸（デバッグ・既定 全ON）");
+  // ── 進行：3択 ──
+  g = group("完成ごとの3択（無料・毎回。削除は店へ移動）", "run");
+  gridRow(g, "何スピンごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
+
+  // ── 進行：3択に出す軸（デバッグ的だが3択内容の絞り込み） ──
+  g = group("3択に出す軸（既定 全ON）", "run");
   for (const c of CUISINE_ORDER){
     gridRow(g, CUISINE_JA[c], boolInput(()=>CONFIG.params.offerCuisines[c] !== false, v=>CONFIG.params.offerCuisines[c]=v));
   }
 
+  // ── 盤面：段構成（総段数 = 2 + 具材 + ソース）。枠の増やし方は店（有料）。下は手動デバッグ用の即時+1。
+  g = group("段構成（上下バンズは常に各1枚。枠を増やすのは店）", "board");
+  gridRow(g, "中段の具材数", numInput(()=>CONFIG.params.tiers.ingredients, v=>{CONFIG.params.tiers.ingredients=Math.max(0,Math.round(v)); updateProgress();}, 1));
+  gridRow(g, "中段のソース数", numInput(()=>CONFIG.params.tiers.sauces, v=>{CONFIG.params.tiers.sauces=Math.max(0,Math.round(v)); updateProgress();}, 1));
+  { const rowb = document.createElement("div"); rowb.className = "btnrow";
+    const bi = document.createElement("button"); bi.textContent = "具材枠 +1（デバッグ）";
+    bi.onclick = () => { CONFIG.params.tiers.ingredients = Math.max(0, Math.round(CONFIG.params.tiers.ingredients) + 1); updateProgress(); renderSettings(); };
+    const bs = document.createElement("button"); bs.textContent = "ソース枠 +1（デバッグ）";
+    bs.onclick = () => { CONFIG.params.tiers.sauces = Math.max(0, Math.round(CONFIG.params.tiers.sauces) + 1); updateProgress(); renderSettings(); };
+    g.parentElement.appendChild(rowb); rowb.append(bi, bs); }
+
   // 具材の隣に出る +N / ×N の残る時間、右上コンボ履歴の件数
-  g = group("具材の隣の表示・右上のコンボ履歴");
+  g = group("具材の隣の表示・右上のコンボ履歴", "fx");
   gridRow(g, "+N の残る時間(秒)", numInput(()=>CONFIG.params.flow.baseLife, v=>CONFIG.params.flow.baseLife=Math.max(0.05,v), 0.1));
   gridRow(g, "×N の残る時間(秒)", numInput(()=>CONFIG.params.flow.comboLife, v=>CONFIG.params.flow.comboLife=Math.max(0.05,v), 0.1));
   gridRow(g, "右上コンボ履歴 件数", numInput(()=>CONFIG.params.flow.feedCap, v=>CONFIG.params.flow.feedCap=Math.max(1,Math.round(v)), 1));
 
   // 帯（band）演出：等比しきい値・段階数・各チャンネルON/OFF
-  g = group("帯の演出（×の積が上がるほど持続的に派手に）");
+  g = group("帯の演出（×の積が上がるほど持続的に派手に）", "fx");
   gridRow(g, "開始しきい値(×)", numInput(()=>CONFIG.params.band.start, v=>CONFIG.params.band.start=Math.max(1.05,v), 0.1));
   gridRow(g, "等比の倍率", numInput(()=>CONFIG.params.band.ratio, v=>CONFIG.params.band.ratio=Math.max(1.05,v), 0.05));
   gridRow(g, "見た目の段階数(循環)", numInput(()=>CONFIG.params.band.stages, v=>CONFIG.params.band.stages=Math.max(1,Math.round(v)), 1));
@@ -2331,13 +2476,13 @@ function renderSettings(){
   gridRow(g, "帯アップの揺れ(0で無し)", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
 
   // 予告（リーチ）：残り数段で次の帯に届きそうなときの緊張演出
-  g = group("予告（リーチ）＝次の帯に届きそうなときの緊張演出");
+  g = group("予告（リーチ）＝次の帯に届きそうなときの緊張演出", "fx");
   gridRow(g, "予告を出す", boolInput(()=>CONFIG.params.reach.on, v=>CONFIG.params.reach.on=v));
   gridRow(g, "残り何段まで対象か", numInput(()=>CONFIG.params.reach.maxTiers, v=>CONFIG.params.reach.maxTiers=Math.max(1,Math.round(v)), 1));
   gridRow(g, "届く見込みの幅(×以内)", numInput(()=>CONFIG.params.reach.window, v=>CONFIG.params.reach.window=Math.max(1.05,v), 0.1));
 
   // 発動の等級（相対しきい値：直近の乗算の積の中央値との比）。大で画面反応・発光の強さに使う。
-  g = group("演出の等級（相対しきい値・大で画面反応）");
+  g = group("演出の等級（相対しきい値・大で画面反応）", "fx");
   gridRow(g, "基準の床(floor)", numInput(()=>CONFIG.params.grade.floor, v=>CONFIG.params.grade.floor=v, 0.05));
   gridRow(g, "中のしきい値", numInput(()=>CONFIG.params.grade.mid, v=>CONFIG.params.grade.mid=v, 0.1));
   gridRow(g, "大のしきい値", numInput(()=>CONFIG.params.grade.big, v=>CONFIG.params.grade.big=v, 0.1));
@@ -2346,11 +2491,11 @@ function renderSettings(){
   // 基礎点
   // 基礎点：基本カード（ORDER）＋効果を持つ軸カード（暫定値・変更可）。
   const baseCards = catalogNames().filter(n => ORDER.includes(n) || (CONFIG.items[n].effect && CONFIG.items[n].effect.id));
-  g = group("基礎点");
+  g = group("基礎点", "cards");
   for (const n of baseCards) gridRow(g, n, numInput(()=>CONFIG.items[n].base, v=>CONFIG.items[n].base=v, 1));
 
   // 軸カードの効果（数値は暫定・調整欄から変更可）。id ごとの数値パラメータを自動で並べる。
-  g = group("軸カードの効果（暫定値・変更可）");
+  g = group("軸カードの効果（暫定値・変更可）", "cards");
   for (const n of catalogNames()){
     const e = CONFIG.items[n].effect; if (!e || !e.id) continue;
     for (const k of Object.keys(e)){
@@ -2377,28 +2522,28 @@ function renderSettings(){
       if (r.kind === "runType") ctrls.appendChild(miniNum("連続", () => r.runLen, v => r.runLen = Math.max(1, Math.round(v)), 1));
       row.appendChild(ctrls); gp.appendChild(row);
     }
-    host.appendChild(gp);
+    cats.cards.appendChild(gp);
   }
 
   // C：コンボ数ボーナス（2件以上で件数に応じ全体倍率）
-  g = group("コンボ数ボーナス（複数コンボで全体に上乗せ）");
+  g = group("コンボ数ボーナス（複数コンボで全体に上乗せ）", "cards");
   gridRow(g, "発動する最小件数", numInput(()=>CONFIG.params.comboBonus.threshold, v=>CONFIG.params.comboBonus.threshold=Math.max(1,Math.round(v)), 1));
   gridRow(g, "1件ごとの上乗せ(0で無効)", numInput(()=>CONFIG.params.comboBonus.perCombo, v=>CONFIG.params.comboBonus.perCombo=v, 0.05));
 
   // 食い込み量
-  g = group("食い込み量（px・大きいほど深く潰れる）");
+  g = group("食い込み量（px・大きいほど深く潰れる）", "board");
   gridRow(g, "既定値", numInput(()=>CONFIG.params.biteDefault, v=>CONFIG.params.biteDefault=v, 1));
   for (const n of ORDER) gridRow(g, n, numInput(()=>biteOf(n), v=>CONFIG.params.bite[n]=v, 1));
 
   // 操作：1クリックで落とす段数・段の間隔・早送り（複数段でも必ず1段ずつ落ちる）
-  g = group("操作（クリックと落下）");
+  g = group("操作（クリックと落下）", "fx");
   gridRow(g, "1クリックで落ちる段数(0=全段)", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(0,Math.round(v)), 1));
   gridRow(g, "段が落ちる間隔(秒)", numInput(()=>CONFIG.params.dropGap, v=>CONFIG.params.dropGap=Math.max(0,v), 0.02));
   gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
   gridRow(g, "演出を省略(結果だけ表示)", boolInput(()=>CONFIG.params.skipFx, v=>CONFIG.params.skipFx=v));
 
   // 落下速度＝その回の期待度。最終到達帯（planで確定）ごとに個別に落下時間を設定できる。
-  g = group("落下の速さ＝期待度（最終到達帯ごと・秒）");
+  g = group("落下の速さ＝期待度（最終到達帯ごと・秒）", "fx");
   { const arr = CONFIG.params.fallByBand;
     for (let i = 0; i < arr.length; i++){ const idx = i;
       gridRow(g, (idx === arr.length-1 ? `帯${idx}以上` : `帯${idx}`) + "の落下時間", numInput(()=>arr[idx], v=>arr[idx]=Math.max(0.02,v), 0.01)); }
@@ -2407,7 +2552,7 @@ function renderSettings(){
   }
 
   // 演出速度（1段あたりの時間）
-  g = group("演出の速さ（秒・1段あたり）");
+  g = group("演出の速さ（秒・1段あたり）", "fx");
   gridRow(g, "1段の落下時間(既定・帯表未使用時)", numInput(()=>CONFIG.params.fallDur, v=>CONFIG.params.fallDur=v, 0.01));
   gridRow(g, "完成〜数え上げの間", numInput(()=>CONFIG.params.landPause, v=>CONFIG.params.landPause=v, 0.01));
   gridRow(g, "数え上げ時間", numInput(()=>CONFIG.params.countUp,       v=>CONFIG.params.countUp=v,     0.01));
@@ -2415,7 +2560,7 @@ function renderSettings(){
   gridRow(g, "完成後の入力ロック", numInput(()=>CONFIG.params.completeLock, v=>CONFIG.params.completeLock=v, 0.05));
 
   // 効果音（Web Audio・コード生成。既定OFF）
-  g = group("効果音（既定OFF）");
+  g = group("効果音", "sound");
   gridRow(g, "音を鳴らす", boolInput(()=>CONFIG.params.sound.on, v=>{ CONFIG.params.sound.on=v; if(v) Sound.unlock(); }));
   gridRow(g, "音のパターン", selectInput(SOUND_SCHEMES.map(s=>s.name), ()=>CONFIG.params.sound.scheme, v=>{ CONFIG.params.sound.scheme=v; if(CONFIG.params.sound.on) Sound.land(0); }));
   gridRow(g, "音量", numInput(()=>CONFIG.params.sound.volume, v=>{ CONFIG.params.sound.volume=Math.max(0,Math.min(1,v)); Sound.setVolume(); }, 0.05));
@@ -2424,12 +2569,12 @@ function renderSettings(){
   const fx = CONFIG.params.fx;
   const fxNum = (obj,key,step)=>numInput(()=>obj[key], v=>obj[key]=v, step);
 
-  g = group("演出：強度カーブ（連続・滑らかに上げる）");
+  g = group("演出：強度カーブ（連続・滑らかに上げる）", "fx");
   const CURVES = ["linear","exp","log","smooth"];
   gridRow(g, "カーブ(linear/exp/log/S字)", selectInput(CURVES, ()=>Math.max(0,CURVES.indexOf(fx.scaling.curve)), v=>{ fx.scaling.curve=CURVES[v]; }));
   gridRow(g, "段階数(5〜。増やせる)", numInput(()=>fx.scaling.stages, v=>fx.scaling.stages=Math.max(1,Math.min(30,Math.round(v))), 1));
 
-  g = group("演出：パーティクル（着地/コンボ/完成の破片）");
+  g = group("演出：パーティクル（着地/コンボ/完成の破片）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.particles.on, v=>fx.particles.on=v));
   gridRow(g, "数(base)", fxNum(fx.particles,"count",1));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.particles,"scale",0.05));
@@ -2439,7 +2584,7 @@ function renderSettings(){
   gridRow(g, "重力", fxNum(fx.particles,"gravity",20));
   gridRow(g, "広がり(0-1)", fxNum(fx.particles,"spread",0.05));
 
-  g = group("演出：帯アップの段階化（5段階・上ほど大げさ）");
+  g = group("演出：帯アップの段階化（5段階・上ほど大げさ）", "fx");
   gridRow(g, "持続の基準(秒)", fxNum(fx.bandup,"durBase",0.05));
   gridRow(g, "持続の段階倍率", fxNum(fx.bandup,"durStep",0.05));
   gridRow(g, "持続の上限(秒)", fxNum(fx.bandup,"durMax",0.1));
@@ -2448,19 +2593,19 @@ function renderSettings(){
   gridRow(g, "拡大の上限", fxNum(fx.bandup,"ampMax",0.1));
   gridRow(g, "音の層数(base)", fxNum(fx.bandup,"layers",1));
 
-  g = group("演出：完成（最高帯で強くなる・重い演出を集約・長め可）");
+  g = group("演出：完成（最高帯で強くなる・重い演出を集約・長め可）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.complete.on, v=>fx.complete.on=v));
   gridRow(g, "強さ(base)", fxNum(fx.complete,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.complete,"scale",0.05));
   gridRow(g, "完成演出の長さ(秒・dur)", numInput(()=>fx.complete.dur, v=>fx.complete.dur=Math.max(0.2,v), 0.1));
 
-  g = group("演出：揺れ（バーガー本体だけ・箱の中に限定）");
+  g = group("演出：揺れ（バーガー本体だけ・箱の中に限定）", "fx");
   gridRow(g, "帯アップの揺れ強さ", numInput(()=>CONFIG.params.band.up.shake, v=>CONFIG.params.band.up.shake=Math.max(0,v), 0.1));
   gridRow(g, "振幅の係数(gain)", numInput(()=>fx.shake.gain, v=>fx.shake.gain=Math.max(0,v), 0.5));
   gridRow(g, "振幅の上限(px)", numInput(()=>fx.shake.ampMax, v=>fx.shake.ampMax=Math.max(8,v), 4));
   gridRow(g, "減衰の形", selectInput(["settle","hard","long"], ()=>Math.max(0,["settle","hard","long"].indexOf(fx.shake.decay)), v=>{ fx.shake.decay=["settle","hard","long"][v]; }));
 
-  g = group("演出：得点をバーガーに重ねる大表示");
+  g = group("演出：得点をバーガーに重ねる大表示", "fx");
   const bsApply = ()=>{ if (typeof applyBurgerScoreVars === "function") applyBurgerScoreVars(); };
   gridRow(g, "ON", boolInput(()=>fx.burgerScore.on, v=>fx.burgerScore.on=v));
   gridRow(g, "大きさ(倍率)", numInput(()=>fx.burgerScore.size, v=>{ fx.burgerScore.size=Math.max(0.2,v); bsApply(); }, 0.1));
@@ -2468,7 +2613,7 @@ function renderSettings(){
   gridRow(g, "横位置(%・50=中央)", numInput(()=>fx.burgerScore.x, v=>{ fx.burgerScore.x=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
   gridRow(g, "縦位置(%・上=0)", numInput(()=>fx.burgerScore.y, v=>{ fx.burgerScore.y=Math.max(0,Math.min(100,v)); bsApply(); }, 5));
 
-  g = group("演出：回収コイン（売上を受け取る）");
+  g = group("演出：回収コイン（売上を受け取る）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.coins.on, v=>fx.coins.on=v));
   { const TGT=["price","cum","score"], TGTJA=["価格の数字","売上累計","得点欄"];
     gridRow(g, "収束先(target)", selectInput(TGTJA, ()=>Math.max(0,TGT.indexOf(fx.coins.target)), v=>{ fx.coins.target=TGT[v]; })); }
@@ -2481,34 +2626,34 @@ function renderSettings(){
   gridRow(g, "1枚ごとの間隔(秒・stagger)", numInput(()=>fx.coins.stagger, v=>fx.coins.stagger=Math.max(0,v), 0.01));
   gridRow(g, "音程の幅(半音・pitchSpan)", numInput(()=>fx.coins.pitchSpan, v=>fx.coins.pitchSpan=Math.max(0,v), 1));
 
-  g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）");
+  g = group("演出：ヒットストップ（大発動/帯上昇で画面停止）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.hitstop.on, v=>fx.hitstop.on=v));
   gridRow(g, "停止(秒・base)", fxNum(fx.hitstop,"base",0.005));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.hitstop,"scale",0.05));
 
-  g = group("演出：残像トレイル（落下の尾）");
+  g = group("演出：残像トレイル（落下の尾）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.trail.on, v=>fx.trail.on=v));
   gridRow(g, "濃さ(base)", fxNum(fx.trail,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.trail,"scale",0.05));
 
-  g = group("演出：カメラの寄り（大発動/帯上昇）");
+  g = group("演出：カメラの寄り（大発動/帯上昇）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.zoom.on, v=>fx.zoom.on=v));
   gridRow(g, "寄り(base・0.03=3%)", fxNum(fx.zoom,"base",0.01));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.zoom,"scale",0.05));
   gridRow(g, "寄りの時間(秒)", fxNum(fx.zoom,"dur",0.02));
 
-  g = group("演出：数字自体（跳ね/拡大/色/回転）");
+  g = group("演出：数字自体（跳ね/拡大/色/回転）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.number.on, v=>fx.number.on=v));
   gridRow(g, "強さ(base)", fxNum(fx.number,"base",0.05));
   gridRow(g, "帯ごとの倍率(scale)", fxNum(fx.number,"scale",0.05));
 
-  g = group("演出：イージング（動きのカーブ）");
+  g = group("演出：イージング（動きのカーブ）", "fx");
   const ekeys = Object.keys(EASINGS);
   gridRow(g, "落下", selectInput(ekeys, ()=>Math.max(0,ekeys.indexOf(fx.easing.drop)), v=>{ fx.easing.drop=ekeys[v]; applyEasing(); }));
   gridRow(g, "数字", selectInput(ekeys, ()=>Math.max(0,ekeys.indexOf(fx.easing.number)), v=>{ fx.easing.number=ekeys[v]; applyEasing(); }));
 
   // デバッグ：帯レベルを強制して、各演出を最大まで上げても破綻しないか確認する。
-  g = group("演出テスト（デバッグ）");
+  g = group("演出テスト（デバッグ）", "debug");
   gridRow(g, "帯レベルを強制(空=通常)", numInput(()=>fxForceBand==null?"":fxForceBand, v=>{ fxForceBand = (Number.isFinite(v)?Math.max(0,Math.round(v)):null); if(fxForceBand!=null) applyBandVisual(fxForceBand); }, 1));
   { const rowb = document.createElement("div"); rowb.className="btnrow";
     const b1=document.createElement("button"); b1.textContent="帯アップを試す";
@@ -2523,7 +2668,7 @@ function renderSettings(){
   }
 
   // デバッグ：点数を段階的に上げるモード（実プレイなしで低→極端まで演出を確認）。
-  g = group("演出テスト：点数ランプ（段階的に上げる）");
+  g = group("演出テスト：点数ランプ（段階的に上げる）", "debug");
   gridRow(g, "到達帯(rampMax)", numInput(()=>CONFIG.params.debug.rampMax, v=>CONFIG.params.debug.rampMax=Math.max(1,Math.round(v)), 1));
   gridRow(g, "刻み(rampStep)", numInput(()=>CONFIG.params.debug.rampStep, v=>CONFIG.params.debug.rampStep=Math.max(0.25,v), 0.25));
   gridRow(g, "間隔(秒・rampInterval)", numInput(()=>CONFIG.params.debug.rampInterval, v=>CONFIG.params.debug.rampInterval=Math.max(0.05,v), 0.1));
@@ -2566,8 +2711,8 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   if (mode === "ignore") wantDrop = revealed;  // 無視に切替えたら未処理の予約は破棄
   updateProgress();
 }));
-$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; temporalBonus = {}; completedCount = 0; resetBurger(); renderPiles(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; cumTotalValue = 0; cumTotalEl.textContent = "0"; completedCount = 0; temporalBonus = {}; collectFillActive = false; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); });
+$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; temporalBonus = {}; completedCount = 0; resetRun(); renderSettings(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; temporalBonus = {}; collectFillActive = false; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2578,6 +2723,7 @@ renderSettings();
 updateStats();
 renderBars();
 updateProgress();
+updateRunStatus();
 applyEasing();
 </script>
 </body>
