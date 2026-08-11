@@ -190,6 +190,38 @@
     border-radius:10px; padding:10px 14px; font-weight:900; font-size:.95rem; text-align:center; cursor:pointer;
     touch-action:manipulation; user-select:none}
   .offer-buy:active{transform:translateY(1px)}
+  /* リザルト（1画面・縦スクロール。到達=cleared / 力尽き=broke で見出しを変える） */
+  #offer.result{background:rgba(10,12,17,.96); gap:12px}
+  .res-scroll{display:flex; flex-direction:column; gap:12px; padding:2px}
+  .res-head{text-align:center; padding:6px 0 2px}
+  .res-badge{display:inline-block; font-weight:900; font-size:1.05rem; padding:6px 18px; border-radius:999px; letter-spacing:.14em}
+  .res-badge.win{background:linear-gradient(180deg,#ffe08a,#f5b73c); color:#3a2600; box-shadow:0 0 0 2px #ffcf5a, 0 0 22px 4px rgba(255,200,80,.5)}
+  .res-badge.lose{background:#2a2230; color:#d9a7c0; box-shadow:0 0 0 1px #5b3a4e}
+  #offer.result.cleared .res-head{animation:reswin .6s ease-out}
+  @keyframes reswin{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  .res-h1{font-size:1.35rem; font-weight:900; margin-top:8px; color:var(--text)}
+  .res-sub{font-size:.76rem; color:var(--muted); margin-top:3px}
+  .res-sec{background:#171a20; border:1px solid var(--line); border-radius:12px; padding:10px}
+  .res-lbl{font-size:.8rem; font-weight:800; color:#ffd98c; margin-bottom:6px}
+  .res-score{font-size:1.5rem; font-weight:900; color:#fff; text-align:center; margin:2px 0 8px}
+  .res-burger{display:flex; justify-content:center; max-height:340px; overflow-y:auto; padding:6px 0}
+  .res-burger-inner{display:flex; flex-direction:column; align-items:center; gap:1px}
+  .res-food{position:relative; flex:0 0 auto}
+  .res-recipe{margin-top:8px; font-size:.72rem; color:var(--muted)}
+  .res-recipe b{color:var(--text)}
+  .res-recipe ol{margin:4px 0 0; padding-left:20px; max-height:160px; overflow-y:auto; columns:2; column-gap:16px}
+  .res-recipe li{margin:1px 0; break-inside:avoid}
+  .res-deck{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .res-axchip{font-size:.74rem; font-weight:700; padding:3px 9px; border-radius:999px; background:#22262d; border:1px solid var(--line); color:var(--text)}
+  .res-axchip b{color:#ffd98c}
+  .res-axtot{font-size:.74rem; font-weight:800; color:var(--muted); margin-left:auto}
+  .res-graph-scroll{overflow-x:auto}
+  .res-graph-svg{display:block}
+  .res-grid{stroke:#333a44; stroke-width:1; stroke-dasharray:2 3}
+  .res-gridlabel{fill:#7a8494; font-size:8px}
+  .res-bar{fill:var(--accent)}
+  .res-xlabel{fill:#8b94a3; font-size:8px}
+  .res-note{font-size:.76rem; color:var(--muted); text-align:center; padding:6px}
   .shop-acts{display:grid; grid-template-columns:1fr 1fr; gap:6px}
   .shopbtn{background:#2b313a; border:1px solid var(--line); border-radius:10px; padding:8px; color:var(--text);
     font-weight:700; font-size:.78rem; cursor:pointer; touch-action:manipulation; user-select:none}
@@ -893,7 +925,7 @@ const DEFAULTS = {
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。無料。スキップは「見送る（何もしない）」。
     offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。
     // ラン制（失敗あり・仮メカニクス）。バーガー1個=1スピン。rentEvery スピンごとに家賃。払えなければラン終了。
-    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4 },   // rentBase=初期家賃(item2:500→300) / rentMul=等比の倍率(item2:1.5→1.4・1.3〜1.5を推奨)
+    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 20 },   // rentBase=初期家賃(item2:500→300) / rentMul=等比の倍率(item2:1.5→1.4) / dayGoal=完走する営業日数（暫定20・設定で変更可）
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
@@ -2339,7 +2371,7 @@ function collect(){
   awaitingCollect = false;
   completedCount++; runSpins++;                     // バーガー1個 = 1スピン
   updateRunStatus();
-  plog.recordSpin(runSpins, total, spinTiers, removedThisSpin);   // プレイログ：このスピンの明細を1行控える（スピン番号確定後）
+  plog.recordSpin(runSpins, total, spinTiers, removedThisSpin, stack);   // プレイログ：このスピンの明細を1行控える（stack＝最高得点バーガーの判定用）
   // 完成の区切りで出す画面を順に積む：3択（無料・毎回）→ 家賃（rentEvery ごと）→ 店。
   const q = [];
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
@@ -2525,11 +2557,16 @@ function showRent(){
   const rebate = reg ? Math.round(due * (reg.ratio || 0)) : 0;
   if (money >= due){
     const pay = el("offer-buy", `支払う（¥${due}）` + (rebate ? `　→ ¥${rebate} 戻る` : ""));
-    pay.addEventListener("click", () => { setMoney(money - due + rebate); daysSurvived++; plog.recordRent(due, money); Sound.coinChink(0, 0.5); updateRunStatus(); advanceOffer(); });
+    pay.addEventListener("click", () => {
+      setMoney(money - due + rebate); daysSurvived++; plog.recordRent(due, money); Sound.coinChink(0, 0.5); updateRunStatus();
+      const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 20));
+      if (daysSurvived >= goal){ endRun("cleared"); return; }   // 目標営業日に到達＝完走。ここで終わる（続行させない）。
+      advanceOffer();
+    });
     offerEl.appendChild(pay);
   } else {
     offerEl.appendChild(el("offer-runinfo warn", "家賃を払えません。ラン終了。"));
-    const btn = el("offer-buy", "結果を見る"); btn.addEventListener("click", () => endRun());
+    const btn = el("offer-buy", "結果を見る"); btn.addEventListener("click", () => endRun("broke"));
     offerEl.appendChild(btn);
   }
   offerEl.classList.add("show"); updateProgress();
@@ -2636,18 +2673,105 @@ function showShopRemove(cost){
   offerEl.appendChild(back);
   offerEl.classList.add("show");
 }
-// ラン終了：結果を出して「最初から」。メタ進行はまだ無し。
-function endRun(){
+// 日本語の桁単位で丸めて読める形に（指数表記 4.4e20 などを使わない）。
+function fmtJP(n){
+  if (n == null || !isFinite(n)) return "∞";
+  n = Math.round(n);
+  if (n < 10000) return n.toLocaleString();
+  const units = [[1e48,"極"],[1e44,"載"],[1e40,"正"],[1e36,"澗"],[1e32,"溝"],[1e28,"穣"],[1e24,"秭"],[1e20,"垓"],[1e16,"京"],[1e12,"兆"],[1e8,"億"],[1e4,"万"]];
+  for (const [u,label] of units){ if (n >= u){ const v = n/u; let s = v>=100 ? v.toFixed(0) : v>=10 ? v.toFixed(1) : v.toFixed(2);
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/,"").replace(/\.$/,"");   // 小数の末尾0だけ落とす（整数の"100"は保つ）
+    return s + label; } }
+  return n.toLocaleString();
+}
+// リザルト用：静的なバーガー画像を host に描く（stack＝下から順のカード名配列。実際の積み方を再現）。
+function renderStaticBurger(host, stackArr){
+  host.innerHTML = ""; const n = stackArr.length;
+  const inner = document.createElement("div"); inner.className = "res-burger-inner";
+  for (let i = n - 1; i >= 0; i--){                  // DOMは上が最上段。index0＝下段なので逆順に積む。
+    const name = stackArr[i]; const it = CONFIG.items[name]; if (!it) continue;
+    const pos = posOf(i, n);
+    const food = document.createElement("div"); food.className = "food res-food";
+    food.dataset.item = name; food.dataset.type = it.type; food.dataset.pos = pos;
+    if (it.ph){ food.dataset.ph = "1"; food.dataset.cuisine = it.cuisine || "none";
+      const lb = document.createElement("span"); lb.className = "phlabel"; lb.textContent = name; food.appendChild(lb); }
+    food.style.height = effHeight(name, pos) + "px";
+    inner.appendChild(food);
+  }
+  host.appendChild(inner);
+}
+// リザルト用：営業日ごとの売上を対数目盛りの棒グラフで描く（序盤の小さい値も潰れずに読める）。
+function renderSalesGraph(host, daily){
+  host.innerHTML = "";
+  const vals = (daily || []).slice();
+  if (!vals.length){ host.appendChild(el("res-note", "（売上データなし）")); return; }
+  const pos = vals.map(v => Math.max(1, v));
+  const lo = Math.floor(Math.log10(Math.min(...pos)));
+  const hi = Math.ceil(Math.log10(Math.max(...pos)));
+  const span = Math.max(1, hi - lo);
+  const NS = "http://www.w3.org/2000/svg";
+  const bw = 26, padL = 6, padR = 8, padT = 8, padB = 20, plot = 150;
+  const W = padL + padR + vals.length * bw, H = padT + plot + padB;
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("class", "res-graph-svg");
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  for (let p = lo; p <= hi; p++){                    // 10のべき乗ごとの目盛り線＋単位ラベル
+    const y = padT + plot * (1 - (p - lo) / span);
+    const ln = document.createElementNS(NS, "line"); ln.setAttribute("x1", padL); ln.setAttribute("x2", W - padR); ln.setAttribute("y1", y); ln.setAttribute("y2", y); ln.setAttribute("class", "res-grid"); svg.appendChild(ln);
+    const tx = document.createElementNS(NS, "text"); tx.setAttribute("x", padL + 1); tx.setAttribute("y", y - 2); tx.setAttribute("class", "res-gridlabel"); tx.textContent = fmtJP(Math.pow(10, p)); svg.appendChild(tx);
+  }
+  vals.forEach((v, i) => {
+    const frac = (Math.log10(Math.max(1, v)) - lo) / span;
+    const bh = Math.max(2, plot * frac);
+    const x = padL + i * bw + bw * 0.18, y = padT + plot - bh;
+    const r = document.createElementNS(NS, "rect"); r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", bw * 0.64); r.setAttribute("height", bh); r.setAttribute("class", "res-bar"); svg.appendChild(r);
+    const t = document.createElementNS(NS, "text"); t.setAttribute("x", x + bw * 0.32); t.setAttribute("y", H - 6); t.setAttribute("text-anchor", "middle"); t.setAttribute("class", "res-xlabel"); t.textContent = (i + 1); svg.appendChild(t);
+  });
+  const scroll = document.createElement("div"); scroll.className = "res-graph-scroll"; scroll.appendChild(svg); host.appendChild(scroll);
+}
+// ラン終了：1画面・縦スクロールのリザルト。outcome="cleared"（目標到達）/"broke"（力尽き）で見出しを変える。
+function endRun(outcome){
+  outcome = (outcome === "cleared") ? "cleared" : "broke";
   runActive = false; offering = false; offerQueue = [];
-  plog.endRun();                                     // プレイログ：このランを確定して保存
-  plog.renderList();
+  const best = plog.currentBest();                   // {score,spin,stack}|null（確定前に読む）
+  const daily = plog.currentDailySales();            // 営業日ごとの売上合計
+  plog.endRun(); plog.renderList();                  // プレイログを確定
+  const cleared = outcome === "cleared";
+  const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 20));
   offerEl.innerHTML = "";
-  offerEl.appendChild(el("offer-title", "ラン終了"));
-  offerEl.appendChild(el("offer-runinfo big", `${daysSurvived}営業日 生き残った`));
-  offerEl.appendChild(el("offer-runinfo", `総スピン ${runSpins}　／　払えなかった家賃 ¥${rentDue()}　／　所持金 ¥${money}`));
-  const btn = el("offer-buy", "最初から"); btn.addEventListener("click", () => resetRun());
-  offerEl.appendChild(btn);
+  offerEl.classList.remove("cleared", "broke"); offerEl.classList.add("result", cleared ? "cleared" : "broke");
+  const wrap = el("res-scroll");
+  // ① 見出し（到達 / 途中終了で文言と見た目を変える）
+  const head = el("res-head");
+  head.innerHTML = cleared
+    ? `<div class="res-badge win">🏁 完 走</div><div class="res-h1">${goal}営業日 達成！</div><div class="res-sub">最後まで生き延びた</div>`
+    : `<div class="res-badge lose">🥀 閉 店</div><div class="res-h1">${daysSurvived}営業日で力尽きた</div><div class="res-sub">家賃を払えなかった（目標 ${goal}営業日）</div>`;
+  wrap.appendChild(head);
+  // ② 最高得点のバーガー（画像＋レシピ＋得点）
+  const bsec = el("res-sec"); bsec.appendChild(el("res-lbl", "🍔 最高得点のバーガー"));
+  if (best && best.stack && best.stack.length){
+    bsec.appendChild(el("res-score", `¥${fmtJP(best.score)}`));
+    const bh = el("res-burger"); renderStaticBurger(bh, best.stack); bsec.appendChild(bh);
+    const rc = el("res-recipe"); rc.innerHTML = `<b>レシピ（下から順・${best.stack.length}段）</b><ol>` + best.stack.map(nm => `<li>${nm}</li>`).join("") + `</ol>`;
+    bsec.appendChild(rc);
+  } else { bsec.appendChild(el("res-note", "（このランには記録がありません）")); }
+  wrap.appendChild(bsec);
+  // ③ 最終デッキ（軸ごとの内訳と枚数）
+  const dsec = el("res-sec"); dsec.appendChild(el("res-lbl", "🗂 最終デッキ"));
+  const by = {}; let tot = 0;
+  for (const nm of catalogNames()){ const c = CONFIG.items[nm].count; if (c > 0){ const cu = CONFIG.items[nm].cuisine || "none"; by[cu] = (by[cu] || 0) + c; tot += c; } }
+  const dl = el("res-deck");
+  const order = ["none", "wa", "chuka", "kaisen", "kokyu", "agemono"];
+  dl.innerHTML = order.filter(k => by[k]).map(k => `<span class="res-axchip ax-${k}">${CUISINE_JA[k]} <b>${by[k]}</b>枚</span>`).join("") + `<span class="res-axtot">計 <b>${tot}</b>枚</span>`;
+  dsec.appendChild(dl); wrap.appendChild(dsec);
+  // ④ 営業日ごとの売上グラフ（最後）
+  const gsec = el("res-sec"); gsec.appendChild(el("res-lbl", "📈 営業日ごとの売上（対数目盛り）"));
+  const gh = el("res-graph"); renderSalesGraph(gh, daily); gsec.appendChild(gh);
+  wrap.appendChild(gsec);
+  const btn = el("offer-buy", "もう一度（最初から）"); btn.addEventListener("click", () => resetRun());
+  wrap.appendChild(btn);
+  offerEl.appendChild(wrap);
   offerEl.classList.add("show"); updateProgress();
+  Sound.coinChink(cleared ? 8 : 0, cleared ? 0.7 : 0.4);
 }
 // ランを最初から（デッキ・段数・所持金・スピンを初期化。演出/音の調整は保持。メタ進行は無し）。
 function restoreDefaultDeck(){
@@ -2663,7 +2787,7 @@ function resetRun(){
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; forcedCard = null;
   refreshMoney(false); clearPiledCoins();
-  offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
+  offering = false; offerEl.classList.remove("show", "result", "cleared", "broke"); offerEl.innerHTML = "";
   updateStats(); renderBars(); renderPiles(); renderAxisTally(); updateRunStatus();
   resetBurger();
 }
@@ -2675,7 +2799,8 @@ function updateRunStatus(){
   e.style.display = "";
   const toRent = (every - (runSpins % every)) % every; const nspin = toRent === 0 ? every : toRent;
   const art = artifactsOwned.length ? `　道具 ${artifactsOwned.length}/${(CONFIG.params.artifacts||{}).maxOwned||5}` : "";
-  e.innerHTML = `<b>${daysSurvived + 1}営業日目</b>　次の家賃 <b>¥${rentDue()}</b>（あと ${nspin} スピン）${art}`;
+  const goal = Math.max(1, Math.round(rn.dayGoal || 20));
+  e.innerHTML = `<b>${daysSurvived + 1}/${goal}営業日</b>　次の家賃 <b>¥${rentDue()}</b>（あと ${nspin} スピン）${art}`;
   updateGoalBanner();
 }
 // 目標（次の家賃）の大表示を更新（item3）。あといくら足りないかも出す。
@@ -2953,6 +3078,7 @@ function renderSettings(){
   gridRow(g, "家賃は何スピンごと(rentEvery)", numInput(()=>CONFIG.params.run.rentEvery, v=>{CONFIG.params.run.rentEvery=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
   gridRow(g, "初期家賃(rentBase)", numInput(()=>CONFIG.params.run.rentBase, v=>{CONFIG.params.run.rentBase=Math.max(0,Math.round(v)); updateRunStatus();}, 50));
   gridRow(g, "家賃の倍率(rentMul・等比)", numInput(()=>CONFIG.params.run.rentMul, v=>{CONFIG.params.run.rentMul=Math.max(1,v); updateRunStatus();}, 0.05));
+  gridRow(g, "完走する営業日数(dayGoal)", numInput(()=>CONFIG.params.run.dayGoal, v=>{CONFIG.params.run.dayGoal=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
 
   // ── 進行：店 ──
   g = group("店（家賃後に開く・値段は購入回数で上げるか切替）", "run");
@@ -3340,7 +3466,7 @@ const plog = (function(){
     cur.summary.finalTiers = cur.spins.length ? cur.spins[cur.spins.length - 1].tiers : 0;
     cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk; }
   function newRun(seed){ cumScore = 0;
-    return { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play", status: "playing" }, spins: [] }; }
+    return { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play", status: "playing", bestBurger: null }, spins: [] }; }
   function finalize(){ if (!cur) return; refreshSummary();               // 確定：終了印を付けて runs へ移し、進行中キーを消す。
     cur.summary.status = "ended"; delete cur.summary.resumed;
     runs.push(cur); cur = null; try { localStorage.removeItem(K_CUR); } catch(e){}
@@ -3358,10 +3484,14 @@ const plog = (function(){
       if (!enabled){ cur = null; try { localStorage.removeItem(K_CUR); } catch(e){} return; }
       cur = newRun(seed); saveCurrent(); renderList();
     },
-    recordSpin(spinNo, score, tiers, removedEffects){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具を控えて即保存。
+    recordSpin(spinNo, score, tiers, removedEffects, stack){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具を控えて即保存。
       if (!enabled || !cur) return; cumScore += score;
       cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, deck: deckSnap(),
         artifacts: artifactsOwned.slice(), rent: null, bought: [], removed: (removedEffects || []).slice() });
+      // 最高得点のバーガー1本だけを summary に保持（積み方＝下から順の配列。全スピン分は持たない）。
+      if (stack && stack.length && (!cur.summary.bestBurger || score > cur.summary.bestBurger.score)){
+        cur.summary.bestBurger = { spin: spinNo, score, stack: stack.slice() };
+      }
       refreshSummary(); saveCurrent(); renderList();
     },
     recordRent(amount, residual){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.rent = { amount, residual }; refreshSummary(); saveCurrent(); } },
@@ -3369,6 +3499,12 @@ const plog = (function(){
     recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.removed.push({ name, cause }); saveCurrent(); } },
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
+    currentBest: () => (cur && cur.summary.bestBurger) ? cur.summary.bestBurger : null,   // 進行中ランの最高得点バーガー（確定前に読む）
+    currentDailySales(){                              // 進行中ランの営業日ごとの売上合計（家賃発生スピンを境目に区切る）
+      if (!cur) return []; const out = []; let acc = 0;
+      for (const s of cur.spins){ acc += (s.score || 0); if (s.rent){ out.push(acc); acc = 0; } }
+      return out;                                     // 家賃前の未完了ぶん（acc>0）は完了した営業日のみ返すため含めない
+    },
     renderList: () => renderList(),
     copySelected(){                                   // 一覧で選んだラン（確定済み＋進行中）を JSON でコピー。
       const arr = cur ? runs.concat([cur]) : runs.slice();
