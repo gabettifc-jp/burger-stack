@@ -929,7 +929,14 @@ const DEFAULTS = {
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
-            cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5 },
+            cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
+            // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
+            // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
+            scale: { slot:     { onBuy: false, mul: 1.5 },   // 段数スロット（具材枠・ソース枠 共通）
+                     card:     { onBuy: false, mul: 1.2 },   // カード
+                     reroll:   { onBuy: false, mul: 1.5 },   // 品揃えの引き直し
+                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト
+                     remove:   { onBuy: false, mul: 1.5 } } },// デッキから取り除く
     // レアリティ（SHOKUZAI §11・仮）。3択/店の抽選確率(weights)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
     rarity: { on: true,
               weights: { nami: 60, jou: 25, tokujou: 12, kiwami: 3 },
@@ -1161,22 +1168,25 @@ function pick(pileKey){
 function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(grand()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 let forcedCard = null;   // item12：3択で取った直後の1個に必ず入れるカード（buildBurger で消費）
-// 枚数（デッキ）で重み付けして1枚引く（山は減らない）。names 内から。
-function weightedPickFrom(names){ if (!names.length) return null; let tot=0; for (const n of names) tot += CONFIG.items[n].count;
-  if (tot<=0) return null; let r=grand()*tot; for (const n of names){ r-=CONFIG.items[n].count; if (r<0) return n; } return names[names.length-1]; }
-// 1個のバーガーの中では同じカードを引かない（非復元・item11）。distinct が足りない枠だけ復元で埋める。
-//   forced が指定され、その山に属するなら必ず1枚含める（item12）。
-function drawDistinctPile(pileKey, count, forced){
-  const names = catalogNames().filter(n => CONFIG.items[n].pile === pileKey && CONFIG.items[n].count > 0);
-  if (!names.length || count <= 0) return count > 0 ? null : [];
+// 残り所持枚数で重み付けして1枚引く（rem＝この1バーガー内で減っていく在庫）。
+function weightedPickFromRem(names, rem){ let tot=0; for (const n of names) tot += rem[n]; if (tot<=0) return names[names.length-1];
+  let r=grand()*tot; for (const n of names){ r-=rem[n]; if (r<0) return n; } return names[names.length-1]; }
+// 非復元の抽選：1バーガーを組む間、引いた札は山に戻さない。count は所持枚数として機能する（2枚持てば2回・1枚なら1回）。
+//   cap は段数スロット＝組める段数の上限。実際に組むのは引けた枚数まで（デッキ枚数で止まる・空段は作らない）。
+//   forced が指定され、その山に属するなら必ず1枚含める（item12・在庫を1消費）。ラン内の次スピンでは在庫は元に戻る（1バーガー単位）。
+function drawPile(pileKey, cap, forced){
+  if (cap <= 0) return [];
+  const rem = {};                                             // 残り在庫（このバーガー内でのみ減る）
+  for (const n of catalogNames()){ const it = CONFIG.items[n]; if (it.pile === pileKey && it.count > 0) rem[n] = it.count; }
   const out = [];
-  if (forced && CONFIG.items[forced] && CONFIG.items[forced].pile === pileKey && CONFIG.items[forced].count > 0){ out.push(forced); }
-  let pool = names.filter(n => !out.includes(n));
-  while (out.length < count){
-    if (pool.length){ const nm = weightedPickFrom(pool); out.push(nm); pool = pool.filter(x => x !== nm); }
-    else out.push(weightedPickFrom(names));   // distinct を使い切ったら復元で埋める（バンズ1種で上下同じ等）
+  if (forced && rem[forced] != null){ out.push(forced); if (--rem[forced] <= 0) delete rem[forced]; }
+  while (out.length < cap){
+    const avail = Object.keys(rem);
+    if (!avail.length) break;                                 // 引ける札が尽きた＝デッキ枚数で止まる（空段は作らない）
+    const nm = weightedPickFromRem(avail, rem);
+    out.push(nm); if (--rem[nm] <= 0) delete rem[nm];
   }
-  return out.slice(0, count);
+  return out;
 }
 // 直近の得点が低いほど 1 に近づく係数（item16：低調が続くと補正を強める）。
 function recentLowFactor(win){
@@ -1200,17 +1210,18 @@ function arrangeStack(bottom, mids, top){
   return cands[cands.length-1].st;
 }
 function buildBurger(){
-  // 段構成は params.tiers で可変。上下バンズは常に1枚ずつ、中段は具材:ソースの指定枚数。1個の中では同じカードは出ない（item11）。
+  // 段数スロット（tiers）は「組める段数の上限」。実際に組むのは引けた枚数まで（非復元・デッキ枚数で止まる・空段は作らない）。
   const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
-  const nIng   = Math.max(0, Math.round(t.ingredients));
-  const nSauce = Math.max(0, Math.round(t.sauces));
+  const nIng   = Math.max(0, Math.round(t.ingredients));        // 具材の段数スロット（上限）
+  const nSauce = Math.max(0, Math.round(t.sauces));             // ソースの段数スロット（上限）
   const f = forcedCard;                                         // item12：この1個に確定で入れるカード（山に応じて割り当て）
-  const buns  = drawDistinctPile("bun", 2, f);
-  const ings  = drawDistinctPile("ingredient", nIng, f);
-  const sauces= drawDistinctPile("sauce", nSauce, f);
-  if (!buns || !ings || !sauces || buns.some(x=>x==null) || ings.some(x=>x==null) || sauces.some(x=>x==null)) return null;
+  let buns    = drawPile("bun", 2, f);                          // バンズは枠（上下）。所持1種でも上下同じで組む。
+  if (buns.length === 1) buns = [buns[0], buns[0]];             // 1枚しか引けなければ上下同じバンズで枠を作る
+  const ings  = drawPile("ingredient", nIng, f);               // 引けた具材（≤ nIng・デッキの具材枚数まで）
+  const sauces= drawPile("sauce", nSauce, f);                   // 引けたソース（≤ nSauce・デッキのソース枚数まで）
+  if (buns.length < 2 || (ings.length + sauces.length) === 0) return null;   // バンズ無し／中身を1枚も引けない＝組めない
   forcedCard = null;                                            // 消費（次のバーガーからは通常抽選）
-  const mids = shuffle([...ings, ...sauces]);                   // 具材とソースを混ぜて中段に
+  const mids = shuffle([...ings, ...sauces]);                   // 具材とソースを混ぜて中段に（空段は無い＝詰めて組む）
   return { stack: arrangeStack(buns[0], mids, buns[1]) };       // index0=最下段。並びは item16 の補正で寄せる
 }
 
@@ -2519,15 +2530,18 @@ function cuiTagHTML(it){ return it.cuisine && it.cuisine !== "none" ? `<span cla
 function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived)); }
 // 家賃までに作れる数＝rentEvery。深夜営業（アーティファクト）があれば +extra 個ぶん延びる。
 function effRentEvery(){ const rn = CONFIG.params.run || {}; const ns = artById("nightshift"); return Math.max(1, Math.round((rn.rentEvery || 5) + (ns ? (ns.extra || 0) : 0))); }
-function shopPrice(key, base){ const sh = CONFIG.params.shop || {}; const n = shopBuys[key] || 0;
-  return Math.max(0, Math.round((base || 0) * (sh.scaleOnBuy ? Math.pow(sh.scaleMul || 1.5, n) : 1))); }
-function bumpBuy(key){ if (CONFIG.params.shop && CONFIG.params.shop.scaleOnBuy) shopBuys[key] = (shopBuys[key] || 0) + 1; }
-// カード/アーティファクトの店の値段。rarity.on ならレアリティ別の基準価格、そうでなければ shop.cardCost。購入回数で上がるかは rarity.scaleOnBuy。
+// 購入キー → 価格スケールの要素（具材枠/ソース枠は段数スロットとして slot に統合）。
+function scaleElemOf(key){ return (key === "ing" || key === "sau") ? "slot" : key; }
+function scaleFor(elem){ const sc = ((CONFIG.params.shop || {}).scale || {})[elem] || {}; return { on: !!sc.onBuy, mul: sc.mul || 1.5 }; }
+function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = shopBuys[key] || 0;
+  return Math.max(0, Math.round((base || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
+function bumpBuy(key){ if (scaleFor(scaleElemOf(key)).on) shopBuys[key] = (shopBuys[key] || 0) + 1; }
+// カード/アーティファクトの店の値段。rarity.on ならレアリティ別の基準価格、そうでなければ shop.cardCost。値上げは要素別スケール（card/artifact）。
 function rarityPrice(rar, buyKey){
   const rr = CONFIG.params.rarity || {}; const sh = CONFIG.params.shop || {};
   const base = (rr.on !== false && rr.prices) ? (rr.prices[rar] != null ? rr.prices[rar] : 100) : (sh.cardCost || 100);
-  const n = buyKey ? (shopBuys[buyKey] || 0) : 0;
-  return Math.max(0, Math.round(base * (rr.scaleOnBuy ? Math.pow(rr.scaleMul || 1.2, n) : 1)));
+  const sc = scaleFor(buyKey === "artifact" ? "artifact" : "card"); const n = buyKey ? (shopBuys[buyKey] || 0) : 0;
+  return Math.max(0, Math.round(base * (sc.on ? Math.pow(sc.mul, n) : 1)));
 }
 const cardPriceOf = name => rarityPrice(rarityOf(name), "card");
 const artPriceOf  = name => rarityPrice((CONFIG.artifacts[name]||{}).rar || "nami", "artifact");
@@ -3090,8 +3104,15 @@ function renderSettings(){
   gridRow(g, "引き直しの値段", numInput(()=>sh.rerollCost, v=>sh.rerollCost=Math.max(0,Math.round(v)), 10));
   gridRow(g, "店に並ぶカード枚数", numInput(()=>sh.cardsShown, v=>sh.cardsShown=Math.max(1,Math.round(v)), 1));
   gridRow(g, "店に並ぶ道具の数", numInput(()=>sh.artifactsShown, v=>sh.artifactsShown=Math.max(0,Math.round(v)), 1));
-  gridRow(g, "枠/削除/引き直しを値上げする", boolInput(()=>sh.scaleOnBuy, v=>sh.scaleOnBuy=v));
-  gridRow(g, "値上げの倍率(scaleMul)", numInput(()=>sh.scaleMul, v=>sh.scaleMul=Math.max(1,v), 0.05));
+  // 価格スケールは要素ごとに独立（段数スロット・カード・引き直し・アーティファクト・取り除き）。初期は全て切＝現状と同じ挙動。
+  const scaleRow = (label, elem) => {
+    gridRow(g, label+"：購入で値上げ", boolInput(()=>sh.scale[elem].onBuy, v=>sh.scale[elem].onBuy=v));
+    gridRow(g, label+"：値上げ倍率", numInput(()=>sh.scale[elem].mul, v=>sh.scale[elem].mul=Math.max(1,v), 0.05)); };
+  scaleRow("段数スロット", "slot");
+  scaleRow("カード", "card");
+  scaleRow("引き直し", "reroll");
+  scaleRow("アーティファクト", "artifact");
+  scaleRow("取り除き", "remove");
 
   // ── 進行：レアリティ（3択/店の抽選確率と店の値段）── SHOKUZAI §11・仮
   const rr = CONFIG.params.rarity;
@@ -3100,8 +3121,7 @@ function renderSettings(){
   for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の重み", numInput(()=>rr.weights[k], v=>rr.weights[k]=Math.max(0,v), 1));
   g = group("レアリティ：店の基準価格", "run");
   for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の値段", numInput(()=>rr.prices[k], v=>rr.prices[k]=Math.max(0,Math.round(v)), 10));
-  gridRow(g, "購入回数で値上げする", boolInput(()=>rr.scaleOnBuy, v=>rr.scaleOnBuy=v));
-  gridRow(g, "値上げの倍率(scaleMul)", numInput(()=>rr.scaleMul, v=>rr.scaleMul=Math.max(1,v), 0.05));
+  // カード価格の値上げは店の「カード」スケール（shop.scale.card）へ移動（要素別分離）。
 
   // ── 進行：アーティファクト（第3層・所持上限と各効果の数値）── SHOKUZAI §10・仮
   const ar = CONFIG.params.artifacts;
