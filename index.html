@@ -713,7 +713,7 @@ const DEFAULTS = {
     "チーズ":            { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, effect:{id:null,kind:null} },
     "きゅうり":          { pile:"ingredient", type:"veg",   cuisine:"none", base:6,  count:1, tier:null, effect:{id:null,kind:null} },   // 初期3枚目（無印・効果なしは初期デッキのみ許容）
     "ケチャップ":        { pile:"sauce", type:"sauce", cuisine:"none", base:2, count:1, tier:null, effect:{id:null,kind:null} },        // 初期ソース（系統Aルールで効く）
-    "ゴマバンズ":            { pile:"bun", type:"bun", cuisine:"none", base:5,  count:1, tier:null, effect:{id:"sesameBun", kind:"adjacent", per:30} },   // 初期バンズ・上下に接する肉に基礎+30
+    "ゴマバンズ":            { pile:"bun", type:"bun", cuisine:"none", base:5,  count:2, tier:null, effect:{id:"sesameBun", kind:"adjacent", per:30} },   // 初期バンズ2枚（上下2枠ぶん・非復元で例外なく成立）・上下に接する肉に基礎+30
     // 無印の抽選カード（item15）：盤面0・次の選択を有利にする。効果は offer 側で読む（得点には効かない）。
     "ピクルス":          { pile:"ingredient", type:"veg",   cuisine:"none", base:0, count:0, tier:null, rar:"nami", effect:{id:"drawAxis",  kind:"draw", bias:0.6} },   // デッキにあると3択が自分の主要軸に寄る
     "レタス":            { pile:"ingredient", type:"veg",   cuisine:"none", base:0, count:0, tier:null, rar:"nami", effect:{id:"drawRare",  kind:"draw", bias:0.6} },   // 3択に高レアが出やすくなる
@@ -1197,13 +1197,15 @@ function recentLowFactor(win){
   return Math.max(0, Math.min(1, 1.2 - rAvg / med));
 }
 // 中段の並びを決める。デッキは変えず順番だけ寄せる（item16）。strength×低調係数 が強いほど良い並びを選ぶ。
+//   top が null（バンズ1枚）のときは上バンズ無しで組む（下バンズ＋中段のみ）。空段は作らない。
 function arrangeStack(bottom, mids, top){
+  const wrap = m => (top != null ? [bottom, ...m, top] : [bottom, ...m]);
   const P = CONFIG.params.orderFix || {}; const strength = Math.max(0, Math.min(1, P.strength || 0));
-  if (strength <= 0 || mids.length <= 1){ shuffle(mids); return [bottom, ...mids, top]; }
+  if (strength <= 0 || mids.length <= 1){ shuffle(mids); return wrap(mids); }
   const eff = strength * recentLowFactor(P.lowWindow || 5);
-  if (eff <= 0.001){ shuffle(mids); return [bottom, ...mids, top]; }
+  if (eff <= 0.001){ shuffle(mids); return wrap(mids); }
   const K = Math.max(2, Math.round(P.samples || 10)); const cands = [];
-  for (let k=0;k<K;k++){ const m = shuffle(mids.slice()); const st=[bottom, ...m, top]; cands.push({ st, score: evaluate(st).total }); }
+  for (let k=0;k<K;k++){ const m = shuffle(mids.slice()); const st=wrap(m); cands.push({ st, score: evaluate(st).total }); }
   const alpha = eff * 6;                              // eff=0→一様（ランダム）／eff=1→最善に強く寄る
   let tot=0; const ws = cands.map(c => { const w = Math.pow(Math.max(1, c.score), alpha); tot += w; return w; });
   let r = grand() * tot; for (let k=0;k<cands.length;k++){ r -= ws[k]; if (r <= 0) return cands[k].st; }
@@ -1215,14 +1217,14 @@ function buildBurger(){
   const nIng   = Math.max(0, Math.round(t.ingredients));        // 具材の段数スロット（上限）
   const nSauce = Math.max(0, Math.round(t.sauces));             // ソースの段数スロット（上限）
   const f = forcedCard;                                         // item12：この1個に確定で入れるカード（山に応じて割り当て）
-  let buns    = drawPile("bun", 2, f);                          // バンズは枠（上下）。所持1種でも上下同じで組む。
-  if (buns.length === 1) buns = [buns[0], buns[0]];             // 1枚しか引けなければ上下同じバンズで枠を作る
+  const buns  = drawPile("bun", 2, f);                          // バンズも非復元＝所持枚数ぶんだけ引く（他の具材と同じ扱い・複製しない）
   const ings  = drawPile("ingredient", nIng, f);               // 引けた具材（≤ nIng・デッキの具材枚数まで）
   const sauces= drawPile("sauce", nSauce, f);                   // 引けたソース（≤ nSauce・デッキのソース枚数まで）
-  if (buns.length < 2 || (ings.length + sauces.length) === 0) return null;   // バンズ無し／中身を1枚も引けない＝組めない
+  if (buns.length === 0 || (ings.length + sauces.length) === 0) return null;   // バンズ0枚／中身を1枚も引けない＝組めない
   forcedCard = null;                                            // 消費（次のバーガーからは通常抽選）
   const mids = shuffle([...ings, ...sauces]);                   // 具材とソースを混ぜて中段に（空段は無い＝詰めて組む）
-  return { stack: arrangeStack(buns[0], mids, buns[1]) };       // index0=最下段。並びは item16 の補正で寄せる
+  const top  = buns.length >= 2 ? buns[1] : null;              // バンズ1枚なら上バンズ無し（下バンズだけで組む＝得点0にはしない）
+  return { stack: arrangeStack(buns[0], mids, top) };           // index0=最下段（下バンズ）。並びは item16 の補正で寄せる
 }
 
 /* =========================================================================
