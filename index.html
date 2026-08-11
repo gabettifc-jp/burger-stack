@@ -244,6 +244,9 @@
     background:#22262d; border:1px solid var(--line); border-radius:8px}
   .plog-row .meta{flex:1; min-width:0; color:var(--muted)}
   .plog-row .meta b{color:var(--text)}
+  .plog-badge{display:inline-block; font-size:.64rem; font-weight:700; padding:1px 6px; border-radius:6px; margin-right:6px; vertical-align:middle}
+  .plog-badge.playing{background:#3a2f18; color:#ffd27a; border:1px solid #6b5320}
+  .plog-badge.ended{background:#1f2a20; color:#8fd9a0; border:1px solid #2f5138}
   .plog-empty{font-size:.74rem; color:var(--muted); padding:6px}
   /* スキップ＝デッキから1枚取り除く：デッキ一覧 */
   .remove-list{display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; padding:2px}
@@ -628,6 +631,7 @@
       <label class="plog-toggle"><input type="checkbox" id="plogEnabled"> 手プレイのランを記録する（既定オン・切っても保存）</label>
       <div id="plogWarn" class="plog-warn"></div>
       <div class="plog-actions">
+        <button id="plogCopyCur" type="button">🎮 いま遊んでいるランをコピー</button>
         <button id="plogSelAll" type="button">全選択／解除</button>
         <button id="plogCopy" type="button">選択したランを JSON でコピー</button>
       </div>
@@ -3286,22 +3290,41 @@ $("gear").addEventListener("click", () => {          // 調整パネルを開い
 /* =========================================================================
    プレイログ（記録）。手プレイのランを localStorage に貯め、一覧から選んで JSON でコピーする。
    ゲームロジック（得点・抽選・経済・乱数）には触らず、既存関数から読み取りフックを呼ぶだけ。
-   永続化はラン終了時のみ（テンポに影響させない）。明細の形式は将来の測定スクリプトと揃える（source で区別）。
+   永続化は1スピンごと（リロード・タブ閉じ・放置でも直前まで残す）。進行中のランも一覧に出す。
+   確定は「ラン終了（家賃を払えず終了）」と「明示的な新規開始（最初から／履歴クリア／設定リセット）」の両方。
+   ブート時は前回の未確定ランを継続する（別ランに分けない）。明細形式は測定スクリプトと揃える（source で区別）。
    ========================================================================= */
 const plog = (function(){
-  const K_RUNS = "bstack.plog.runs.v1", K_EN = "bstack.plog.enabled.v1";
+  const K_RUNS = "bstack.plog.runs.v1", K_EN = "bstack.plog.enabled.v1", K_CUR = "bstack.plog.current.v1";
   let enabled = true, runs = [], cur = null, cumScore = 0, warnMsg = "";
   try { const v = localStorage.getItem(K_EN); enabled = (v === null) ? true : (v === "1"); } catch(e){ enabled = true; }
   try { runs = JSON.parse(localStorage.getItem(K_RUNS) || "[]") || []; } catch(e){ runs = []; }
+  try { cur = JSON.parse(localStorage.getItem(K_CUR) || "null"); } catch(e){ cur = null; }   // 前回の未確定ランを復元
+  if (cur && (!cur.summary || !Array.isArray(cur.spins))) cur = null;                          // 壊れた値は捨てる
+  if (cur){ cumScore = cur.spins.length ? (cur.spins[cur.spins.length - 1].cum || 0) : 0;      // 累計を引き継ぐ
+    cur.summary.status = "playing"; cur.summary.resumed = true; }                              // リロードで再開した印
   const $p = id => document.getElementById(id);
   function renderWarn(){ const el = $p("plogWarn"); if (el) el.textContent = warnMsg; }
-  function saveRuns(){                                // 保存。容量超過なら古いランから消すが、必ず警告を出す（黙って消さない）。
+  function saveRuns(){                                // 確定済みを保存。容量超過なら古いランから消すが必ず警告（黙って消さない）。
     let trimmed = 0;
-    for (let guard = 0; guard < 200; guard++){
+    for (let guard = 0; guard < 500; guard++){
       try { localStorage.setItem(K_RUNS, JSON.stringify(runs)); if (!trimmed) warnMsg = ""; renderWarn(); return true; }
-      catch(e){ if (runs.length <= 1){ warnMsg = "容量が足りず保存できません。JSONでコピーして退避してください。"; renderWarn(); return false; }
+      catch(e){ if (runs.length < 1){ warnMsg = "容量が足りず保存できません。JSONでコピーして退避してください。"; renderWarn(); return false; }
         runs.shift(); trimmed++;                      // 最古を1件落として再試行
         warnMsg = `容量超過のため、古いラン ${trimmed} 件を削除しました（保存のため）。JSONでコピーして退避を。`; renderWarn(); }
+    }
+    return false;
+  }
+  function saveCurrent(){                             // 進行中ランを保存（1スピンごと）。容量超過なら確定済みの古いランを削って進行中を守る。
+    if (!cur){ try { localStorage.removeItem(K_CUR); } catch(e){} return true; }
+    for (let guard = 0; guard < 500; guard++){
+      try { localStorage.setItem(K_CUR, JSON.stringify(cur)); return true; }
+      catch(e){
+        if (runs.length){ runs.shift();
+          warnMsg = "容量超過のため、古い確定ランを削除しました（進行中を保存するため）。JSONでコピーして退避を。"; renderWarn();
+          try { localStorage.setItem(K_RUNS, JSON.stringify(runs)); } catch(_){}
+        } else { warnMsg = "容量が足りず進行中のランを保存できません。JSONでコピーして退避してください。"; renderWarn(); return false; }
+      }
     }
     return false;
   }
@@ -3310,53 +3333,75 @@ const plog = (function(){
     return { total: tot, byAxis: by }; }
   function mainAxisOf(by){ let m = "none", best = -1; for (const k of Object.keys(by)) if (by[k] > best){ best = by[k]; m = k; } return m; }
   function lastSpin(){ return (cur && cur.spins.length) ? cur.spins[cur.spins.length - 1] : null; }
-  function finalize(){ if (!cur) return; const dk = deckSnap();
+  const nowISO = () => { try { return new Date().toISOString(); } catch(e){ return ""; } };
+  function refreshSummary(){ if (!cur) return; const dk = deckSnap();   // 要約を現在値で更新（進行中でも意味のある値にする）
     cur.summary.spins = cur.spins.length; cur.summary.finalCum = cumScore;
     cur.summary.mainAxis = mainAxisOf(dk.byAxis);
     cur.summary.finalTiers = cur.spins.length ? cur.spins[cur.spins.length - 1].tiers : 0;
-    cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk;
-    runs.push(cur); cur = null; saveRuns(); renderList(); }
-  const nowISO = () => { try { return new Date().toISOString(); } catch(e){ return ""; } };
+    cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk; }
+  function newRun(seed){ cumScore = 0;
+    return { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play", status: "playing" }, spins: [] }; }
+  function finalize(){ if (!cur) return; refreshSummary();               // 確定：終了印を付けて runs へ移し、進行中キーを消す。
+    cur.summary.status = "ended"; delete cur.summary.resumed;
+    runs.push(cur); cur = null; try { localStorage.removeItem(K_CUR); } catch(e){}
+    saveRuns(); renderList(); }
   return {
     isEnabled: () => enabled,
     setEnabled(v){ enabled = !!v; try { localStorage.setItem(K_EN, enabled ? "1" : "0"); } catch(e){} },
-    startRun(seed){                                   // ラン開始（resetRun／ブート）。前ランが未確定なら確定してから新規作成。
-      if (cur && cur.spins.length) finalize(); else cur = null;
+    bootStart(seed){                                  // ブート：前回の未確定ランがあれば継続、無ければ新規（別ランに分けない）。
       if (!enabled){ cur = null; return; }
-      cumScore = 0;
-      cur = { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play" }, spins: [] };
+      if (cur){ refreshSummary(); saveCurrent(); renderList(); return; }
+      cur = newRun(seed); saveCurrent(); renderList();
     },
-    recordSpin(spinNo, score, tiers, removedEffects){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具を控える。
+    startRun(seed){                                   // 明示的なラン開始（最初から／履歴クリア／設定リセット）。前ランを確定して新規。
+      if (cur && cur.spins.length) finalize(); else cur = null;
+      if (!enabled){ cur = null; try { localStorage.removeItem(K_CUR); } catch(e){} return; }
+      cur = newRun(seed); saveCurrent(); renderList();
+    },
+    recordSpin(spinNo, score, tiers, removedEffects){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具を控えて即保存。
       if (!enabled || !cur) return; cumScore += score;
       cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, deck: deckSnap(),
         artifacts: artifactsOwned.slice(), rent: null, bought: [], removed: (removedEffects || []).slice() });
+      refreshSummary(); saveCurrent(); renderList();
     },
-    recordRent(amount, residual){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.rent = { amount, residual }; },
-    recordBuy(kind, name, cost){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.bought.push({ kind, name, cost }); },
-    recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.removed.push({ name, cause }); },
+    recordRent(amount, residual){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.rent = { amount, residual }; refreshSummary(); saveCurrent(); } },
+    recordBuy(kind, name, cost){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.bought.push({ kind, name, cost }); saveCurrent(); } },
+    recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.removed.push({ name, cause }); saveCurrent(); } },
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
     renderList: () => renderList(),
-    copySelected(){
+    copySelected(){                                   // 一覧で選んだラン（確定済み＋進行中）を JSON でコピー。
+      const arr = cur ? runs.concat([cur]) : runs.slice();
       const checks = [...document.querySelectorAll(".plog-check:checked")].map(c => +c.dataset.idx);
-      const sel = checks.map(i => runs[i]).filter(Boolean);
+      const sel = checks.map(i => arr[i]).filter(Boolean);
       const text = JSON.stringify(sel, null, 2);
-      const done = () => { warnMsg = `${sel.length} ラン（${text.length.toLocaleString()} 文字）をコピーしました。`; renderWarn(); };
-      if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done)); }
-      else fallbackCopy(text, done);
+      doCopy(text, () => { warnMsg = `${sel.length} ラン（${text.length.toLocaleString()} 文字）をコピーしました。`; renderWarn(); });
+    },
+    copyCurrent(){                                    // いま遊んでいるラン（進行中）をその場で直接コピー。
+      if (!cur){ warnMsg = "いま進行中のランがありません。"; renderWarn(); return; }
+      refreshSummary();
+      const text = JSON.stringify(cur, null, 2);
+      doCopy(text, () => { warnMsg = `進行中のラン（スピン${cur ? cur.spins.length : 0}・${text.length.toLocaleString()} 文字）をコピーしました。`; renderWarn(); });
     },
   };
+  function doCopy(text, done){
+    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done)); }
+    else fallbackCopy(text, done);
+  }
   function fallbackCopy(text, done){ const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch(e){} document.body.removeChild(ta); done && done(); }
   function renderList(){
     const host = $p("plogList"); if (!host) return; host.innerHTML = "";
-    if (!runs.length){ const d = document.createElement("div"); d.className = "plog-empty"; d.textContent = "まだ記録がありません。手でランを1回遊ぶと貯まります。"; host.appendChild(d); return; }
-    for (let i = runs.length - 1; i >= 0; i--){ const r = runs[i], s = r.summary;
+    const arr = cur ? runs.concat([cur]) : runs.slice();   // 確定済み＋進行中（末尾）
+    if (!arr.length){ const d = document.createElement("div"); d.className = "plog-empty"; d.textContent = "まだ記録がありません。手でランを1回遊ぶと貯まります。"; host.appendChild(d); return; }
+    for (let i = arr.length - 1; i >= 0; i--){ const r = arr[i], s = r.summary;
       const row = document.createElement("div"); row.className = "plog-row";
       const cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "plog-check"; cb.dataset.idx = i;
       const meta = document.createElement("div"); meta.className = "meta";
       const dt = (s.date || "").replace("T", " ").slice(0, 16);
-      meta.innerHTML = `<b>${dt}</b>　${CUISINE_JA[s.mainAxis] || s.mainAxis}軸　スピン<b>${s.spins}</b>　累計<b>¥${(s.finalCum||0).toLocaleString()}</b>　段<b>${s.finalTiers}</b>　${s.daysSurvived}営業日　seed ${s.seed}`;
+      const playing = s.status !== "ended";
+      const badge = playing ? `<span class="plog-badge playing">進行中${s.resumed ? "・再開" : ""}</span>` : `<span class="plog-badge ended">終了</span>`;
+      meta.innerHTML = `${badge}<b>${dt}</b>　${CUISINE_JA[s.mainAxis] || s.mainAxis}軸　スピン<b>${s.spins}</b>　累計<b>¥${(s.finalCum||0).toLocaleString()}</b>　段<b>${s.finalTiers}</b>　${s.daysSurvived}営業日　seed ${s.seed}`;
       row.append(cb, meta); host.appendChild(row);
     }
   }
@@ -3384,12 +3429,13 @@ window.RUN = {
 window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハーネス用に明示公開（関数宣言だが依存の明確化のため）
 
 seedRun(pendingSeed);   // 初回ラン（ブート）のシードを確定（未指定なら自動）
-plog.startRun(gameSeed); // プレイログ：ブート＝最初のランの記録を開始
+plog.bootStart(gameSeed); // プレイログ：ブート＝前回の未確定ランがあれば継続、無ければ新規
 // プレイログUIの結線（記録トグル・全選択／解除・JSONコピー）。
 (function wirePlog(){
   const en = $("plogEnabled"); if (en){ en.checked = plog.isEnabled(); en.addEventListener("change", () => plog.setEnabled(en.checked)); }
   const sel = $("plogSelAll"); if (sel){ sel.addEventListener("click", () => { const cs = [...document.querySelectorAll(".plog-check")]; const all = cs.every(c => c.checked); cs.forEach(c => c.checked = !all); }); }
   const cp = $("plogCopy"); if (cp){ cp.addEventListener("click", () => plog.copySelected()); }
+  const cc = $("plogCopyCur"); if (cc){ cc.addEventListener("click", () => plog.copyCurrent()); }
   plog.renderList();
 })();
 renderPiles();
