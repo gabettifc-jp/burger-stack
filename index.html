@@ -228,6 +228,9 @@
   .shopbtn:active{transform:translateY(1px); border-color:var(--accent)}
   .runstatus{font-size:.72rem; color:var(--muted); margin-top:4px}
   .runstatus b{color:var(--text); font-weight:800}
+  .tiercap{font-size:.72rem; color:var(--muted); margin:2px 0 8px; line-height:1.35}
+  .tiercap b{color:var(--text); font-weight:800}
+  .tiercap .cap-lim{color:#ffb0a0; font-weight:800}   /* デッキ枚数が枠より少なく段が制限されているとき */
   /* 目標（次の家賃）の大表示（item3）。常に視界に入る位置に、大きく。 */
   .goalbanner{display:flex; align-items:center; justify-content:space-between; gap:10px;
     background:linear-gradient(180deg,#2a2016,#1c1710); border:1px solid #5a4a2a; border-radius:12px;
@@ -561,6 +564,9 @@
 
   <!-- 軸の内訳（デッキに各軸が何枚。常に表示して偏りが分かるようにする） -->
   <div id="axisTally"></div>
+
+  <!-- 今このデッキ・枠で組める段数（非復元：枠の上限とデッキ枚数の小さい方で決まる） -->
+  <div id="tierCap" class="tiercap"></div>
 
   <!-- 1. バーガー表示 -->
   <!-- 目標（次の家賃）を常に大きく表示（item3・Balatroのブラインド要求点のように目立たせる）。 -->
@@ -925,18 +931,18 @@ const DEFAULTS = {
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。無料。スキップは「見送る（何もしない）」。
     offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。
     // ラン制（失敗あり・仮メカニクス）。バーガー1個=1スピン。rentEvery スピンごとに家賃。払えなければラン終了。
-    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 20 },   // rentBase=初期家賃(item2:500→300) / rentMul=等比の倍率(item2:1.5→1.4) / dayGoal=完走する営業日数（暫定20・設定で変更可）
+    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 5 },   // rentBase=初期家賃(item2:500→300) / rentMul=等比の倍率(item2:1.5→1.4) / dayGoal=完走する営業日数（20→5・まず5営業日を面白くできるか見る・設定で変更可）
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
             cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
             // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
-            scale: { slot:     { onBuy: false, mul: 1.5 },   // 段数スロット（具材枠・ソース枠 共通）
-                     card:     { onBuy: false, mul: 1.2 },   // カード
-                     reroll:   { onBuy: false, mul: 1.5 },   // 品揃えの引き直し
-                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト
-                     remove:   { onBuy: false, mul: 1.5 } } },// デッキから取り除く
+            scale: { slot:     { onBuy: false, mul: 1.5 },   // 段数スロット（具材枠・ソース枠 共通）※値は別途測定
+                     card:     { onBuy: false, mul: 1.2 },   // カード ※値は別途測定
+                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ：50→100→200→…）
+                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト ※値は別途測定
+                     remove:   { onBuy: true,  mul: 2.0 } } },// デッキから取り除く（購入で2倍ずつ）
     // レアリティ（SHOKUZAI §11・仮）。3択/店の抽選確率(weights)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
     rarity: { on: true,
               weights: { nami: 60, jou: 25, tokujou: 12, kiwami: 3 },
@@ -2933,6 +2939,7 @@ function burgerCountUp(target, token){
 }
 
 function updateProgress(){
+  updateTierCap();                                  // 段数スロットやデッキが変わったら「組める段数」表示を更新
   const el = $("progress");
   const total = stack ? stack.length : (2 + Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces));
   if (offering){ el.textContent = "選択肢から1つ選ぶ（タップ）"; return; }
@@ -3021,6 +3028,24 @@ function renderPiles(){
     host.appendChild(box);
   }
   renderAxisTally();
+  updateTierCap();
+}
+// 山ごとの所持合計枚数（非復元では、その山から引ける最大枚数）。
+function pileCopies(pileKey){ let n = 0; for (const nm of catalogNames()){ const it = CONFIG.items[nm]; if (it.pile === pileKey) n += it.count; } return n; }
+// 今このデッキ・枠で「組める段数」を表示する。実際に組める段数＝枠の上限とデッキ枚数の小さい方（非復元）。
+function updateTierCap(){
+  const e = $("tierCap"); if (!e) return;
+  const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
+  const nIng = Math.max(0, Math.round(t.ingredients)), nSau = Math.max(0, Math.round(t.sauces));
+  const ingC = pileCopies("ingredient"), sauC = pileCopies("sauce"), bunC = pileCopies("bun");
+  const ingB = Math.min(nIng, ingC), sauB = Math.min(nSau, sauC), bunB = Math.min(2, bunC);   // 実際に組める段
+  const total = ingB + sauB + bunB;
+  const part = (label, build, cap, copies) => {                                                // デッキ不足で制限中は赤く出す
+    const limited = copies < cap;
+    return `${label} <b>${build}</b><span class="${limited ? "cap-lim" : ""}">（枠${cap}・デッキ${copies}${limited ? "→不足" : ""}）</span>`;
+  };
+  e.innerHTML = `🍔 組める段 <b>${total}</b>段　` +
+    part("具材", ingB, nIng, ingC) + " ／ " + part("ソース", sauB, nSau, sauC) + " ／ " + part("バンズ", bunB, 2, bunC);
 }
 
 // 軸ごとの内訳（デッキに何枚あるか）。常に画面から偏りが分かるよう、上部に固定表示する。
