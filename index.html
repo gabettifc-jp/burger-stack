@@ -1064,22 +1064,39 @@ const Sound = (() => {
 /* =========================================================================
    ロジック（生成・得点）
    ========================================================================= */
+/* ゲーム乱数のシード管理（プレイログ再生の前段）。
+   ゲームロジックの抽選（カード抽選・shuffle・3択・キャビア削除・並び補正）だけを、シード付きの
+   単一生成器 grand() に通す。演出の乱数（パーティクル・音のノイズ・揺れ・コインの軌道 等）は
+   Math.random のまま＝毎回異なってよい。得点計算・効果判定・経済ロジックは変更しない（取得元の差し替えのみ）。 */
+function mulberry32(a){ return function(){ a |= 0; a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+let gameSeed = null;                       // 現在のランのシード（記録・再利用のため保持）
+let gameRng  = null;                       // 現在のランの生成器
+let pendingSeed = null;                     // 次のラン開始で使うシード（外から指定・無ければ自動）
+function grand(){ return gameRng ? gameRng() : Math.random(); }   // ゲーム側の乱数はすべてここを通す
+// ランのシードを決めて生成器を張り替える。seed 未指定なら自動生成。返り値＝確定したシード。
+function seedRun(seed){
+  gameSeed = (seed == null) ? (Math.floor(Math.random() * 0x100000000) >>> 0) : (seed >>> 0);
+  gameRng = mulberry32(gameSeed);
+  return gameSeed;
+}
 function pick(pileKey){
   const entries = catalogNames()                    // 全カタログ（新軸カードも count>0 なら引ける）
     .filter(n => CONFIG.items[n].pile === pileKey && CONFIG.items[n].count > 0)
     .map(n => [n, CONFIG.items[n].count]);
   let tot = 0; for (const [,c] of entries) tot += c;
   if (tot <= 0) return null;
-  let r = Math.random() * tot;          // 山は減らない・毎回引き直し（枚数で重み付け）
+  let r = grand() * tot;          // 山は減らない・毎回引き直し（枚数で重み付け）
   for (const [n,c] of entries){ r -= c; if (r < 0) return n; }
   return entries[entries.length-1][0];
 }
-function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(grand()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 let forcedCard = null;   // item12：3択で取った直後の1個に必ず入れるカード（buildBurger で消費）
 // 枚数（デッキ）で重み付けして1枚引く（山は減らない）。names 内から。
 function weightedPickFrom(names){ if (!names.length) return null; let tot=0; for (const n of names) tot += CONFIG.items[n].count;
-  if (tot<=0) return null; let r=Math.random()*tot; for (const n of names){ r-=CONFIG.items[n].count; if (r<0) return n; } return names[names.length-1]; }
+  if (tot<=0) return null; let r=grand()*tot; for (const n of names){ r-=CONFIG.items[n].count; if (r<0) return n; } return names[names.length-1]; }
 // 1個のバーガーの中では同じカードを引かない（非復元・item11）。distinct が足りない枠だけ復元で埋める。
 //   forced が指定され、その山に属するなら必ず1枚含める（item12）。
 function drawDistinctPile(pileKey, count, forced){
@@ -1112,7 +1129,7 @@ function arrangeStack(bottom, mids, top){
   for (let k=0;k<K;k++){ const m = shuffle(mids.slice()); const st=[bottom, ...m, top]; cands.push({ st, score: evaluate(st).total }); }
   const alpha = eff * 6;                              // eff=0→一様（ランダム）／eff=1→最善に強く寄る
   let tot=0; const ws = cands.map(c => { const w = Math.pow(Math.max(1, c.score), alpha); tot += w; return w; });
-  let r = Math.random() * tot; for (let k=0;k<cands.length;k++){ r -= ws[k]; if (r <= 0) return cands[k].st; }
+  let r = grand() * tot; for (let k=0;k<cands.length;k++){ r -= ws[k]; if (r <= 0) return cands[k].st; }
   return cands[cands.length-1].st;
 }
 function buildBurger(){
@@ -2278,7 +2295,7 @@ function collect(){
   for (let k = 0; k < (sc.sacrificeRandom || 0); k++){
     const pool = catalogNames().filter(nm => CONFIG.items[nm].count > 0 && CONFIG.items[nm].effect.id !== "caviar");
     if (!pool.length) break;
-    const victim = pool[Math.floor(Math.random() * pool.length)];
+    const victim = pool[Math.floor(grand() * pool.length)];
     CONFIG.items[victim].count = Math.max(0, CONFIG.items[victim].count - 1);
   }
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（もちの成長／除外を反映）
@@ -2315,7 +2332,7 @@ function advanceOffer(){ offerQueue.shift(); showNextOffer(); }   // 現在の�
 // 第1層：完成ごとの3択。いずれかの山に1枚足す／スキップ（小報酬）。タップで即決・確認画面なし。
 function sample(arr, n){
   const a = arr.slice(), out = [];
-  for (let k = 0; k < n && a.length; k++){ out.push(a.splice(Math.floor(Math.random()*a.length), 1)[0]); }
+  for (let k = 0; k < n && a.length; k++){ out.push(a.splice(Math.floor(grand()*a.length), 1)[0]); }
   return out;
 }
 // デッキの主要軸と、その「固まり具合」（主要軸が軸カード全体に占める割合 share）。傾斜のランプに使う。
@@ -2352,7 +2369,7 @@ function sampleWeighted(arr, n){
   const a = arr.slice(), out = [];
   for (let k = 0; k < n && a.length; k++){
     let tot = 0; for (const x of a) tot += weightOf(x);
-    let r = Math.random() * tot, pick = a.length - 1;
+    let r = grand() * tot, pick = a.length - 1;
     for (let i = 0; i < a.length; i++){ r -= weightOf(a[i]); if (r <= 0){ pick = i; break; } }
     out.push(a.splice(pick, 1)[0]);
   }
@@ -2455,7 +2472,7 @@ function rerollArtifacts(){
   const rr = CONFIG.params.rarity || {};
   const wOf = nm => (rr.on !== false && rr.weights) ? (rr.weights[(CONFIG.artifacts[nm].rar)||"nami"] || 1) : 1;
   const a = pool.slice(), out = [], want = artifactsShownN();
-  for (let k = 0; k < want && a.length; k++){ let tot=0; for (const x of a) tot += wOf(x); let r=Math.random()*tot, pick=a.length-1;
+  for (let k = 0; k < want && a.length; k++){ let tot=0; for (const x of a) tot += wOf(x); let r=grand()*tot, pick=a.length-1;
     for (let i=0;i<a.length;i++){ r-=wOf(a[i]); if (r<=0){ pick=i; break; } } out.push(a.splice(pick,1)[0]); }
   artifactStock = out;
 }
@@ -2598,6 +2615,8 @@ function restoreDefaultDeck(){
   CONFIG.params.tiers.sauces = DEFAULTS.params.tiers.sauces;
 }
 function resetRun(){
+  seedRun(pendingSeed);                              // ラン開始時にシード確定（pendingSeed 指定があればそれ、無ければ自動）
+  pendingSeed = null;
   restoreDefaultDeck();
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; forcedCard = null;
@@ -3240,9 +3259,14 @@ window.RUN = {
   setAcquiredAt: (nm, v) => { acquiredAt[nm] = v; },
   clearTemporal: () => { temporalBonus = {}; temporalMult = {}; acquiredAt = {}; },
   reset: () => resetRun(),
+  // シード管理：測定スクリプトからランを再生するための口。
+  seed: () => gameSeed,                              // 現在のランのシードを読む（記録用）
+  seedNow: (s) => seedRun(s),                        // ゲーム乱数の生成器を今すぐ張り替える（返り値＝確定シード。ハーネスの再生用）
+  setPendingSeed: (s) => { pendingSeed = (s == null) ? null : (s >>> 0); },  // 次の resetRun で使うシードを予約（未指定なら自動）
 };
 window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハーネス用に明示公開（関数宣言だが依存の明確化のため）
 
+seedRun(pendingSeed);   // 初回ラン（ブート）のシードを確定（未指定なら自動）
 renderPiles();
 renderSettings();
 updateStats();
