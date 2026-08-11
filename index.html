@@ -230,6 +230,21 @@
   .artchip{background:#3a2f52; color:#d3b8ff; border:1px solid #4a3f63; border-radius:999px; padding:2px 8px;
     font-size:.66rem; font-weight:700; cursor:pointer; touch-action:manipulation; user-select:none}
   .artchip:active{transform:translateY(1px); border-color:var(--accent)}
+  /* プレイログ（記録）パネル */
+  #plog .tsummary{cursor:pointer}
+  .plog-toggle{display:flex; align-items:center; gap:6px; font-size:.8rem; margin:8px 0; color:var(--text)}
+  .plog-warn{color:#ffb0a0; font-size:.74rem; font-weight:700; margin:4px 0; min-height:0}
+  .plog-warn:empty{display:none}
+  .plog-actions{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0}
+  .plog-actions button{background:#2b313a; border:1px solid var(--line); border-radius:8px; padding:6px 10px;
+    color:var(--text); font-size:.76rem; cursor:pointer}
+  .plog-actions button:active{transform:translateY(1px); border-color:var(--accent)}
+  .plog-list{display:flex; flex-direction:column; gap:3px; max-height:320px; overflow-y:auto; margin-top:4px}
+  .plog-row{display:flex; align-items:center; gap:8px; font-size:.72rem; padding:4px 6px;
+    background:#22262d; border:1px solid var(--line); border-radius:8px}
+  .plog-row .meta{flex:1; min-width:0; color:var(--muted)}
+  .plog-row .meta b{color:var(--text)}
+  .plog-empty{font-size:.74rem; color:var(--muted); padding:6px}
   /* スキップ＝デッキから1枚取り除く：デッキ一覧 */
   .remove-list{display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; padding:2px}
   .remove-row{display:flex; align-items:center; gap:6px; background:#2b313a; border:1px solid var(--line);
@@ -602,6 +617,22 @@
         <button id="clearHist">履歴をクリア</button>
       </div>
       <p class="barnote">※ 変更は次に作るバーガーから反映。保存はしない（リロードで初期化）。</p>
+    </details>
+  </section>
+
+  <!-- プレイログ：手プレイのランを localStorage に記録し、一覧から選んで JSON でコピーする（読み取りのみ） -->
+  <section id="plog">
+    <p class="lbl">🧾 プレイログ（記録）</p>
+    <details id="plogDetails">
+      <summary class="tsummary">🧾 ここを押して開く — 記録した手プレイのランを一覧・コピー</summary>
+      <label class="plog-toggle"><input type="checkbox" id="plogEnabled"> 手プレイのランを記録する（既定オン・切っても保存）</label>
+      <div id="plogWarn" class="plog-warn"></div>
+      <div class="plog-actions">
+        <button id="plogSelAll" type="button">全選択／解除</button>
+        <button id="plogCopy" type="button">選択したランを JSON でコピー</button>
+      </div>
+      <div id="plogList" class="plog-list"></div>
+      <p class="barnote">※ 保存は localStorage。全ランを貯める。容量に達したら古いランから消えるが、上の欄に必ず警告を出す（黙って消さない）。</p>
     </details>
   </section>
 </div>
@@ -2271,6 +2302,8 @@ function complete(){
 // 回収：得点欄（このバーガーの売値）と売上累計を、コインの着弾に同期して段階的に満たす。時間で勝手に数え上げない。
 function collect(){
   const total = sc.total, prod = sc.mult;
+  const spinTiers = stack ? stack.length : 0;        // プレイログ：このバーガーの段数（回収時に控える）
+  const removedThisSpin = [];                        // プレイログ：この回で効果により山から消えたカード（かつおぶし・キャビア）
   money += total;                                   // 所持金（真の値）は即時に加算＝家賃判定に使う。表示はコインで寄る。
   showBreakdown(sc);                                // 明細（基礎点/加算/乗算/合計）は回収の瞬間に出す
   const cid = ++currentCollectId; collectFillActive = true;   // この回収の識別子。以後この売値をコインで満たす
@@ -2289,19 +2322,20 @@ function collect(){
     if (e.id === "growMult")  temporalMult[nm] = (temporalMult[nm] || 0) + (e.per || 0); }
   // 破壊・消費系：発動したカード（かつおぶし等）を山から1枚取り除く。
   if (sc.sacrifice && sc.sacrifice.length){
-    for (const nm of sc.sacrifice) if (CONFIG.items[nm]) CONFIG.items[nm].count = Math.max(0, CONFIG.items[nm].count - 1);
+    for (const nm of sc.sacrifice) if (CONFIG.items[nm]){ CONFIG.items[nm].count = Math.max(0, CONFIG.items[nm].count - 1); removedThisSpin.push({ name: nm, cause: "katsuobushi" }); }
   }
   // キャビア：発動ぶんだけ、デッキから他のカードを無作為に1枚取り除く（消費系）。
   for (let k = 0; k < (sc.sacrificeRandom || 0); k++){
     const pool = catalogNames().filter(nm => CONFIG.items[nm].count > 0 && CONFIG.items[nm].effect.id !== "caviar");
     if (!pool.length) break;
     const victim = pool[Math.floor(grand() * pool.length)];
-    CONFIG.items[victim].count = Math.max(0, CONFIG.items[victim].count - 1);
+    CONFIG.items[victim].count = Math.max(0, CONFIG.items[victim].count - 1); removedThisSpin.push({ name: victim, cause: "caviar" });
   }
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（もちの成長／除外を反映）
   awaitingCollect = false;
   completedCount++; runSpins++;                     // バーガー1個 = 1スピン
   updateRunStatus();
+  plog.recordSpin(runSpins, total, spinTiers, removedThisSpin);   // プレイログ：このスピンの明細を1行控える（スピン番号確定後）
   // 完成の区切りで出す画面を順に積む：3択（無料・毎回）→ 家賃（rentEvery ごと）→ 店。
   const q = [];
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
@@ -2487,7 +2521,7 @@ function showRent(){
   const rebate = reg ? Math.round(due * (reg.ratio || 0)) : 0;
   if (money >= due){
     const pay = el("offer-buy", `支払う（¥${due}）` + (rebate ? `　→ ¥${rebate} 戻る` : ""));
-    pay.addEventListener("click", () => { setMoney(money - due + rebate); daysSurvived++; Sound.coinChink(0, 0.5); updateRunStatus(); advanceOffer(); });
+    pay.addEventListener("click", () => { setMoney(money - due + rebate); daysSurvived++; plog.recordRent(due, money); Sound.coinChink(0, 0.5); updateRunStatus(); advanceOffer(); });
     offerEl.appendChild(pay);
   } else {
     offerEl.appendChild(el("offer-runinfo warn", "家賃を払えません。ラン終了。"));
@@ -2549,7 +2583,7 @@ function showShop(){
   acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), money >= rc));
   acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), money >= ic));
   acts.appendChild(mkbtn("ソース枠 +1", scst, () => buySlot("sauces", "sau", scst), money >= scst));
-  acts.appendChild(mkbtn("品揃えの引き直し", rr, () => { setMoney(money - rr); bumpBuy("reroll"); rerollStock(); showShop(); }, money >= rr));
+  acts.appendChild(mkbtn("品揃えの引き直し", rr, () => { setMoney(money - rr); bumpBuy("reroll"); plog.recordBuy("reroll", "reroll", rr); rerollStock(); showShop(); }, money >= rr));
   offerEl.appendChild(acts);
   const leave = el("offer-skip", "店を出る →"); leave.addEventListener("click", () => { shopStock = null; artifactStock = null; advanceOffer(); });
   offerEl.appendChild(leave);
@@ -2559,7 +2593,7 @@ function buyCard(name, cost){
   if (money < cost) return;
   noteAcquire(name);
   setMoney(money - cost); bumpBuy("card");
-  CONFIG.items[name].count += 1; renderPiles(); renderAxisTally();
+  CONFIG.items[name].count += 1; plog.recordBuy("card", name, cost); renderPiles(); renderAxisTally();
   const i = shopStock.indexOf(name); if (i >= 0) shopStock.splice(i, 1);   // 買ったカードは棚から消える
   Sound.coinChink(4, 0.5); showShop();
 }
@@ -2567,7 +2601,7 @@ function buyArtifact(name, cost){
   if (money < cost) return;
   if (artifactsOwned.length >= ((CONFIG.params.artifacts||{}).maxOwned || 5)) return;
   setMoney(money - cost); bumpBuy("artifact");
-  artifactsOwned.push(name);
+  artifactsOwned.push(name); plog.recordBuy("artifact", name, cost);
   artifactStock = artifactStock.filter(x => x !== name);
   updateRunStatus(); Sound.coinChink(6, 0.6); showShop();
 }
@@ -2575,6 +2609,7 @@ function buySlot(field, key, cost){
   if (money < cost) return;
   setMoney(money - cost); bumpBuy(key);
   CONFIG.params.tiers[field] = Math.max(0, Math.round(CONFIG.params.tiers[field]) + 1);
+  plog.recordBuy("slot", field, cost);
   updateProgress(); if (tuningOpen()) renderSettings(); Sound.coinChink(4, 0.5); showShop();
 }
 // 店の「取り除く」：有料で1枚 −1。デッキの中身を出し、任意の1枚を選ぶ（最後の1枚は残す）。
@@ -2589,7 +2624,7 @@ function showShopRemove(cost){
     const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="tag cui">${CUISINE_JA[it.cuisine]}</span>` : "";
     const sysTag = (it.type !== "sauce" && it.type !== "bun") ? `<span class="tag">${TYPE_JA[it.type]}</span>` : "";
     rowEl.innerHTML = `<span class="nm">${name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}<span class="ct2">×${it.count}</span>`;
-    if (!last) rowEl.addEventListener("click", () => { setMoney(money - cost); bumpBuy("remove"); CONFIG.items[name].count -= 1; renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
+    if (!last) rowEl.addEventListener("click", () => { setMoney(money - cost); bumpBuy("remove"); CONFIG.items[name].count -= 1; plog.recordRemove(name, "shop"); renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
     list.appendChild(rowEl);
   }
   offerEl.appendChild(list);
@@ -2600,6 +2635,8 @@ function showShopRemove(cost){
 // ラン終了：結果を出して「最初から」。メタ進行はまだ無し。
 function endRun(){
   runActive = false; offering = false; offerQueue = [];
+  plog.endRun();                                     // プレイログ：このランを確定して保存
+  plog.renderList();
   offerEl.innerHTML = "";
   offerEl.appendChild(el("offer-title", "ラン終了"));
   offerEl.appendChild(el("offer-runinfo big", `${daysSurvived}営業日 生き残った`));
@@ -2617,6 +2654,7 @@ function restoreDefaultDeck(){
 function resetRun(){
   seedRun(pendingSeed);                              // ラン開始時にシード確定（pendingSeed 指定があればそれ、無ければ自動）
   pendingSeed = null;
+  plog.startRun(gameSeed);                           // プレイログ：新しいランの記録を開始（前ランが未確定なら確定してから）
   restoreDefaultDeck();
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; forcedCard = null;
@@ -3239,11 +3277,90 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; temporalBonus = {}; completedCount = 0; resetRun(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; collectFillActive = false; clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; collectFillActive = false; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
 });
+
+/* =========================================================================
+   プレイログ（記録）。手プレイのランを localStorage に貯め、一覧から選んで JSON でコピーする。
+   ゲームロジック（得点・抽選・経済・乱数）には触らず、既存関数から読み取りフックを呼ぶだけ。
+   永続化はラン終了時のみ（テンポに影響させない）。明細の形式は将来の測定スクリプトと揃える（source で区別）。
+   ========================================================================= */
+const plog = (function(){
+  const K_RUNS = "bstack.plog.runs.v1", K_EN = "bstack.plog.enabled.v1";
+  let enabled = true, runs = [], cur = null, cumScore = 0, warnMsg = "";
+  try { const v = localStorage.getItem(K_EN); enabled = (v === null) ? true : (v === "1"); } catch(e){ enabled = true; }
+  try { runs = JSON.parse(localStorage.getItem(K_RUNS) || "[]") || []; } catch(e){ runs = []; }
+  const $p = id => document.getElementById(id);
+  function renderWarn(){ const el = $p("plogWarn"); if (el) el.textContent = warnMsg; }
+  function saveRuns(){                                // 保存。容量超過なら古いランから消すが、必ず警告を出す（黙って消さない）。
+    let trimmed = 0;
+    for (let guard = 0; guard < 200; guard++){
+      try { localStorage.setItem(K_RUNS, JSON.stringify(runs)); if (!trimmed) warnMsg = ""; renderWarn(); return true; }
+      catch(e){ if (runs.length <= 1){ warnMsg = "容量が足りず保存できません。JSONでコピーして退避してください。"; renderWarn(); return false; }
+        runs.shift(); trimmed++;                      // 最古を1件落として再試行
+        warnMsg = `容量超過のため、古いラン ${trimmed} 件を削除しました（保存のため）。JSONでコピーして退避を。`; renderWarn(); }
+    }
+    return false;
+  }
+  function deckSnap(){ const by = {}; let tot = 0;
+    for (const nm of catalogNames()){ const c = CONFIG.items[nm].count; if (c > 0){ const cu = CONFIG.items[nm].cuisine || "none"; by[cu] = (by[cu]||0) + c; tot += c; } }
+    return { total: tot, byAxis: by }; }
+  function mainAxisOf(by){ let m = "none", best = -1; for (const k of Object.keys(by)) if (by[k] > best){ best = by[k]; m = k; } return m; }
+  function lastSpin(){ return (cur && cur.spins.length) ? cur.spins[cur.spins.length - 1] : null; }
+  function finalize(){ if (!cur) return; const dk = deckSnap();
+    cur.summary.spins = cur.spins.length; cur.summary.finalCum = cumScore;
+    cur.summary.mainAxis = mainAxisOf(dk.byAxis);
+    cur.summary.finalTiers = cur.spins.length ? cur.spins[cur.spins.length - 1].tiers : 0;
+    cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk;
+    runs.push(cur); cur = null; saveRuns(); renderList(); }
+  const nowISO = () => { try { return new Date().toISOString(); } catch(e){ return ""; } };
+  return {
+    isEnabled: () => enabled,
+    setEnabled(v){ enabled = !!v; try { localStorage.setItem(K_EN, enabled ? "1" : "0"); } catch(e){} },
+    startRun(seed){                                   // ラン開始（resetRun／ブート）。前ランが未確定なら確定してから新規作成。
+      if (cur && cur.spins.length) finalize(); else cur = null;
+      if (!enabled){ cur = null; return; }
+      cumScore = 0;
+      cur = { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play" }, spins: [] };
+    },
+    recordSpin(spinNo, score, tiers, removedEffects){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具を控える。
+      if (!enabled || !cur) return; cumScore += score;
+      cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, deck: deckSnap(),
+        artifacts: artifactsOwned.slice(), rent: null, bought: [], removed: (removedEffects || []).slice() });
+    },
+    recordRent(amount, residual){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.rent = { amount, residual }; },
+    recordBuy(kind, name, cost){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.bought.push({ kind, name, cost }); },
+    recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s) s.removed.push({ name, cause }); },
+    endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
+    getRuns: () => runs,
+    renderList: () => renderList(),
+    copySelected(){
+      const checks = [...document.querySelectorAll(".plog-check:checked")].map(c => +c.dataset.idx);
+      const sel = checks.map(i => runs[i]).filter(Boolean);
+      const text = JSON.stringify(sel, null, 2);
+      const done = () => { warnMsg = `${sel.length} ラン（${text.length.toLocaleString()} 文字）をコピーしました。`; renderWarn(); };
+      if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done)); }
+      else fallbackCopy(text, done);
+    },
+  };
+  function fallbackCopy(text, done){ const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch(e){} document.body.removeChild(ta); done && done(); }
+  function renderList(){
+    const host = $p("plogList"); if (!host) return; host.innerHTML = "";
+    if (!runs.length){ const d = document.createElement("div"); d.className = "plog-empty"; d.textContent = "まだ記録がありません。手でランを1回遊ぶと貯まります。"; host.appendChild(d); return; }
+    for (let i = runs.length - 1; i >= 0; i--){ const r = runs[i], s = r.summary;
+      const row = document.createElement("div"); row.className = "plog-row";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "plog-check"; cb.dataset.idx = i;
+      const meta = document.createElement("div"); meta.className = "meta";
+      const dt = (s.date || "").replace("T", " ").slice(0, 16);
+      meta.innerHTML = `<b>${dt}</b>　${CUISINE_JA[s.mainAxis] || s.mainAxis}軸　スピン<b>${s.spins}</b>　累計<b>¥${(s.finalCum||0).toLocaleString()}</b>　段<b>${s.finalTiers}</b>　${s.daysSurvived}営業日　seed ${s.seed}`;
+      row.append(cb, meta); host.appendChild(row);
+    }
+  }
+})();
 
 // 計測・デバッグ用API（コンソール／測定ハーネスから触れる）。ゲームの内部状態を読み書きする。
 window.RUN = {
@@ -3267,6 +3384,14 @@ window.RUN = {
 window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハーネス用に明示公開（関数宣言だが依存の明確化のため）
 
 seedRun(pendingSeed);   // 初回ラン（ブート）のシードを確定（未指定なら自動）
+plog.startRun(gameSeed); // プレイログ：ブート＝最初のランの記録を開始
+// プレイログUIの結線（記録トグル・全選択／解除・JSONコピー）。
+(function wirePlog(){
+  const en = $("plogEnabled"); if (en){ en.checked = plog.isEnabled(); en.addEventListener("change", () => plog.setEnabled(en.checked)); }
+  const sel = $("plogSelAll"); if (sel){ sel.addEventListener("click", () => { const cs = [...document.querySelectorAll(".plog-check")]; const all = cs.every(c => c.checked); cs.forEach(c => c.checked = !all); }); }
+  const cp = $("plogCopy"); if (cp){ cp.addEventListener("click", () => plog.copySelected()); }
+  plog.renderList();
+})();
 renderPiles();
 renderSettings();
 updateStats();
