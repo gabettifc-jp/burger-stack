@@ -58,12 +58,13 @@ const out = await p.evaluate((MODE) => {
     R.seedNow(seed >>> 0);
     const buys = {};
     let money = 0, day = 0, spins = 0, tierBuys = 0, totalBuys = 0, chi = 0, prevScore = null;
-    const run = { summary: { seed: seed >>> 0, spins: 0, finalCum: 0, mainAxis: 'none', finalTiers: 0, daysSurvived: 0, source: 'sim', policy, status: 'playing' }, spins: [] };
-    let cum = 0; const ratios = [];
+    const run = { summary: { seed: seed >>> 0, spins: 0, finalCum: 0, mainAxis: 'none', finalTiers: 0, daysSurvived: 0, source: 'sim', policy, status: 'playing', bestBurger: null }, spins: [] };
+    let cum = 0; const ratios = []; let bestB = null;
     let died = false, locked = false, tierGuardHit = false;
     for (let guard = 0; guard < DAY_CAP * every + 5; guard++) {
       const b = bb(); let sc = 0; if (b) { const r = ev(b.stack); sc = (r && isFinite(r.total)) ? r.total : LOCK_SCORE; }
       spins++; cum += sc; money += sc;
+      if (b && (bestB == null || sc > bestB.score)) bestB = { spin: spins, score: sc, stack: b.stack.slice() };   // 最高得点バーガー1本のみ（測定側も同形式）
       const rec = { spin: spins, score: sc, cum, tiers: b ? b.stack.length : 0, deck: deckSnap(), artifacts: [], rent: null, bought: [], removed: [] };
       run.spins.push(rec);
       if (spins % every === 0) {
@@ -101,7 +102,7 @@ const out = await p.evaluate((MODE) => {
     const dk = deckSnap();
     run.summary.spins = run.spins.length; run.summary.finalCum = cum; run.summary.mainAxis = mainAxisOf(dk.byAxis);
     run.summary.finalTiers = run.spins.length ? run.spins[run.spins.length - 1].tiers : 0;
-    run.summary.daysSurvived = day; run.summary.finalDeck = dk; run.summary.status = 'ended';
+    run.summary.daysSurvived = day; run.summary.finalDeck = dk; run.summary.status = 'ended'; run.summary.bestBurger = bestB;
     let beatDay = null;   // 家賃比が1を切って戻らなくなる営業日
     for (let i = 0; i < ratios.length; i++) { if (ratios[i].ratio < 1) { let ok = true; for (let j = i; j < ratios.length; j++) if (ratios[j].ratio >= 1) { ok = false; break; } if (ok) { beatDay = ratios[i].day; break; } } }
     const alwaysAbove1 = ratios.length > 0 && ratios.every(r => r.ratio >= 1);
