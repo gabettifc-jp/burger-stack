@@ -938,10 +938,11 @@ const DEFAULTS = {
             cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
             // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
-            scale: { slot:     { onBuy: false, mul: 1.5 },   // 段数スロット（具材枠・ソース枠 共通）※値は別途測定
-                     card:     { onBuy: false, mul: 1.2 },   // カード ※値は別途測定
-                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ：50→100→200→…）
-                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト ※値は別途測定
+            scale: { slot:     { onBuy: true,  mul: 2.0 },   // 具材枠（購入で2倍ずつ：150→300→600→…）※試験値
+                     sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠（具材枠から分離・倍率が集中するため高く：150→450→1350→…）※試験値
+                     card:     { onBuy: false, mul: 1.2 },   // カード（既定のまま）
+                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ）
+                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
                      remove:   { onBuy: true,  mul: 2.0 } } },// デッキから取り除く（購入で2倍ずつ）
     // レアリティ（SHOKUZAI §11・仮）。3択/店の抽選確率(weights)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
     rarity: { on: true,
@@ -2539,7 +2540,7 @@ function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rent
 // 家賃までに作れる数＝rentEvery。深夜営業（アーティファクト）があれば +extra 個ぶん延びる。
 function effRentEvery(){ const rn = CONFIG.params.run || {}; const ns = artById("nightshift"); return Math.max(1, Math.round((rn.rentEvery || 5) + (ns ? (ns.extra || 0) : 0))); }
 // 購入キー → 価格スケールの要素（具材枠/ソース枠は段数スロットとして slot に統合）。
-function scaleElemOf(key){ return (key === "ing" || key === "sau") ? "slot" : key; }
+function scaleElemOf(key){ return key === "ing" ? "slot" : key === "sau" ? "sslot" : key; }   // 具材枠=slot / ソース枠=sslot（分離）
 function scaleFor(elem){ const sc = ((CONFIG.params.shop || {}).scale || {})[elem] || {}; return { on: !!sc.onBuy, mul: sc.mul || 1.5 }; }
 function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = shopBuys[key] || 0;
   return Math.max(0, Math.round((base || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
@@ -3135,7 +3136,8 @@ function renderSettings(){
   const scaleRow = (label, elem) => {
     gridRow(g, label+"：購入で値上げ", boolInput(()=>sh.scale[elem].onBuy, v=>sh.scale[elem].onBuy=v));
     gridRow(g, label+"：値上げ倍率", numInput(()=>sh.scale[elem].mul, v=>sh.scale[elem].mul=Math.max(1,v), 0.05)); };
-  scaleRow("段数スロット", "slot");
+  scaleRow("具材枠", "slot");
+  scaleRow("ソース枠", "sslot");
   scaleRow("カード", "card");
   scaleRow("引き直し", "reroll");
   scaleRow("アーティファクト", "artifact");
