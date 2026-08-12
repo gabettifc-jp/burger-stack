@@ -787,7 +787,7 @@ const DEFAULTS = {
     "かき揚げ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:22, effect:{id:null}, ph:true, },  // 自分より下の段1つにつき +22
     "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:68, effect:{id:null}, ph:true, },  // 引き直しが1回無料になる。使うと廃棄
     "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:78, effect:{id:"treatAdjAsCui", targetCui:"agemono"}, ph:true, },  // 隣接1枚を揚げ物として扱う
-    "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:136, effect:{id:null}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
+    "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:136, effect:{id:"runCuiAdd", cui:"agemono", per:50}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
     "天かす": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:18, effect:{id:"onDiscardBoost", per:20, targetCui:"agemono"}, ph:true, },  // 廃棄されると、デッキの揚げ物すべてに +20（永続）
     "フライドポテト": { pile:"ingredient", type:"veg", cuisine:"agemono", base:25, count:0, tier:null, rar:"jou", weight:50, effect:{id:"belowPrevAdd", add:120}, ph:true, },  // 基礎点25。前スピンより得点が低いとき +120
     "カレーソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:109, effect:{id:"useMult", per:0.3, max:5}, ph:true, },  // 使うたび ×0.3 ずつ増える。5回で酸化して廃棄
@@ -804,8 +804,8 @@ const DEFAULTS = {
     "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:174, effect:{id:null}, ph:true, },  // 真下1枚の重さを +100 として扱う
     "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:24, effect:{id:null}, ph:true, },  // 真上1枚の重さを −100 として扱う
     "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:42, effect:{id:"matsutakeTwice"}, ph:true, },  // 最初に引かれた具材の効果が2回発動
-    "茶碗蒸し": { pile:"ingredient", type:"dairy", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:140, effect:{id:null}, ph:true, },  // 和が連続して並ぶ長さ×55
-    "お好み焼き": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:154, effect:{id:null}, ph:true, },  // 基礎点が下から昇順の組ごとに +65
+    "茶碗蒸し": { pile:"ingredient", type:"dairy", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:140, effect:{id:"runCuiAdd", cui:"wa", per:55}, ph:true, },  // 和が連続して並ぶ長さ×55
+    "お好み焼き": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:154, effect:{id:"ascPairAdd", per:65}, ph:true, },  // 基礎点が下から昇順の組ごとに +65
     "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:59, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する和1枚につき ×1.6
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
     "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
@@ -823,7 +823,7 @@ const DEFAULTS = {
     "マッシュルーム": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:91, effect:{id:"dayAxisAdd", per:60}, ph:true, },  // 営業日ごとに軸が指定される。その軸の具材1枚につき +60
     "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
     "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:"becomeRarestCui"}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
-    "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:null}, ph:true, },  // 異軸が交互に並んでいる長さ×70
+    "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:"altCuiRunAdd", per:70}, ph:true, },  // 異軸が交互に並んでいる長さ×70
     "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:"adjDiffCuiMult", mult:1.45}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
     "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:51, effect:{id:"axisKindsMult", base:0.65, per:0.45}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
     "継ぎ足しのタレ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:65, effect:{id:"spinAxisMult", per:0.04, maxMul:1.5}, ph:true, },  // 毎スピン、軸の種類×0.04 ずつ育つ（永続）
@@ -1575,6 +1575,10 @@ const EFFECT_TEXT = {
   axisKindsMult:  e => `乗算 = ${e.base!=null?e.base:0.65} + ${e.per||0.45} × 軸の種類数`,
   adjDiffCuiMult: e => `上下2枚が互いに違う軸なら ×${e.mult||1.45}`,
   adjDiffCuiAdd:  e => `上下2枚が互いに違う軸なら、その2枚の基礎点を各+${e.per||55}`,
+  // Wave5 Step2（連続・並び。長さは1枚から数える）
+  runCuiAdd:      e => `${CUISINE_JA[e.cui]||e.cui}が連続して並ぶ最長の長さ1枚につき 基礎点+${e.per||50}`,
+  altCuiRunAdd:   e => `違う軸が交互に並んでいる最長の長さ1枚につき 基礎点+${e.per||70}`,
+  ascPairAdd:     e => `隣り合う2枚で基礎点が下から上へ増えている組1つにつき 基礎点+${e.per||65}`,
   // Wave4 Step5（賭け）
   gambleHalve:  e => `高級以外の具材1枚につき${Math.round((e.per||0.06)*100)}%の確率で、このバーガーが半分`,
   gambleAdd:    e => `具材の枚数×${Math.round((e.per||0.07)*100)}%で成功。成功で+${e.add||250}、失敗で0`,
@@ -1766,6 +1770,8 @@ function resolveCard(i, ctx){
   // 中段（バンズを除く）の軸集計。none は軸として数えない（P7）。
   const midAxisCount = () => { const c = {}; for (let k = 0; k < n; k++){ if (items[stack[k]].pile === "bun") continue;
     const cu = cuiAt(k); if (cu && cu !== "none") c[cu] = (c[cu] || 0) + 1; } return c; };
+  // 中段の段番号（下→上）。連続の判定に使う。バンズは含めない＝バンズで連続が切れる。
+  const midIdx = () => { const a = []; for (let k = 0; k < n; k++) if (items[stack[k]].pile !== "bun") a.push(k); return a; };
   const amAdd = a => a * axisMul(selfCui);                    // 軸アーティファクト（暖簾/中華鍋 等）で強める
   const amMul = m => 1 + (m - 1) * axisMul(selfCui);
   const CJ = c => CUISINE_JA[c] || c;
@@ -1806,6 +1812,29 @@ function resolveCard(i, ctx){
                                pushMult(nm+"：上下が異軸", amMul(e.mult || 1.45), [i, a, u]);
                              break; }
     case "adjDiffCuiAdd": hits.push({ label:nm+"：上下が異軸なら各+"+(e.per||55), effect:"第1項", idx:[i], kind:"note", src:i }); break;   // 福神漬け（第1項＝baseArray 側で加算）
+    // ── Wave5 Step2：連続・並び（中段のみ＝バンズで連続が切れる／長さは1枚から数える・P5） ──
+    case "runCuiAdd": {                                 // 串カツ・茶碗蒸し：指定軸が連続して並ぶ「最長の長さ」× per
+      const want = e.cui || selfCui; let best = 0, bestIdx = [], run = [];
+      for (const k of midIdx()){
+        if (cuiAt(k) !== want) run = [];
+        else if (run.length && k === run[run.length-1] + 1) run.push(k);
+        else run = [k];
+        if (run.length > best){ best = run.length; bestIdx = run.slice(); } }
+      const len = best + nb;
+      pushAdd(nm+"："+CJ(want)+"の連続"+len+"枚", amAdd((e.per||50) * len), [i, ...bestIdx]); break; }
+    case "altCuiRunAdd": {                              // ウインナー：軸が互いに違う並びの「最長の長さ」× per（none 同士は同じ扱い＝切れる）
+      let best = 0, bestIdx = [], run = [];
+      for (const k of midIdx()){
+        const p = run.length ? run[run.length-1] : -99;
+        if (run.length && k === p + 1 && cuiAt(k) !== cuiAt(p)) run.push(k); else run = [k];
+        if (run.length > best){ best = run.length; bestIdx = run.slice(); } }
+      const len = best + nb;
+      pushAdd(nm+"：異軸が交互に"+len+"枚", amAdd((e.per||70) * len), [i, ...bestIdx]); break; }
+    case "ascPairAdd": {                                // お好み焼き：隣り合う2枚で第1項が下から上へ増えている組の数 × per（第1項だけを見る）
+      const M = midIdx(); let c = 0; const idx = [];
+      for (let t = 1; t < M.length; t++){ const a = M[t-1], k = M[t];
+        if (k === a + 1 && baseArr[a] < baseArr[k]){ c++; if (idx[idx.length-1] !== a) idx.push(a); idx.push(k); } }
+      pushAdd(nm+"：昇順の組"+(c+nb), amAdd((e.per||65) * (c + nb)), [i, ...idx]); break; }
     // ── Step5：賭け（計算層で確定・同一シードで再現）。当たっても外れても内訳に出す（隠さない）。 ──
     case "gambleHalve": {                              // 生牡蠣：高級以外の具材枚数×per を1回だけ判定（Q9）。当たると全体×0.5
       let c = 0; for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) !== "kokyu") c++;
