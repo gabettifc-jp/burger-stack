@@ -755,7 +755,7 @@ const DEFAULTS = {
     "麻婆豆腐": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:112, effect:{id:"perTier", per:15}, ph:true, },  // 段数×15を加算
     "北京ダック": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:128, effect:{id:"drawAdd", per:12}, ph:true, },  // 引かれるたび +12（永続）
     "中華まん": { pile:"ingredient", type:"veg", cuisine:"chuka", base:30, count:0, tier:null, rar:"jou", weight:54, effect:{id:"nextDrawMore", draw:1}, ph:true, },  // 基礎点30。次のスピンの具材枠+1として引く
-    "八宝菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:116, effect:{id:null}, ph:true, },  // 隣接1枚を中華として扱う
+    "八宝菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:116, effect:{id:"treatAdjAsCui", targetCui:"chuka"}, ph:true, },  // 隣接1枚を中華として扱う
     "搾菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:36, effect:{id:"buyAdd", per:10}, ph:true, },  // カードを購入するたび +10（永続）
     "ピータン": { pile:"ingredient", type:"dairy", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:122, effect:{id:null}, ph:true, },  // 成功で +250、失敗で 0。成功率=具材の枚数×7%
     "すぶた": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:142, effect:{id:"bigBurgerAdd", per:25, need:10}, ph:true, },  // 10段以上のバーガーを作るたび +25（永続）
@@ -786,29 +786,29 @@ const DEFAULTS = {
     "かぼちゃ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:107, effect:{id:null}, ph:true, },  // 上下がソースの組ごとに +80
     "かき揚げ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:22, effect:{id:null}, ph:true, },  // 自分より下の段1つにつき +22
     "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:68, effect:{id:null}, ph:true, },  // 引き直しが1回無料になる。使うと廃棄
-    "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:78, effect:{id:null}, ph:true, },  // 隣接1枚を揚げ物として扱う
+    "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:78, effect:{id:"treatAdjAsCui", targetCui:"agemono"}, ph:true, },  // 隣接1枚を揚げ物として扱う
     "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:136, effect:{id:null}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
     "天かす": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:18, effect:{id:"onDiscardBoost", per:20, targetCui:"agemono"}, ph:true, },  // 廃棄されると、デッキの揚げ物すべてに +20（永続）
     "フライドポテト": { pile:"ingredient", type:"veg", cuisine:"agemono", base:25, count:0, tier:null, rar:"jou", weight:50, effect:{id:null}, ph:true, },  // 基礎点25。前スピンより得点が低いとき +120
     "カレーソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:109, effect:{id:"useMult", per:0.3, max:5}, ph:true, },  // 使うたび ×0.3 ずつ増える。5回で酸化して廃棄
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:105, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する揚げ物1枚につき ×1.6
-    "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:123, effect:{id:null}, ph:true, },  // 隣接する「賭け」の効果を必ず成功させる
+    "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:123, effect:{id:"forceWin"}, ph:true, },  // 隣接する「賭け」の効果を必ず成功させる
     "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:160, effect:{id:null}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
     "白米": { pile:"ingredient", type:"veg", cuisine:"wa", base:30, count:0, tier:null, rar:"jou", weight:144, effect:{id:"adjCuiAdd", per:45}, ph:true, },  // 基礎点30。隣接する和1枚につき +45
     "豆腐": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:62, effect:{id:"tofu", per:40}, ph:true, },  // 隣接2枚の基礎点を各 +40
     "油揚げ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:60, effect:{id:"drawAdjAdd", per:8}, ph:true, },  // 引かれるたび、隣接2枚に +8（永続）
     "キムチ": { pile:"ingredient", type:"veg", cuisine:"wa", base:-30, count:0, tier:null, rar:"jou", weight:56, effect:{id:"dayAdjAdd", per:20}, ph:true, },  // 基礎点 −30。営業日ごとに隣接2枚へ +20 ずつ（永続）
-    "かつおぶし": { pile:"ingredient", type:"meat", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:103, effect:{id:null}, ph:true, },  // 自分を消して廃棄。隣接2枚の効果を今回2回発動
+    "かつおぶし": { pile:"ingredient", type:"meat", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:103, effect:{id:"katsuobushiTwice"}, ph:true, },  // 自分を消して廃棄。隣接2枚の効果を今回2回発動
     "こんにゃく": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:40, effect:{id:"konjacMeat", per:60}, ph:true, },  // 引いた肉は段に乗らず消える。1枚につき和すべて +60（永続）
-    "のり": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:34, effect:{id:null}, ph:true, },  // 上下の条件付き効果の成立数を+1として数えさせる
+    "のり": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:34, effect:{id:"noriCount", add:1}, ph:true, },  // 上下の条件付き効果の成立数を+1として数えさせる
     "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:174, effect:{id:null}, ph:true, },  // 真下1枚の重さを +100 として扱う
     "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:24, effect:{id:null}, ph:true, },  // 真上1枚の重さを −100 として扱う
-    "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:42, effect:{id:null}, ph:true, },  // 最初に引かれた具材の効果が2回発動
+    "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:42, effect:{id:"matsutakeTwice"}, ph:true, },  // 最初に引かれた具材の効果が2回発動
     "茶碗蒸し": { pile:"ingredient", type:"dairy", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:140, effect:{id:null}, ph:true, },  // 和が連続して並ぶ長さ×55
     "お好み焼き": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:154, effect:{id:null}, ph:true, },  // 基礎点が下から昇順の組ごとに +65
     "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:59, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する和1枚につき ×1.6
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
-    "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:null}, ph:true, },  // 隣接する具材の加算効果を1.6倍
+    "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
     "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
     "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:48, effect:{id:null}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
     "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
@@ -822,12 +822,12 @@ const DEFAULTS = {
     "福神漬け": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:111, effect:{id:null}, ph:true, },  // 上下が違う軸なら、その2枚に +55 ずつ
     "マッシュルーム": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:91, effect:{id:"dayAxisAdd", per:60}, ph:true, },  // 営業日ごとに軸が指定される。その軸の具材1枚につき +60
     "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
-    "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:null}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
+    "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:"becomeRarestCui"}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
     "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:null}, ph:true, },  // 異軸が交互に並んでいる長さ×70
     "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:null}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
     "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:51, effect:{id:null}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
     "継ぎ足しのタレ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:65, effect:{id:"spinAxisMult", per:0.04, maxMul:1.5}, ph:true, },  // 毎スピン、軸の種類×0.04 ずつ育つ（永続）
-    "五目あん": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:93, effect:{id:null}, ph:true, },  // 接する2枚を互いに違う軸として扱う
+    "五目あん": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:93, effect:{id:"treatAdjDiffCui"}, ph:true, },  // 接する2枚を互いに違う軸として扱う
     "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:5, count:2, tier:null, rar:"jou", weight:0, effect:{id:null} },  // つなぎのバンズ（枠を埋めるだけ・効果なし）。Wave5で新バンズシステムに置換
   },
   // アーティファクト（第3層・SHOKUZAI §10）。盤面の枠を使わない＝希釈しない。店で購入、所持上限まで持てる。数値は暫定・調整欄で変更可。
@@ -998,6 +998,7 @@ const PILE_JA = { bun:"バンズ", ingredient:"具材", sauce:"ソース" };
 // 軸（cuisine）。系統(type)とは別の第2のタグ。1枚が「系統」と「軸」の両方を持つ。
 const CUISINE_JA = { none:"無印", wa:"和", chuka:"中華", kaisen:"海鮮", kokyu:"高級", agemono:"揚げ物" };
 const CUISINE_ORDER = ["none","wa","chuka","kaisen","kokyu","agemono"];
+const CUI_DIFF = "_diff";   // 五目あん：どの軸とも一致しない専用の値（「互いに違う軸として扱う」ための読み替え先）
 // レアリティ（SHOKUZAI §11）。抽選確率と店の値段に使う。
 const RARITY_JA = { nami:"並", jou:"上", tokujou:"特上", kiwami:"極" };
 const RARITY_ORDER = ["nami","jou","tokujou","kiwami"];
@@ -1413,6 +1414,9 @@ function applyBaseRewrites(stack, arr, inst){
     const a = i - 1, b = i + 1;
     if (a >= 0 && b < n && !isBun(a) && !isBun(b)){ const t = arr[a]; arr[a] = arr[b]; arr[b] = t; }
   }
+  for (let i = 0; i < n; i++){                       // かつおぶし：自分は第1項0（隣接2枚を2回発動させる代わり）
+    if ((items[stack[i]].effect || {}).id === "katsuobushiTwice") arr[i] = 0;
+  }
   for (let i = 0; i < n; i++){                       // 蟹カマ：最も低い第1項を、最も高い第1項と同じ値にする
     if ((items[stack[i]].effect || {}).id !== "lowToHigh") continue;
     let lo = -1, hi = -1;
@@ -1594,6 +1598,15 @@ const EFFECT_TEXT = {
   adjGrowMult:  e => `上下に接する具材の育ち合計${e.per||5}につき ×${e.mult||1.2}`,
   doubleGrowBonusAdj: e => `上下2枚の「育ち」の点を2倍にする（そのスピンのみ）`,
   maxGrowToAdj: e => `盤面で最も育った値を、上下2枚の育ちとして計算する（そのスピンのみ）`,
+  // Wave4 Step4（メタ・軸の読み替え）
+  treatAdjAsCui:   e => `隣接1枚を${CUISINE_JA[e.targetCui]||e.targetCui}として扱う（上優先）`,
+  treatAdjDiffCui: e => `上下2枚を互いに違う軸として扱わせる`,
+  becomeRarestCui: e => `自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）`,
+  noriCount:       e => `上下の条件付き効果の成立数を+${e.add||1}として数えさせる`,
+  forceWin:        e => `上下2枚の「賭け」を必ず成功させる`,
+  matsutakeTwice:  e => `このバーガーで最初に引かれた具材の効果が2回発動する`,
+  katsuobushiTwice:e => `基礎点0。自分は廃棄され、上下2枚の効果が2回発動する`,
+  mirinAddMult:    e => `上下2枚の「加算」の効果を${e.mult||1.6}倍にする`,
   // Wave4 Step3（引き系・D5：盤面に出た次のスピンだけ枠が変わる）
   drawFewerMult:    e => `×${e.mult||2.5}。次のスピンだけ引く枚数${e.draw||-2}`,
   drawFewerCuiMult: e => `このバーガーの和1枚につき ×${e.mult||1.3}。次のスピンだけ引く枚数${e.draw||-1}`,
@@ -1667,11 +1680,79 @@ function applyHits(hits, acc){
   }
 }
 // ①〜④の表を作る関数（Step4 で中身を入れる）。今は素通し。
-function buildCuiMap(stack, ctx){ return stack.map(nm => CONFIG.items[nm].cuisine); }
-function buildNoriMap(stack, ctx){ return stack.map(() => 0); }
-function buildForceWinMap(stack, ctx){ return stack.map(() => false); }
-function buildTimesMap(stack, ctx){ return stack.map(() => 1); }
-function applyMirin(stack, ctx, acc){}   // ⑦ Step4：味醂（第3項の hit だけを ×1.6）
+function buildCuiMap(stack, ctx){
+  const n = stack.length, items = CONFIG.items;
+  const base = stack.map(nm => items[nm].cuisine);      // 読み替えの判定はすべて「元の軸」を見る（結果に対して再度読み替えない）
+  const out = base.slice();
+  const isBun = i => items[stack[i]].pile === "bun";
+  for (let i = 0; i < n; i++){                          // 複数の読み替えが当たるときは下の段（index の小さい方）が先
+    const e = items[stack[i]].effect; if (!e || !e.id) continue;
+    if (e.id === "treatAdjAsCui"){                      // 八宝菜・アジフライ：隣接1枚（上優先・無ければ下・Q8）を指定軸として扱う
+      const j = (i+1 < n && !isBun(i+1)) ? i+1 : ((i-1 >= 0 && !isBun(i-1)) ? i-1 : -1);
+      if (j >= 0) out[j] = e.targetCui;
+    } else if (e.id === "becomeRarestCui"){             // アボカド：自分の軸を盤面で最も少ない軸にする（none 除く・0枚は数えない・同数は grand()）
+      const cnt = {};
+      for (let k = 0; k < n; k++){ if (isBun(k) || k === i) continue; const c = base[k]; if (c && c !== "none") cnt[c] = (cnt[c] || 0) + 1; }
+      const axes = Object.keys(cnt);
+      if (axes.length){ const mn = Math.min(...axes.map(c => cnt[c])); const cands = axes.filter(c => cnt[c] === mn);
+        out[i] = cands[Math.floor(grand() * cands.length)]; }
+    } else if (e.id === "treatAdjDiffCui"){             // 五目あん：上下2枚を互いに違う軸として扱わせる（下は変えず、上が同じ軸のときだけ専用値に）
+      const a = i - 1, u = i + 1;
+      if (a >= 0 && u < n && !isBun(a) && !isBun(u) && out[a] === out[u]) out[u] = CUI_DIFF;
+    }
+  }
+  return out;
+}
+// のり：上下2枚の「〜1枚につき」「〜が N 枚以上で」の成立数を +add として数えさせる（加算・乗算の両方に効く）。
+function buildNoriMap(stack, ctx){
+  const n = stack.length, out = stack.map(() => 0);
+  for (let i = 0; i < n; i++){
+    const e = CONFIG.items[stack[i]].effect; if (!e || e.id !== "noriCount") continue;
+    for (const j of [i-1, i+1]) if (j >= 0 && j < n) out[j] += (e.add || 1);
+  }
+  return out;
+}
+// ウスターソース：上下2枚の賭けを必ず成功させる（Step5 の賭けが読む）。
+function buildForceWinMap(stack, ctx){
+  const n = stack.length, out = stack.map(() => false);
+  for (let i = 0; i < n; i++){
+    const e = CONFIG.items[stack[i]].effect; if (!e || e.id !== "forceWin") continue;
+    for (const j of [i-1, i+1]) if (j >= 0 && j < n) out[j] = true;
+  }
+  return out;
+}
+// 発動回数。まつたけ＝最初に引かれた具材／かつおぶし＝上下2枚 を2回にする。
+function buildTimesMap(stack, ctx){
+  const n = stack.length, items = CONFIG.items, out = stack.map(() => 1);
+  for (let i = 0; i < n; i++){
+    const e = items[stack[i]].effect; if (!e || !e.id) continue;
+    if (e.id === "matsutakeTwice"){                     // 「最初に引かれた」は buildBurger の引き順（整列前）で決める
+      const fid = ctx.firstIngId;
+      if (fid != null && ctx.inst) for (let k = 0; k < n; k++) if (ctx.inst[k] && ctx.inst[k].id === fid) out[k] = 2;
+    } else if (e.id === "katsuobushiTwice"){
+      for (const j of [i-1, i+1]) if (j >= 0 && j < n && items[stack[j]].pile !== "bun") out[j] = 2;
+    }
+  }
+  return out;
+}
+// 味醂：上下2枚が発動元（src）である「加算」の hit だけを ×mult する。第1項・第2項・乗算 hit には効かない（D1）。
+function applyMirin(stack, ctx, acc){
+  const n = stack.length, done = new Set();
+  for (let i = 0; i < n; i++){
+    const e = CONFIG.items[stack[i]].effect; if (!e || e.id !== "mirinAddMult") continue;
+    const f = e.mult || 1.6;
+    for (const j of [i-1, i+1]){
+      if (j < 0 || j >= n) continue;
+      acc.hits.forEach((h, hi) => {
+        if (h.kind !== "add" || h.src !== j) return;
+        const key = i + ":" + hi; if (done.has(key)) return; done.add(key);
+        const before = h.add, after = Math.round(before * f);
+        acc.add += (after - before); h.add = after;
+        h.effect = (after >= 0 ? "+" : "") + after; h.label += "（味醂×" + f + "）";
+      });
+    }
+  }
+}
 
 function resolveCard(i, ctx){
   const { stack, n, items, inst, baseArr, rawG, side } = ctx;
@@ -1680,6 +1761,7 @@ function resolveCard(i, ctx){
   const pushMult = (label, m, idx) => { if (m === 1) return; hits.push({ label, effect:"×"+r2(m), idx, kind:"mult", mult:m, src:i }); };
   const pushAdd  = (label, a, idx) => { if (a === 0) return; hits.push({ label, effect:(a>=0?"+":"")+a, idx, kind:"add", add:a, src:i }); };
   const cuiAt = ctx.cuiAt, selfCui = cuiAt(i);
+  const nb = ctx.noriBonus(i);                                // のり：この位置の効果の「成立数」に足される数（既定0）
   const typ = j => items[stack[j]].type;                     // 系統は読み替えない
   const isIng = j => items[stack[j]].pile === "ingredient";
   const neigh = k => [k-1, k+1].filter(j => j >= 0 && j < n);
@@ -1689,61 +1771,70 @@ function resolveCard(i, ctx){
   const CJ = c => CUISINE_JA[c] || c;
   switch (e.id){
     // ── 既存（和・無印） ──
-    case "riceBun":   pushAdd(nm+"：和×"+e.per, amAdd(e.per * cuiInBurger("wa")), [i]); break;
-    case "sesameBun": { let a=0, idx=[i]; for (const j of neigh(i)) if (typ(j)==="meat"){ a+=e.per; idx.push(j);} pushAdd(nm+"：接する肉", amAdd(a), idx); break; }
+    case "riceBun":   pushAdd(nm+"：和×"+e.per, amAdd(e.per * (cuiInBurger("wa") + nb)), [i]); break;
+    case "sesameBun": { let c=0, idx=[i]; for (const j of neigh(i)) if (typ(j)==="meat"){ c++; idx.push(j);} pushAdd(nm+"：接する肉", amAdd(e.per * (c + nb)), idx); break; }
     case "shokupanBoard": { if (stack.indexOf(nm) !== i) break;   // 盤面の食パン枚数で1回だけ（item10）
       const cnt = stack.filter(x => x === nm).length; const m = cnt >= 2 ? (e.mult2||2) : (e.mult1||1.3);
       pushMult(nm+"：盤面"+cnt+"枚", amMul(m), stack.map((x,k)=>x===nm?k:-1).filter(k=>k>=0)); break; }
-    case "muffin":    pushMult(nm+"：段少", amMul(1 + e.per * Math.max(0, e.ref - n)), [i]); break;
+    case "muffin":    pushMult(nm+"：段少", amMul(1 + e.per * (Math.max(0, e.ref - n) + nb)), [i]); break;
     case "melonpan":  side.disableMult = true; break;                        // 後で最大の乗算を無効化
     case "tamago":    { const s=neigh(i).filter(j=>typ(j)==="sauce"); if (s.length) pushAdd(nm+"：隣ソース", amAdd(e.add), [i, ...s]); break; }
     case "nori":      if (i===1 || i===n-2) pushMult(nm+"：バンズ内側", amMul(e.mult), [i]); break;
-    case "natto":     { const w = cuiInBurger("wa"); pushMult(nm+(w>=e.need?"：和"+e.need+"+":"：和不足"), amMul(w>=e.need ? e.mult : e.penalty), [i]); break; }
-    case "tofu":      { let a=0, idx=[i]; for (const j of neigh(i)){ a+=e.per; idx.push(j);} pushAdd(nm+"：隣を強化", amAdd(a), idx); break; }
+    case "natto":     { const w = cuiInBurger("wa") + nb; pushMult(nm+(w>=e.need?"：和"+e.need+"+":"：和不足"), amMul(w>=e.need ? e.mult : e.penalty), [i]); break; }
+    case "tofu":      { let c=0, idx=[i]; for (const j of neigh(i)){ c++; idx.push(j);} pushAdd(nm+"：隣を強化", amAdd(e.per * (c + nb)), idx); break; }
     case "katsuobushi": pushMult(nm, amMul(e.mult), [i]); if (inst && inst[i]) side.sacrificeIds.push(inst[i].id); break;
-    case "takenoko":  if (ctx.deckCui("wa") >= e.need) pushMult(nm+"：山の和"+e.need+"+", amMul(e.mult), [i]); break;
-    case "miso":      for (const j of neigh(i)) if (cuiAt(j)==="wa") pushMult(nm+"：接する和", amMul(e.mult), [i, j]); break;
-    case "teriyaki":  for (const j of neigh(i)) if (typ(j)==="meat") pushMult(nm+"：接する肉", amMul(e.mult), [i, j]); break;
-    case "tonkatsuSauce": for (const j of neigh(i)) if (cuiAt(j)==="agemono") pushMult(nm+"：接する揚げ物", amMul(e.mult), [i, j]); break;
+    case "takenoko":  if (ctx.deckCui("wa") + nb >= e.need) pushMult(nm+"：山の和"+e.need+"+", amMul(e.mult), [i]); break;
+    case "miso":      { let c=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)==="wa"){ c++; idx.push(j);} if (c+nb > 0) pushMult(nm+"：接する和"+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
+    case "teriyaki":  { let c=0, idx=[i]; for (const j of neigh(i)) if (typ(j)==="meat"){ c++; idx.push(j);} if (c+nb > 0) pushMult(nm+"：接する肉"+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
+    case "tonkatsuSauce": { let c=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)==="agemono"){ c++; idx.push(j);} if (c+nb > 0) pushMult(nm+"：接する揚げ物"+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
     case "mochiGrow": break;                        // 育った基礎は第1項に載る。ここでは何もしない
     // ── 中華：大きく作る（加算が巨大・段数/デッキで伸びる） ──
-    case "perTier":     pushAdd(nm+"：段数×"+e.per, amAdd(e.per * n), [i]); break;
-    case "adjAnyAdd":   { const g=neigh(i); pushAdd(nm+"：隣接", amAdd(e.per * g.length), [i, ...g]); break; }
-    case "selfDeckAdd": pushAdd(nm+"：デッキ同名", amAdd(e.per * items[nm].count), [i]); break;
-    case "cuiCountAdd": if (cuiInBurger(selfCui) >= e.need) pushAdd(nm+"："+CJ(selfCui)+e.need+"+", amAdd(e.add), [i]); break;
-    case "deckSizeAdd": pushAdd(nm+"：デッキ枚数×"+e.per, amAdd(e.per * ctx.deckSize), [i]); break;
-    case "adjCuiAdd":   { let a=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)===selfCui){ a+=e.per; idx.push(j);} pushAdd(nm+"：接する"+CJ(selfCui), amAdd(a), idx); break; }
-    case "adjTypeAdd":  { let a=0, idx=[i]; for (const j of neigh(i)) if (typ(j)===e.targ){ a+=e.per; idx.push(j);} pushAdd(nm+"：接する"+(TYPE_JA[e.targ]||e.targ), amAdd(a), idx); break; }
-    case "tierMult":    if (n >= e.need) pushMult(nm+"：段"+e.need+"+", amMul(e.mult), [i]); break;
+    case "perTier":     pushAdd(nm+"：段数×"+e.per, amAdd(e.per * (n + nb)), [i]); break;
+    case "adjAnyAdd":   { const g=neigh(i); pushAdd(nm+"：隣接", amAdd(e.per * (g.length + nb)), [i, ...g]); break; }
+    case "selfDeckAdd": pushAdd(nm+"：デッキ同名", amAdd(e.per * (items[nm].count + nb)), [i]); break;
+    case "cuiCountAdd": if (cuiInBurger(selfCui) + nb >= e.need) pushAdd(nm+"："+CJ(selfCui)+e.need+"+", amAdd(e.add), [i]); break;
+    case "deckSizeAdd": pushAdd(nm+"：デッキ枚数×"+e.per, amAdd(e.per * (ctx.deckSize + nb)), [i]); break;
+    case "adjCuiAdd":   { let c=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)===selfCui){ c++; idx.push(j);} pushAdd(nm+"：接する"+CJ(selfCui), amAdd(e.per * (c + nb)), idx); break; }
+    case "adjTypeAdd":  { let c=0, idx=[i]; for (const j of neigh(i)) if (typ(j)===e.targ){ c++; idx.push(j);} pushAdd(nm+"：接する"+(TYPE_JA[e.targ]||e.targ), amAdd(e.per * (c + nb)), idx); break; }
+    case "tierMult":    if (n + nb >= e.need) pushMult(nm+"：段"+e.need+"+", amMul(e.mult), [i]); break;
     // ── 高級：小さく作る（乗算が極端・薄いほど強い）。「基礎点」は第1項＝baseArr を読む（育ちは読まない・D1）。 ──
-    case "tierMultMax": if (n <= e.max) pushMult(nm+"：段"+e.max+"以下", amMul(e.mult), [i]); break;
-    case "deckMultMax": if (ctx.deckSize <= e.max) pushMult(nm+"：デッキ"+e.max+"以下", amMul(e.mult), [i]); break;
+    case "tierMultMax": if (n - nb <= e.max) pushMult(nm+"：段"+e.max+"以下", amMul(e.mult), [i]); break;
+    case "deckMultMax": if (ctx.deckSize - nb <= e.max) pushMult(nm+"：デッキ"+e.max+"以下", amMul(e.mult), [i]); break;
     case "caviar":      pushMult(nm, amMul(e.mult), [i]); side.sacrificeRandom++; break;
     case "purity":      { const impure = stack.some((m,k)=> k!==i && isIng(k) && cuiAt(k)!=="kokyu"); if (impure) pushAdd(nm+"：純度崩れ", -baseArr[i], [i]); break; }
     case "foiegras":    { const g=neigh(i); let absorbed=0; for (const j of g){ absorbed += baseArr[j]; side.absorbedIdx.add(j); }   // 隣の第1項を取り込む（吸収・損しない）
                           pushAdd(nm+"：吸収", amAdd(absorbed), [i, ...g]); pushMult(nm, amMul(e.mult), [i, ...g]); break; }
-    case "iseebi":      pushMult(nm+"：薄いほど", amMul(1 + e.per * Math.max(0, (e.refHigh||20) - ctx.deckSize)), [i]); break;
+    case "iseebi":      pushMult(nm+"：薄いほど", amMul(1 + e.per * (Math.max(0, (e.refHigh||20) - ctx.deckSize) + nb)), [i]); break;
     case "demiMult":    pushAdd(nm+"：基礎0", -baseArr[i], [i]); pushMult(nm, amMul(e.mult), [i]); break;
     // ── 海鮮：早く決める（育つ・時間軸） ──
     case "sinceAdd":    { const made = Math.max(0, completedCount - (acquiredAt[nm]==null ? completedCount : acquiredAt[nm])); pushAdd(nm+"：取得後"+made+"個", amAdd(e.per * made), [i]); break; }
     case "growMult":    pushMult(nm+"：育つ", amMul(1 + (temporalMult[nm]||0)), [i]); break;
-    case "cuiCountMult":if (cuiInBurger(selfCui) >= e.need) pushMult(nm+"："+CJ(selfCui)+e.need+"+", amMul(e.mult), [i]); break;
-    case "adjCuiMult":  for (const j of neigh(i)) if (cuiAt(j)===selfCui) pushMult(nm+"：接する"+CJ(selfCui), amMul(e.mult), [i, j]); break;
+    case "cuiCountMult":if (cuiInBurger(selfCui) + nb >= e.need) pushMult(nm+"："+CJ(selfCui)+e.need+"+", amMul(e.mult), [i]); break;
+    case "adjCuiMult":  { let c=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)===selfCui){ c++; idx.push(j);} if (c+nb > 0) pushMult(nm+"：接する"+CJ(selfCui)+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
     // ── 海鮮：育ちの読み手（Wave3）。生の育ち（rawG）を読む（醤油/出汁の第2項修飾は別処理）。 ──
     case "adjGrowMult": { let sum = 0; const idx=[i];   // 魚醤：上下に接する具材の育ち合計 per につき ×mult
                           for (const j of neigh(i)) if (isIng(j)){ sum += (rawG[j]||0); idx.push(j); }
-                          const stp = Math.floor(sum / (e.per || 5)); if (stp > 0) pushMult(nm+"：隣接の育ち"+sum, amMul(Math.pow(e.mult || 1.2, stp)), idx); break; }
+                          const stp = Math.floor(sum / (e.per || 5)) + nb; if (stp > 0) pushMult(nm+"：隣接の育ち"+sum, amMul(Math.pow(e.mult || 1.2, stp)), idx); break; }
     case "grownCountAdd": { let cnt = 0; const idx=[i];   // いか：盤面の育った具材（育ち≥1）1枚につき +per
                           for (let k=0;k<n;k++) if (isIng(k) && (rawG[k]||0) >= 1){ cnt++; idx.push(k); }
-                          pushAdd(nm+"：育った具材"+cnt+"枚", amAdd((e.per||45) * cnt), idx); break; }
-    case "adjKaisenGrowAdd": { const self = rawG[i]||0; let a=0; const idx=[i];   // いくら：隣接海鮮1枚につき +(base + 自分の育ち×perG)
-                          for (const j of neigh(i)) if (cuiAt(j)==="kaisen"){ a += (e.base||30) + self * (e.perG||6); idx.push(j); }
-                          pushAdd(nm+"：隣接海鮮", amAdd(a), idx); break; }
+                          pushAdd(nm+"：育った具材"+(cnt+nb)+"枚", amAdd((e.per||45) * (cnt + nb)), idx); break; }
+    case "adjKaisenGrowAdd": { const self = rawG[i]||0; let c=0; const idx=[i];   // いくら：隣接海鮮1枚につき +(base + 自分の育ち×perG)
+                          for (const j of neigh(i)) if (cuiAt(j)==="kaisen"){ c++; idx.push(j); }
+                          pushAdd(nm+"：隣接海鮮"+(c+nb)+"枚", amAdd(((e.base||30) + self * (e.perG||6)) * (c + nb)), idx); break; }
     case "dayAxisAdd": { let cnt = 0; const idx=[i];   // マッシュルーム：本日の指定軸の具材1枚につき +per
                          for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) === dayAxis){ cnt++; idx.push(k); }
-                         pushAdd(nm+"：本日の"+(CUISINE_JA[dayAxis]||dayAxis)+cnt+"枚", amAdd((e.per||60) * cnt), idx); break; }
+                         pushAdd(nm+"：本日の"+(CUISINE_JA[dayAxis]||dayAxis)+(cnt+nb)+"枚", amAdd((e.per||60) * (cnt + nb)), idx); break; }
+    case "katsuobushiTwice": hits.push({ label:nm+"：上下2枚を2回発動（自分は基礎0・廃棄）", effect:"メタ", idx:neigh(i).concat([i]), kind:"note", src:i });
+                             if (inst && inst[i]) side.sacrificeIds.push(inst[i].id); break;
+    case "matsutakeTwice":   hits.push({ label:nm+"：最初に引かれた具材を2回発動", effect:"メタ", idx:[i], kind:"note", src:i }); break;
+    case "noriCount":        hits.push({ label:nm+"：上下の成立数+"+(e.add||1), effect:"メタ", idx:neigh(i).concat([i]), kind:"note", src:i }); break;
+    case "forceWin":         hits.push({ label:nm+"：上下の賭けを必ず成功", effect:"メタ", idx:neigh(i).concat([i]), kind:"note", src:i }); break;
+    case "treatAdjAsCui":    hits.push({ label:nm+"：隣接1枚を"+CJ(e.targetCui)+"として扱う", effect:"軸", idx:[i], kind:"note", src:i }); break;
+    case "treatAdjDiffCui":  hits.push({ label:nm+"：上下を違う軸として扱う", effect:"軸", idx:neigh(i).concat([i]), kind:"note", src:i }); break;
+    case "becomeRarestCui":  hits.push({ label:nm+"：自分の軸→"+CJ(selfCui), effect:"軸", idx:[i], kind:"note", src:i }); break;
+    case "mirinAddMult":     hits.push({ label:nm+"：上下の加算を×"+(e.mult||1.6), effect:"メタ", idx:neigh(i).concat([i]), kind:"note", src:i }); break;
     case "drawFewerMult": pushMult(nm, amMul(e.mult || 1), [i]); break;                       // 貴腐ワイン：×2.5（枠の減りは次スピン）
-    case "drawFewerCuiMult": { const w = cuiInBurger("wa");                                    // 白味噌：このバーガーの和1枚につき ×mult
+    case "drawFewerCuiMult": { const w = cuiInBurger("wa") + nb;                                // 白味噌：このバーガーの和1枚につき ×mult
                                if (w > 0) pushMult(nm+"：和"+w+"枚", amMul(Math.pow(e.mult || 1.3, w)), [i]); break; }
     case "nextDrawMore": case "drawMoreHeaviest": case "nextDrawRareAxis": break;               // 次スピンの引きに効く（得点には効かない）
     case "dayAdd": case "dayBaseMul": case "dayAdjAdd": case "drawAdd": case "drawAdjAdd":
@@ -1761,15 +1852,16 @@ function resolveCard(i, ctx){
     case "flatMult":    pushMult(nm, amMul(e.mult), [i]); break;
     case "potato":      pushAdd(nm, amAdd(e.add), [i]); break;           // 落下加速は curFallDur() 側で反映
     // ── 追加（item4/9）──
-    case "perCuiAdd":   pushAdd(nm+"："+CJ(selfCui)+"×"+e.per, amAdd(e.per * cuiInBurger(selfCui)), [i]); break;
+    case "perCuiAdd":   pushAdd(nm+"："+CJ(selfCui)+"×"+e.per, amAdd(e.per * (cuiInBurger(selfCui) + nb)), [i]); break;
     case "adjCuiAnyAdd":if (neigh(i).some(j => cuiAt(j)===selfCui)) pushAdd(nm+"：隣"+CJ(selfCui), amAdd(e.add), [i]); break;
-    case "adjOtherCuiAdd": { let a=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)===e.targetCui){ a+=e.per; idx.push(j);} pushAdd(nm+"：接する"+CJ(e.targetCui), amAdd(a), idx); break; }
-    case "tierAdd":     if (n >= e.need) pushAdd(nm+"：段"+e.need+"+", amAdd(e.add), [i]); break;
-    case "adjTypeMult": for (const j of neigh(i)) if (typ(j)===e.targ) pushMult(nm+"：接する"+(TYPE_JA[e.targ]||e.targ), amMul(e.mult), [i, j]); break;
+    case "adjOtherCuiAdd": { let c=0, idx=[i]; for (const j of neigh(i)) if (cuiAt(j)===e.targetCui){ c++; idx.push(j);} pushAdd(nm+"：接する"+CJ(e.targetCui), amAdd(e.per * (c + nb)), idx); break; }
+    case "tierAdd":     if (n + nb >= e.need) pushAdd(nm+"：段"+e.need+"+", amAdd(e.add), [i]); break;
+    case "adjTypeMult": { let c=0, idx=[i]; for (const j of neigh(i)) if (typ(j)===e.targ){ c++; idx.push(j);} if (c+nb > 0) pushMult(nm+"：接する"+(TYPE_JA[e.targ]||e.targ)+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
     case "adjBaseMult": { let a=0, idx=[i]; for (const j of neigh(i)){ a += baseArr[j] * ((e.factor||1) - 1); idx.push(j);} pushAdd(nm+"：隣を"+e.factor+"倍", amAdd(Math.round(a)), idx); break; }
     case "tierBasePenalty": if (n > (e.maxTier||6)) pushAdd(nm+"：段"+((e.maxTier||6)+1)+"+で失効", -baseArr[i], [i]); break;
-    case "adjTwoCuiMult": for (const j of neigh(i)){ const c=cuiAt(j); if (c===e.cuiA || c===e.cuiB) pushMult(nm+"：接する"+CJ(c), amMul(e.mult), [i, j]); } break;
-    case "perigueux":   { for (const j of neigh(i)) if (cuiAt(j)==="kokyu"){ let m=e.mult; if (stack[j]==="トリュフ"||stack[j]==="フォアグラ") m *= (e.bonus||1); pushMult(nm+"：接する高級", amMul(m), [i, j]); } break; }
+    case "adjTwoCuiMult": { let c=0, idx=[i]; for (const j of neigh(i)){ const cj=cuiAt(j); if (cj===e.cuiA || cj===e.cuiB){ c++; idx.push(j);} } if (c+nb > 0) pushMult(nm+"：接する"+CJ(e.cuiA)+"/"+CJ(e.cuiB)+(c+nb)+"枚", amMul(Math.pow(e.mult, c+nb)), idx); break; }
+    case "perigueux":   { for (const j of neigh(i)) if (cuiAt(j)==="kokyu"){ let m=e.mult; if (stack[j]==="トリュフ"||stack[j]==="フォアグラ") m *= (e.bonus||1); pushMult(nm+"：接する高級", amMul(m), [i, j]); }
+                          if (nb > 0) pushMult(nm+"：のり成立+"+nb, amMul(Math.pow(e.mult, nb)), [i]); break; }
     // draw* は抽選への効果（item15）。得点計算では何もしない。
     case "drawAxis": case "drawRare": case "drawExtra": case "drawReroll": break;
   }
@@ -1783,7 +1875,7 @@ function applyCardEffects(stack, acc){
   const baseArr = acc.baseArr || baseArray(stack, inst);
   const rawG = acc.rawG || stack.map(() => 0);
   const side = { disableMult:false, sacrificeIds:[], sacrificeRandom:0, absorbedIdx:new Set() };
-  const ctx = { stack, n, items, inst, baseArr, rawG, side,
+  const ctx = { stack, n, items, inst, baseArr, rawG, side, firstIngId: acc.firstIngId,
                 cuiAt: i => items[stack[i]].cuisine, noriBonus: () => 0, forceWin: () => false,
                 deckSize: 0, deckCui: () => 0, cuiInBurger: () => 0 };
   // ① 軸の読み替え表（八宝菜・アジフライ・五目あん・アボカド）。一度だけ確定させ、再帰させない。
@@ -1801,7 +1893,11 @@ function applyCardEffects(stack, acc){
   // ⑤ 解決と反映（times 回ぶん呼ぶ。乱数を使う効果は毎回別に判定される）
   for (let i = 0; i < n; i++){
     const t = Math.max(1, times[i] || 1);
-    for (let k = 0; k < t; k++) applyHits(resolveCard(i, ctx), acc);
+    for (let k = 0; k < t; k++){
+      const hs = resolveCard(i, ctx);                    // 乱数を使う効果（賭け）は2回とも別々に判定される
+      if (k > 0) for (const h of hs) h.label += "（2回発動）";
+      applyHits(hs, acc);
+    }
   }
   // ⑥ pm（永続の倍率上乗せ）：盤面に出た個体の pm > 0 なら ×(1+pm)
   if (inst) for (let i = 0; i < n; i++){
@@ -1826,7 +1922,7 @@ function applyCardEffects(stack, acc){
   acc.sacrificeIds = side.sacrificeIds; acc.sacrificeRandom = side.sacrificeRandom;   // 廃棄は collect が discardInstance で処理
 }
 // 得点 =（第1項 基礎点 ＋ 第2項 育ち ＋ 第3項 加算）×（乗算の積）。3項に分ける（Wave4・D1）。
-function evaluate(stack, growthArr, inst){
+function evaluate(stack, growthArr, inst, firstIngId){
   const G = growthArr || stack.map(() => 0);         // 位置ごとの生の育ち（無ければ全0＝Wave2以前と同じ）
   const baseArr = baseArray(stack, inst);            // 第1項（印字 base ＋ pb ＋ 盤面操作）
   const growArr = growArray(stack, G);               // 第2項（育ち×15・醤油/出汁の修飾込み・バンズ除外）
@@ -1872,7 +1968,7 @@ function evaluate(stack, growthArr, inst){
     }
   }
   // 軸カードの効果（第3項の加算・乗算・無効化など）。無いと崩壊する項は乗算に置かず、見返りを複数カードに分散。
-  const acc = { add, mult, hits, rawG: G, inst: inst || null, baseArr, growArr };
+  const acc = { add, mult, hits, rawG: G, inst: inst || null, baseArr, growArr, firstIngId: (firstIngId != null ? firstIngId : null) };
   applyCardEffects(stack, acc);
   add = acc.add; mult = acc.mult;                    // hits は同じ配列参照に push 済み（第1項・第2項は効果で変えない）
 
@@ -2145,7 +2241,8 @@ function buildPlan(){
   }
   growBoard(inst, st); onBoard(inst, st);           // ④盤面成長：白身魚（上下が海鮮の組ごとに自分+2・即時反映）／油揚げ・キムチ・かに・あわび・カレーソース
   const rawG = inst.map(x => x.g);                  // 得点時の生の育ち（位置ごと）
-  const score = evaluate(st, rawG, inst), lay = computeLayout(st), grades = computeGrades(score, st);   // ⑤得点（3項＋効果）
+  const firstIng = b.drawn.find(x => CONFIG.items[x.name].pile === "ingredient");   // まつたけ：最初に引かれた具材（引き順・整列前）
+  const score = evaluate(st, rawG, inst, firstIng ? firstIng.id : null), lay = computeLayout(st), grades = computeGrades(score, st);   // ⑤得点（3項＋効果）
   const n = st.length;
   const revealAt = {};                              // 各ヒットが「出そろう」段（両側が揃う＝max(idx)）
   score.hits.forEach((h, i) => { const at = Math.max(...h.idx); (revealAt[at] = revealAt[at] || []).push(i); });
