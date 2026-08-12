@@ -183,6 +183,7 @@
   /* ラン制（家賃・店・結果）の画面 */
   .offer-card.cant, .shopbtn.cant{opacity:.4; cursor:default}
   .offer-card .price, .shopbtn .price{display:block; margin-top:4px; color:#ffd98c; font-weight:800; font-size:.72rem}
+  .shopbtn .reason{display:block; margin-top:3px; color:#ffb0a0; font-weight:700; font-size:.64rem}   /* 買えない理由（ソース枠の上限など） */
   .offer-runinfo{text-align:center; font-size:.9rem; color:var(--text); font-weight:700}
   .offer-runinfo.warn{color:#ffb0a0}
   .offer-runinfo.big{font-size:1.3rem; font-weight:900; color:#ffd98c}
@@ -958,11 +959,15 @@ const DEFAULTS = {
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
+            // ソース枠だけ上限つき（Wave6 2-1）。ソースはほぼ全てが乗算カードなので、枠は乗算の枚数を直接増やす。
+            //   等比の値上げでは得点の伸び（積）に追いつかない（実プレイで枠5枚まで買われ 2,984→45,569 に跳ねた）。
+            //   上限3・初期1なので購入は生涯2回だけ。等比の式をやめて固定価格の配列にした（2-2・どちらも仮値）。
+            sauceSlotMax: 3, sauceSlotPrices: [2000, 12000],
             cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
             // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
             scale: { slot:     { onBuy: true,  mul: 2.0 },   // 具材枠（購入で2倍ずつ：150→300→600→…）※試験値
-                     sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠（具材枠から分離・倍率が集中するため高く：150→450→1350→…）※試験値
+                     sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠：Wave6 2-2 で固定価格（sauceSlotPrices）に移したので**使っていない**。後方互換で残置
                      card:     { onBuy: false, mul: 1.2 },   // カード（既定のまま）
                      reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ）
                      artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
@@ -3172,7 +3177,16 @@ function scaleElemOf(key){ return key === "ing" ? "slot" : key === "sau" ? "sslo
 function scaleFor(elem){ const sc = ((CONFIG.params.shop || {}).scale || {})[elem] || {}; return { on: !!sc.onBuy, mul: sc.mul || 1.5 }; }
 function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = shopBuys[key] || 0;
   return Math.max(0, Math.round((base || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
-function bumpBuy(key){ if (scaleFor(scaleElemOf(key)).on) shopBuys[key] = (shopBuys[key] || 0) + 1; }
+function bumpBuy(key){ if (key === "sau" || scaleFor(scaleElemOf(key)).on) shopBuys[key] = (shopBuys[key] || 0) + 1; }   // sau は固定価格なので何回目かを常に数える
+// ソース枠：上限（枚数）と、何回目かで決まる固定価格（Wave6 2-1/2-2）。scale.sslot は使わない。
+function sauceSlotMax(){ const sh = CONFIG.params.shop || {}; return Math.max(1, Math.round(sh.sauceSlotMax != null ? sh.sauceSlotMax : 3)); }
+function sauceSlotAtMax(){ return Math.round(CONFIG.params.tiers.sauces || 0) >= sauceSlotMax(); }
+function sauceSlotPrice(){                          // 上限を手で上げたときは最後の値段を使い回す（買えなくならないように）
+  const sh = CONFIG.params.shop || {}; const arr = sh.sauceSlotPrices || [];
+  if (!arr.length) return Math.max(0, Math.round(sh.sauceSlotCost || 0));
+  const i = Math.min(shopBuys.sau || 0, arr.length - 1);
+  return Math.max(0, Math.round(arr[i]));
+}
 // カード/アーティファクトの店の値段。rarity.on ならレアリティ別の基準価格、そうでなければ shop.cardCost。値上げは要素別スケール（card/artifact）。
 function rarityPrice(rar, buyKey){
   const rr = CONFIG.params.rarity || {}; const sh = CONFIG.params.shop || {};
@@ -3270,12 +3284,16 @@ function showShop(){
     offerEl.appendChild(owned);
   }
   const acts = document.createElement("div"); acts.className = "shop-acts";
-  const mkbtn = (label, cost, fn, aff) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
-    b.innerHTML = `${label}<span class="price">¥${cost}</span>`; if (aff) b.addEventListener("click", fn); return b; };
-  const rc = removeCostBase(), ic = shopPrice("ing", sh.ingredientSlotCost), scst = shopPrice("sau", sh.sauceSlotCost), rr = shopPrice("reroll", sh.rerollCost);
+  const mkbtn = (label, cost, fn, aff, note) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
+    b.innerHTML = `${label}` + (note ? `<span class="reason">${note}</span>` : "") + (cost != null ? `<span class="price">¥${cost}</span>` : "");
+    if (aff) b.addEventListener("click", fn); return b; };
+  const rc = removeCostBase(), ic = shopPrice("ing", sh.ingredientSlotCost), rr = shopPrice("reroll", sh.rerollCost);
+  const sCap = sauceSlotAtMax(), scst = sauceSlotPrice();          // ソース枠は上限つき・固定価格（Wave6）
   acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), money >= rc));
   acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), money >= ic));
-  acts.appendChild(mkbtn("ソース枠 +1", scst, () => buySlot("sauces", "sau", scst), money >= scst));
+  // 上限に達しても消さない。買えないことが見えるほうがよい（2-1）。
+  acts.appendChild(mkbtn("ソース枠 +1", sCap ? null : scst, () => buySlot("sauces", "sau", scst),
+    !sCap && money >= scst, sCap ? `ソース枠は${sauceSlotMax()}枚まで` : null));
   acts.appendChild(mkbtn("品揃えの引き直し", rr, () => { setMoney(money - rr); bumpBuy("reroll"); plog.recordBuy("reroll", "reroll", rr); rerollStock(); showShop(); }, money >= rr));
   offerEl.appendChild(acts);
   const leave = el("offer-skip", "店を出る →"); leave.addEventListener("click", () => { shopStock = null; artifactStock = null; advanceOffer(); });
@@ -3302,6 +3320,7 @@ function buyArtifact(name, cost){
 }
 function buySlot(field, key, cost){
   if (money < cost) return;
+  if (field === "sauces" && sauceSlotAtMax()) return;   // 上限（Wave6 2-1）。ボタンは無効表示だが二重の守り
   setMoney(money - cost); bumpBuy(key);
   CONFIG.params.tiers[field] = Math.max(0, Math.round(CONFIG.params.tiers[field]) + 1);
   plog.recordBuy("slot", field, cost);
@@ -3803,7 +3822,10 @@ function renderSettings(){
   gridRow(g, "カード追加の値段", numInput(()=>sh.cardCost, v=>sh.cardCost=Math.max(0,Math.round(v)), 10));
   gridRow(g, "取り除きの値段", numInput(()=>sh.removeCost, v=>sh.removeCost=Math.max(0,Math.round(v)), 10));
   gridRow(g, "具材枠+1の値段", numInput(()=>sh.ingredientSlotCost, v=>sh.ingredientSlotCost=Math.max(0,Math.round(v)), 10));
-  gridRow(g, "ソース枠+1の値段", numInput(()=>sh.sauceSlotCost, v=>sh.sauceSlotCost=Math.max(0,Math.round(v)), 10));
+  // ソース枠は上限つき・固定価格（Wave6 2-1/2-2）。sauceSlotCost と scale.sslot はもう使っていない。
+  gridRow(g, "ソース枠の上限(sauceSlotMax)", numInput(()=>sh.sauceSlotMax, v=>{sh.sauceSlotMax=Math.max(1,Math.round(v)); updateProgress();}, 1));
+  gridRow(g, "ソース枠 1回目の値段", numInput(()=>sh.sauceSlotPrices[0], v=>sh.sauceSlotPrices[0]=Math.max(0,Math.round(v)), 100));
+  gridRow(g, "ソース枠 2回目の値段", numInput(()=>sh.sauceSlotPrices[1], v=>sh.sauceSlotPrices[1]=Math.max(0,Math.round(v)), 100));
   gridRow(g, "引き直しの値段", numInput(()=>sh.rerollCost, v=>sh.rerollCost=Math.max(0,Math.round(v)), 10));
   gridRow(g, "店に並ぶカード枚数", numInput(()=>sh.cardsShown, v=>sh.cardsShown=Math.max(1,Math.round(v)), 1));
   gridRow(g, "店に並ぶ道具の数", numInput(()=>sh.artifactsShown, v=>sh.artifactsShown=Math.max(0,Math.round(v)), 1));
@@ -3817,7 +3839,7 @@ function renderSettings(){
     gridRow(g, label+"：購入で値上げ", boolInput(()=>sh.scale[elem].onBuy, v=>sh.scale[elem].onBuy=v));
     gridRow(g, label+"：値上げ倍率", numInput(()=>sh.scale[elem].mul, v=>sh.scale[elem].mul=Math.max(1,v), 0.05)); };
   scaleRow("具材枠", "slot");
-  scaleRow("ソース枠", "sslot");
+  scaleRow("ソース枠（未使用・固定価格に移行）", "sslot");
   scaleRow("カード", "card");
   scaleRow("引き直し", "reroll");
   scaleRow("アーティファクト", "artifact");
