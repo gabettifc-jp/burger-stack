@@ -817,15 +817,15 @@ const DEFAULTS = {
     "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:1, tier:null, rar:"jou", weight:28, effect:{id:null}, },  // 初期デッキ。効果なし
     "トマト": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:20, effect:{id:"drawExtra", extra:1}, },  // 3択の選択肢が1つ増える（基礎点0）
     "オニオン": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:32, effect:{id:"drawReroll", rerolls:1}, },  // 3択を1回引き直せる（基礎点0）
-    "ちゃんぽん麺": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:117, effect:{id:null}, ph:true, },  // このバーガーの軸の種類×65
-    "パイナップル": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:133, effect:{id:null}, ph:true, },  // 盤面で1枚しかない軸の数×85
-    "福神漬け": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:111, effect:{id:null}, ph:true, },  // 上下が違う軸なら、その2枚に +55 ずつ
+    "ちゃんぽん麺": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:117, effect:{id:"axisKindsAdd", per:65}, ph:true, },  // このバーガーの軸の種類×65
+    "パイナップル": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:133, effect:{id:"soloAxisAdd", per:85}, ph:true, },  // 盤面で1枚しかない軸の数×85
+    "福神漬け": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:111, effect:{id:"adjDiffCuiAdd", per:55}, ph:true, },  // 上下が違う軸なら、その2枚に +55 ずつ
     "マッシュルーム": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:91, effect:{id:"dayAxisAdd", per:60}, ph:true, },  // 営業日ごとに軸が指定される。その軸の具材1枚につき +60
     "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
     "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:"becomeRarestCui"}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
     "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:null}, ph:true, },  // 異軸が交互に並んでいる長さ×70
-    "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:null}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
-    "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:51, effect:{id:null}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
+    "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:"adjDiffCuiMult", mult:1.45}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
+    "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:51, effect:{id:"axisKindsMult", base:0.65, per:0.45}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
     "継ぎ足しのタレ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:65, effect:{id:"spinAxisMult", per:0.04, maxMul:1.5}, ph:true, },  // 毎スピン、軸の種類×0.04 ずつ育つ（永続）
     "五目あん": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:93, effect:{id:"treatAdjDiffCui"}, ph:true, },  // 接する2枚を互いに違う軸として扱う
     "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:5, count:2, tier:null, rar:"jou", weight:0, effect:{id:null} },  // つなぎのバンズ（枠を埋めるだけ・効果なし）。Wave5で新バンズシステムに置換
@@ -1378,7 +1378,7 @@ function rawTerm1(stack, inst){
     return it.base + pb; });
 }
 // 第1項：位置ごとの基礎点。inst が無ければ pb=0 として扱う（ハーネスの evaluate(stack) 用）。
-function baseArray(stack, inst){
+function baseArray(stack, inst, cuiMap){
   const n = stack.length; const out = new Array(n).fill(0);
   for (let i = 0; i < n; i++){
     const it = CONFIG.items[stack[i]]; if (!it) continue;
@@ -1387,7 +1387,7 @@ function baseArray(stack, inst){
     out[i] = it.base + pb;
   }
   // 盤面操作（あわび＝下1枚を0 → 飴細工＝上下の入れ替え → 蟹カマ＝最低を最高に底上げ）はここで第1項を書き換える。
-  return applyBaseRewrites(stack, out, inst);
+  return applyBaseRewrites(stack, out, inst, cuiMap);
 }
 // 第2項：位置ごとの「育ち×15」。バンズは0。出汁（隣2枚に盤面最大育ちを適用）→ 醤油（隣2枚を2倍）。
 function growArray(stack, G){
@@ -1401,9 +1401,15 @@ function growArray(stack, G){
   return gb;
 }
 // 第1項の盤面操作。得点時のみ・永続化しない・育ちは読まない（D1）。複数枚あるときは下の段（index の小さい方）から順に適用する。
-function applyBaseRewrites(stack, arr, inst){
+function applyBaseRewrites(stack, arr, inst, cuiMap){
   const n = stack.length, items = CONFIG.items;
   const isBun = i => items[stack[i]].pile === "bun";
+  const cui = i => (cuiMap ? cuiMap[i] : items[stack[i]].cuisine);   // 軸は読み替え表を経由（Wave4）
+  for (let i = 0; i < n; i++){                        // 福神漬け：上下2枚が互いに違う軸なら、その2枚の第1項を各 +per（P6）
+    const e = items[stack[i]].effect; if (!e || e.id !== "adjDiffCuiAdd") continue;
+    const a = i - 1, u = i + 1;
+    if (a >= 0 && u < n && !isBun(a) && !isBun(u) && cui(a) !== cui(u)){ const per = e.per || 55; arr[a] += per; arr[u] += per; }
+  }
   for (let i = 0; i < n; i++){                       // あわび：吸われた下1枚は第1項0（onBoard で記録・そのスピンのみ）
     if (inst && inst[i] && spinZeroBase.has(inst[i].id)) arr[i] = 0;
   }
@@ -1563,6 +1569,12 @@ const EFFECT_TEXT = {
   adjGrowMult:  e => `上下に接する具材の育ち合計${e.per||5}につき ×${e.mult||1.2}`,
   doubleGrowBonusAdj: e => `上下2枚の「育ち」の点を2倍にする（そのスピンのみ）`,
   maxGrowToAdj: e => `盤面で最も育った値を、上下2枚の育ちとして計算する（そのスピンのみ）`,
+  // Wave5 Step1（軸の多様性・無印は軸として数えない）
+  axisKindsAdd:   e => `このバーガーの軸の種類1つにつき 基礎点+${e.per||65}`,
+  soloAxisAdd:    e => `盤面で1枚しかない軸1つにつき 基礎点+${e.per||85}`,
+  axisKindsMult:  e => `乗算 = ${e.base!=null?e.base:0.65} + ${e.per||0.45} × 軸の種類数`,
+  adjDiffCuiMult: e => `上下2枚が互いに違う軸なら ×${e.mult||1.45}`,
+  adjDiffCuiAdd:  e => `上下2枚が互いに違う軸なら、その2枚の基礎点を各+${e.per||55}`,
   // Wave4 Step5（賭け）
   gambleHalve:  e => `高級以外の具材1枚につき${Math.round((e.per||0.06)*100)}%の確率で、このバーガーが半分`,
   gambleAdd:    e => `具材の枚数×${Math.round((e.per||0.07)*100)}%で成功。成功で+${e.add||250}、失敗で0`,
@@ -1648,7 +1660,7 @@ function applyHits(hits, acc){
   }
 }
 // ①〜④の表を作る関数（Step4 で中身を入れる）。今は素通し。
-function buildCuiMap(stack, ctx){
+function buildCuiMap(stack, ctx){   // ctx は省略可（Step1：baseArray より前に呼ぶため）
   const n = stack.length, items = CONFIG.items;
   const base = stack.map(nm => items[nm].cuisine);      // 読み替えの判定はすべて「元の軸」を見る（結果に対して再度読み替えない）
   const out = base.slice();
@@ -1748,8 +1760,12 @@ function resolveCard(i, ctx){
   const nb = ctx.noriBonus(i);                                // のり：この位置の効果の「成立数」に足される数（既定0）
   const typ = j => items[stack[j]].type;                     // 系統は読み替えない
   const isIng = j => items[stack[j]].pile === "ingredient";
+  const isBunAt = j => items[stack[j]].pile === "bun";
   const neigh = k => [k-1, k+1].filter(j => j >= 0 && j < n);
   const cuiInBurger = ctx.cuiInBurger;
+  // 中段（バンズを除く）の軸集計。none は軸として数えない（P7）。
+  const midAxisCount = () => { const c = {}; for (let k = 0; k < n; k++){ if (items[stack[k]].pile === "bun") continue;
+    const cu = cuiAt(k); if (cu && cu !== "none") c[cu] = (c[cu] || 0) + 1; } return c; };
   const amAdd = a => a * axisMul(selfCui);                    // 軸アーティファクト（暖簾/中華鍋 等）で強める
   const amMul = m => 1 + (m - 1) * axisMul(selfCui);
   const CJ = c => CUISINE_JA[c] || c;
@@ -1776,6 +1792,20 @@ function resolveCard(i, ctx){
     case "dayAxisAdd": { let cnt = 0; const idx=[i];   // マッシュルーム：本日の指定軸の具材1枚につき +per
                          for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) === dayAxis){ cnt++; idx.push(k); }
                          pushAdd(nm+"：本日の"+(CUISINE_JA[dayAxis]||dayAxis)+(cnt+nb)+"枚", amAdd((e.per||60) * (cnt + nb)), idx); break; }
+    // ── Wave5 Step1：軸の多様性（none は軸として数えない・P7／バンズは含めない） ──
+    case "axisKindsAdd": { const k = Object.keys(midAxisCount()).length + nb;      // ちゃんぽん麺：軸の種類数 × per
+                           pushAdd(nm+"：軸"+k+"種", amAdd((e.per||65) * k), [i]); break; }
+    case "soloAxisAdd": { const c = midAxisCount();                                 // パイナップル：1枚しかない軸の数 × per
+                          const solo = Object.keys(c).filter(x => c[x] === 1).length + nb;
+                          pushAdd(nm+"：単独軸"+solo+"種", amAdd((e.per||85) * solo), [i]); break; }
+    case "axisKindsMult": { const k = Object.keys(midAxisCount()).length + nb;      // サルサソース：base + per × 軸の種類数
+                            const m = (e.base != null ? e.base : 0.65) + (e.per || 0.45) * k;
+                            pushMult(nm+"：軸"+k+"種", amMul(m), [i]); break; }
+    case "adjDiffCuiMult": { const a = i-1, u = i+1;                                 // 万能だれ：接する2枚が互いに違う軸なら ×mult
+                             if (a >= 0 && u < n && !isBunAt(a) && !isBunAt(u) && cuiAt(a) !== cuiAt(u))
+                               pushMult(nm+"：上下が異軸", amMul(e.mult || 1.45), [i, a, u]);
+                             break; }
+    case "adjDiffCuiAdd": hits.push({ label:nm+"：上下が異軸なら各+"+(e.per||55), effect:"第1項", idx:[i], kind:"note", src:i }); break;   // 福神漬け（第1項＝baseArray 側で加算）
     // ── Step5：賭け（計算層で確定・同一シードで再現）。当たっても外れても内訳に出す（隠さない）。 ──
     case "gambleHalve": {                              // 生牡蠣：高級以外の具材枚数×per を1回だけ判定（Q9）。当たると全体×0.5
       let c = 0; for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) !== "kokyu") c++;
@@ -1846,8 +1876,8 @@ function applyCardEffects(stack, acc){
   const ctx = { stack, n, items, inst, baseArr, rawG, side, firstIngId: acc.firstIngId,
                 cuiAt: i => items[stack[i]].cuisine, noriBonus: () => 0, forceWin: () => false,
                 deckSize: 0, deckCui: () => 0, cuiInBurger: () => 0 };
-  // ① 軸の読み替え表（八宝菜・アジフライ・五目あん・アボカド）。一度だけ確定させ、再帰させない。
-  const cuiMap = buildCuiMap(stack, ctx); ctx.cuiAt = i => cuiMap[i];
+  // ① 軸の読み替え表（八宝菜・アジフライ・五目あん・アボカド）。evaluate 側で確定済みならそれを使う（一度だけ・再帰させない）。
+  const cuiMap = acc.cuiMap || buildCuiMap(stack, ctx); ctx.cuiAt = i => cuiMap[i];
   // ② のりの成立数+1
   const noriMap = buildNoriMap(stack, ctx); ctx.noriBonus = i => noriMap[i] || 0;
   // ③ 賭けの必勝（ウスターソース）
@@ -1893,7 +1923,8 @@ function applyCardEffects(stack, acc){
 // 得点 =（第1項 基礎点 ＋ 第2項 育ち ＋ 第3項 加算）×（乗算の積）。3項に分ける（Wave4・D1）。
 function evaluate(stack, growthArr, inst, firstIngId){
   const G = growthArr || stack.map(() => 0);         // 位置ごとの生の育ち（無ければ全0＝Wave2以前と同じ）
-  const baseArr = baseArray(stack, inst);            // 第1項（印字 base ＋ pb ＋ 盤面操作）
+  const cuiMap = buildCuiMap(stack);                 // ①軸の読み替え（第1項の書き換えでも使うので先に確定させる）
+  const baseArr = baseArray(stack, inst, cuiMap);    // 第1項（印字 base ＋ pb ＋ 盤面操作）
   const growArr = growArray(stack, G);               // 第2項（育ち×15・醤油/出汁の修飾込み・バンズ除外）
   let base = 0; for (const v of baseArr) base += v;
   let grow = 0; for (const v of growArr) grow += v;
@@ -1937,7 +1968,7 @@ function evaluate(stack, growthArr, inst, firstIngId){
     }
   }
   // 軸カードの効果（第3項の加算・乗算・無効化など）。無いと崩壊する項は乗算に置かず、見返りを複数カードに分散。
-  const acc = { add, mult, hits, rawG: G, inst: inst || null, baseArr, growArr, firstIngId: (firstIngId != null ? firstIngId : null) };
+  const acc = { add, mult, hits, rawG: G, inst: inst || null, baseArr, growArr, cuiMap, firstIngId: (firstIngId != null ? firstIngId : null) };
   applyCardEffects(stack, acc);
   add = acc.add; mult = acc.mult;                    // hits は同じ配列参照に push 済み（第1項・第2項は効果で変えない）
 
