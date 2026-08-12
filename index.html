@@ -747,14 +747,14 @@ const DEFAULTS = {
     "デミグラスソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:76, effect:{id:"flatMult", mult:1.2}, ph:true, },  // ×1.2。無条件
     "コンソメ": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:108, effect:{id:null}, ph:true, },  // 高級1枚につき ×1.3、高級以外1枚につき ×0.9
     "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:92, effect:{id:"perigueux", mult:2.0, bonus:1.5}, ph:true, },  // 接する高級1枚につき ×2.0。トリュフ/フォアグラなら更に ×1.5
-    "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:124, effect:{id:null}, ph:true, },  // 引く枚数 −2、×2.5
+    "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:124, effect:{id:"drawFewerMult", draw:-2, mult:2.5}, ph:true, },  // 引く枚数 −2、×2.5
     "ぎょうざ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:40, count:0, tier:null, rar:"jou", weight:102, effect:{id:"perCuiAdd", per:40}, ph:true, },  // 基礎点40。このバーガーの中華1枚につき +40
     "もやし": { pile:"ingredient", type:"veg", cuisine:"chuka", base:5, count:0, tier:null, rar:"jou", weight:66, effect:{id:"selfDeckAdd", per:10}, ph:true, },  // 基礎点5。デッキのもやし1枚につき +10
     "エビチリ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:138, effect:{id:"deckSizeAdd", per:4}, ph:true, },  // デッキ枚数×4を加算
     "チャーシュー": { pile:"ingredient", type:"meat", cuisine:"chuka", base:65, count:0, tier:null, rar:"jou", weight:146, effect:{id:null}, ph:true, },  // 基礎点65。効果なし
     "麻婆豆腐": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:112, effect:{id:"perTier", per:15}, ph:true, },  // 段数×15を加算
     "北京ダック": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:128, effect:{id:"drawAdd", per:12}, ph:true, },  // 引かれるたび +12（永続）
-    "中華まん": { pile:"ingredient", type:"veg", cuisine:"chuka", base:30, count:0, tier:null, rar:"jou", weight:54, effect:{id:null}, ph:true, },  // 基礎点30。次のスピンの具材枠+1として引く
+    "中華まん": { pile:"ingredient", type:"veg", cuisine:"chuka", base:30, count:0, tier:null, rar:"jou", weight:54, effect:{id:"nextDrawMore", draw:1}, ph:true, },  // 基礎点30。次のスピンの具材枠+1として引く
     "八宝菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:116, effect:{id:null}, ph:true, },  // 隣接1枚を中華として扱う
     "搾菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:36, effect:{id:"buyAdd", per:10}, ph:true, },  // カードを購入するたび +10（永続）
     "ピータン": { pile:"ingredient", type:"dairy", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:122, effect:{id:null}, ph:true, },  // 成功で +250、失敗で 0。成功率=具材の枚数×7%
@@ -772,7 +772,7 @@ const DEFAULTS = {
     "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:104, effect:{id:"growAllSpin", per:3, halveChance:0.2}, ph:true, },  // 毎スピン育ち+3。ただし20%で育ちが半減
     "フグ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:130, count:0, tier:null, rar:"jou", weight:126, effect:{id:null}, ph:true, },  // 基礎点130。10%でこのバーガーが0点
     "かまぼこ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:150, count:0, tier:null, rar:"jou", weight:46, effect:{id:"dayAdd", per:-30}, ph:true, },  // 基礎点150。営業日をまたぐごとに −30
-    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:156, effect:{id:null}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も重いカード
+    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:156, effect:{id:"drawMoreHeaviest", draw:1}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も重いカード
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:88, effect:{id:"adjKaisenGrowAdd", base:30, perG:6}, ph:true, },  // 隣接する海鮮1枚につき +30。育ち1段階につきこの値 +6
     "さけ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:82, effect:{id:"growAccel"}, ph:true, },  // 育ちが1増えるたび、さらに+1（加速）
     "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:148, effect:{id:"grownCountAdd", per:45}, ph:true, },  // 育った具材（育ち1以上）1枚につき +45
@@ -809,19 +809,19 @@ const DEFAULTS = {
     "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:59, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する和1枚につき ×1.6
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
     "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:null}, ph:true, },  // 隣接する具材の加算効果を1.6倍
-    "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:70, effect:{id:null}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
+    "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
     "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:48, effect:{id:null}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
     "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
     "チーズ": { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:52, effect:{id:null}, },  // 初期デッキ。効果なし
     "きゅうり": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:38, effect:{id:null}, },  // 初期デッキ。効果なし
     "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:1, tier:null, rar:"jou", weight:28, effect:{id:null}, },  // 初期デッキ。効果なし
-    "トマト": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:20, effect:{id:null}, },  // 3択の選択肢が1つ増える（基礎点0）
-    "オニオン": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:32, effect:{id:null}, },  // 3択を1回引き直せる（基礎点0）
+    "トマト": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:20, effect:{id:"drawExtra", extra:1}, },  // 3択の選択肢が1つ増える（基礎点0）
+    "オニオン": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:32, effect:{id:"drawReroll", rerolls:1}, },  // 3択を1回引き直せる（基礎点0）
     "ちゃんぽん麺": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:117, effect:{id:null}, ph:true, },  // このバーガーの軸の種類×65
     "パイナップル": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:133, effect:{id:null}, ph:true, },  // 盤面で1枚しかない軸の数×85
     "福神漬け": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:111, effect:{id:null}, ph:true, },  // 上下が違う軸なら、その2枚に +55 ずつ
     "マッシュルーム": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:91, effect:{id:"dayAxisAdd", per:60}, ph:true, },  // 営業日ごとに軸が指定される。その軸の具材1枚につき +60
-    "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:null}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
+    "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
     "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:null}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
     "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:null}, ph:true, },  // 異軸が交互に並んでいる長さ×70
     "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:null}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
@@ -1211,17 +1211,48 @@ function instancesOf(name){ return deck.filter(x => x.name === name); }
 function grow(inst, n){ if (!n) return; inst.g += n; if (inst.name === "さけ") inst.g += n; }
 
 let forcedCard = null;   // item12：3択で取った直後の1個に必ず入れるカード（buildBurger で消費）
+/* ── 引く枚数の増減（Wave4・D5）。盤面に出た次のスピンだけ効く（デッキにあるだけでは変わらない）。
+   対象は具材枠のみ（ソース枠は変えない）。下限1・上限なし。使ったら0に戻す。 ── */
+let pendingDraw = 0;       // 次のスピンの具材枠に足す枚数（負もあり）
+let pendingForced = [];    // 次のスピンで確定で引く指定（{kind:"heaviest"}＝ツナ／{kind:"rarestAxis"}＝ロースハム）
+function effIngSlots(){ return Math.max(1, Math.round(CONFIG.params.tiers.ingredients) + pendingDraw); }
+// 確定引きの対象を「個体id」に解決する。増えた枠は具材枠なので、具材の山から選ぶ。
+function resolvePendingForcedIds(){
+  const ids = [];
+  for (const req of pendingForced){
+    const pool = deck.filter(x => CONFIG.items[x.name].pile === "ingredient" && !ids.includes(x.id));
+    if (!pool.length) continue;
+    if (req.kind === "heaviest"){                                  // ツナ：デッキで最も重いカード（同値は id の小さい方）
+      let best = pool[0];
+      for (const x of pool){ const w = cardWeight(x.name), bw = cardWeight(best.name); if (w > bw || (w === bw && x.id < best.id)) best = x; }
+      ids.push(best.id);
+    } else if (req.kind === "rarestAxis"){                          // ロースハム：デッキで最も少ない軸（none 除く・0枚は数えない）。同数は grand()
+      const cnt = {}; for (const x of pool){ const c = CONFIG.items[x.name].cuisine; if (c && c !== "none") cnt[c] = (cnt[c] || 0) + 1; }
+      const axes = Object.keys(cnt); if (!axes.length) continue;
+      const mn = Math.min(...axes.map(c => cnt[c]));
+      const cands = axes.filter(c => cnt[c] === mn);
+      const ax = cands[Math.floor(grand() * cands.length)];
+      const inAx = pool.filter(x => CONFIG.items[x.name].cuisine === ax);
+      ids.push(inAx[Math.floor(grand() * inAx.length)].id);
+    }
+  }
+  return ids;
+}
 // 残り所持枚数で重み付けして1枚引く（rem＝この1バーガー内で減っていく在庫）。
 function weightedPickFromRem(names, rem){ let tot=0; for (const n of names) tot += rem[n]; if (tot<=0) return names[names.length-1];
   let r=grand()*tot; for (const n of names){ r-=rem[n]; if (r<0) return n; } return names[names.length-1]; }
 // 非復元の抽選：1バーガーを組む間、引いた札は山に戻さない。count は所持枚数として機能する（2枚持てば2回・1枚なら1回）。
 //   cap は段数スロット＝組める段数の上限。実際に組むのは引けた枚数まで（デッキ枚数で止まる・空段は作らない）。
 //   forced が指定され、その山に属するなら必ず1枚含める（item12・在庫を1消費）。ラン内の次スピンでは在庫は元に戻る（1バーガー単位）。
-function drawPile(pileKey, cap, forced){
+function drawPile(pileKey, cap, forced, forcedIds){
   if (cap <= 0) return [];
   const pool = deck.filter(x => CONFIG.items[x.name] && CONFIG.items[x.name].pile === pileKey);   // この山の個体（非復元＝ここから抜いていく）
   const out = [];
-  if (forced){ const i = pool.findIndex(x => x.name === forced); if (i >= 0){ out.push(pool[i]); pool.splice(i,1); } }
+  for (const fid of (forcedIds || [])){                          // 個体を指定して確定で引く（ツナ・ロースハム）
+    if (out.length >= cap) break;
+    const k = pool.findIndex(x => x.id === fid); if (k >= 0){ out.push(pool[k]); pool.splice(k,1); }
+  }
+  if (forced && out.length < cap){ const i = pool.findIndex(x => x.name === forced); if (i >= 0){ out.push(pool[i]); pool.splice(i,1); } }
   while (out.length < cap && pool.length){
     let tot = 0; for (const x of pool) tot += weightOf(x.name);   // レアリティ重み（現状は全 jou で一様）
     let r = grand() * tot, pick = pool.length - 1;
@@ -1260,18 +1291,20 @@ function arrangeStack(bottom, mids, top){   // bottom/top/mids は「個体」�
 function canBuild(){
   const t = CONFIG.params.tiers || { ingredients:0, sauces:0 };
   if (pileCopies("bun") < 1) return false;                                    // バンズ0枚＝組めない
-  const ing = Math.min(Math.max(0, Math.round(t.ingredients)), pileCopies("ingredient"));
+  const ing = Math.min(effIngSlots(), pileCopies("ingredient"));               // 実効の具材枠（pendingDraw 込み）
   const sau = Math.min(Math.max(0, Math.round(t.sauces)),      pileCopies("sauce"));
   return (ing + sau) >= 1;                                                    // 中身を1枚も引けない＝組めない
 }
 function buildBurger(){
   // 段数スロット（tiers）は「組める段数の上限」。実際に組むのは引けた枚数まで（非復元・デッキ枚数で止まる・空段は作らない）。
   const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
-  const nIng   = Math.max(0, Math.round(t.ingredients));        // 具材の段数スロット（上限）
+  const nIng   = effIngSlots();                                 // 具材の段数スロット（上限）＝印字の枠 ＋ pendingDraw（次スピン1回だけ・D5）
+  const fIds   = resolvePendingForcedIds();                     // ツナ・ロースハムの確定引き（この1回だけ）
+  pendingDraw = 0; pendingForced = [];                          // 使ったら戻す
   const nSauce = Math.max(0, Math.round(t.sauces));             // ソースの段数スロット（上限）
   const f = forcedCard;                                         // item12：この1個に確定で入れるカード（山に応じて割り当て）
   const buns  = drawPile("bun", 2, f);                          // バンズも非復元＝所持個体ぶんだけ引く（他の具材と同じ扱い・複製しない）
-  let   ings  = drawPile("ingredient", nIng, f);               // 引けた具材（個体・≤ nIng・デッキの具材数まで）
+  let   ings  = drawPile("ingredient", nIng, f, fIds);         // 引けた具材（個体・≤ nIng・デッキの具材数まで）
   const sauces= drawPile("sauce", nSauce, f);                   // 引けたソース（個体・≤ nSauce・デッキのソース数まで）
   if (buns.length === 0 || (ings.length + sauces.length) === 0) return null;   // バンズ0枚／中身を1枚も引けない＝組めない
   forcedCard = null;                                            // 消費（次のバーガーからは通常抽選）
@@ -1441,6 +1474,11 @@ function onBoard(inst, stack){   // ④盤面成長：かに・あわび（Step1
         for (const j of [i-1, i+1]) if (j >= 0 && j < n && items[stack[j]].pile !== "bun") inst[j].pb += (e.per || 20);
         inst[i].charge -= 1;
       }
+    } else if (e.id === "drawFewerMult" || e.id === "drawFewerCuiMult" || e.id === "nextDrawMore" || e.id === "drawMoreHeaviest"){
+      pendingDraw += (e.draw || 0);                  // 引く枚数の増減は「次のスピン」だけ（見返りが先・対価が後・D5）
+      if (e.id === "drawMoreHeaviest") pendingForced.push({ kind:"heaviest" });      // ツナ：増えた1枚はデッキで最も重いカード
+    } else if (e.id === "nextDrawRareAxis"){
+      pendingForced.push({ kind:"rarestAxis" });     // ロースハム：次に引く1枚をデッキで最も少ない軸にする（枠は増えない）
     } else if (e.id === "useMult"){                  // カレーソース：使うたび pm が増える。上限回数で回収時に廃棄
       inst[i].uses += 1; inst[i].pm += (e.per || 0.3);
     } else if (e.id === "sacrificeBelowGrow"){       // あわび：下1枚の第1項を0にし、その半分（切り捨て）ぶん自分が育つ。下1枚は回収時に廃棄（Q6）
@@ -1556,6 +1594,12 @@ const EFFECT_TEXT = {
   adjGrowMult:  e => `上下に接する具材の育ち合計${e.per||5}につき ×${e.mult||1.2}`,
   doubleGrowBonusAdj: e => `上下2枚の「育ち」の点を2倍にする（そのスピンのみ）`,
   maxGrowToAdj: e => `盤面で最も育った値を、上下2枚の育ちとして計算する（そのスピンのみ）`,
+  // Wave4 Step3（引き系・D5：盤面に出た次のスピンだけ枠が変わる）
+  drawFewerMult:    e => `×${e.mult||2.5}。次のスピンだけ引く枚数${e.draw||-2}`,
+  drawFewerCuiMult: e => `このバーガーの和1枚につき ×${e.mult||1.3}。次のスピンだけ引く枚数${e.draw||-1}`,
+  nextDrawMore:     e => `次のスピンだけ引く枚数+${e.draw||1}`,
+  drawMoreHeaviest: e => `次のスピンだけ引く枚数+${e.draw||1}。増えた1枚はデッキで最も重いカード`,
+  nextDrawRareAxis: e => `次のスピンで引く1枚を、デッキで最も少ない軸のカードにする`,
   // Wave4 Step2（営業日・発動回数）
   dayAdd:       e => (e.per >= 0 ? `営業日をまたぐごとに 基礎点+${e.per}（永続）` : `営業日をまたぐごとに 基礎点${e.per}（永続・0で下げ止め）`),
   dayBaseMul:   e => `営業日をまたぐごとに 基礎点が${e.mult||2}倍（永続）`,
@@ -1698,6 +1742,10 @@ function resolveCard(i, ctx){
     case "dayAxisAdd": { let cnt = 0; const idx=[i];   // マッシュルーム：本日の指定軸の具材1枚につき +per
                          for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) === dayAxis){ cnt++; idx.push(k); }
                          pushAdd(nm+"：本日の"+(CUISINE_JA[dayAxis]||dayAxis)+cnt+"枚", amAdd((e.per||60) * cnt), idx); break; }
+    case "drawFewerMult": pushMult(nm, amMul(e.mult || 1), [i]); break;                       // 貴腐ワイン：×2.5（枠の減りは次スピン）
+    case "drawFewerCuiMult": { const w = cuiInBurger("wa");                                    // 白味噌：このバーガーの和1枚につき ×mult
+                               if (w > 0) pushMult(nm+"：和"+w+"枚", amMul(Math.pow(e.mult || 1.3, w)), [i]); break; }
+    case "nextDrawMore": case "drawMoreHeaviest": case "nextDrawRareAxis": break;               // 次スピンの引きに効く（得点には効かない）
     case "dayAdd": case "dayBaseMul": case "dayAdjAdd": case "drawAdd": case "drawAdjAdd":
     case "buyAdd": case "completeAdd": case "bigBurgerAdd": case "spinMult": case "spinAxisMult":
     case "useMult": break;                             // 永続欄（pb/pm）で効く＝第1項・⑥pm に載る。ここでは何もしない
@@ -3198,6 +3246,7 @@ function resetRun(){
   pendingSeed = null;
   plog.startRun(gameSeed);                           // プレイログ：新しいランの記録を開始（前ランが未確定なら確定してから）
   restoreDefaultDeck(); rollDayAxis();               // マッシュルームの指定軸：ラン開始時にも1回引く（1営業日目から働かせる）
+  pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; temporalBonus = {}; temporalMult = {}; acquiredAt = {}; artifactsOwned = []; forcedCard = null;
   refreshMoney(false); clearPiledCoins();
@@ -3436,7 +3485,8 @@ function pileCopies(pileKey){ let n = 0; for (const nm of catalogNames()){ const
 function updateTierCap(){
   const e = $("tierCap"); if (!e) return;
   const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
-  const nIng = Math.max(0, Math.round(t.ingredients)), nSau = Math.max(0, Math.round(t.sauces));
+  const nIng = effIngSlots(), nSau = Math.max(0, Math.round(t.sauces));   // 具材は実効値（pendingDraw 込み・D5）
+  const pd = pendingDraw;
   const ingC = pileCopies("ingredient"), sauC = pileCopies("sauce"), bunC = pileCopies("bun");
   const ingB = Math.min(nIng, ingC), sauB = Math.min(nSau, sauC), bunB = Math.min(2, bunC);   // 実際に組める段
   const total = ingB + sauB + bunB;
@@ -3444,7 +3494,8 @@ function updateTierCap(){
     const limited = copies < cap;
     return `${label} <b>${build}</b><span class="${limited ? "cap-lim" : ""}">（枠${cap}・デッキ${copies}${limited ? "→不足" : ""}）</span>`;
   };
-  e.innerHTML = `🍔 組める段 <b>${total}</b>段　` +
+  const pdTag = pd !== 0 ? `<span class="cap-lim">（次スピン ${pd>0?"+":""}${pd}枚）</span>` : "";
+  e.innerHTML = `🍔 組める段 <b>${total}</b>段${pdTag}　` +
     part("具材", ingB, nIng, ingC) + " ／ " + part("ソース", sauB, nSau, sauC) + " ／ " + part("バンズ", bunB, 2, bunC);
 }
 
