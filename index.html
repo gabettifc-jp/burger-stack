@@ -222,6 +222,14 @@
   .res-bar{fill:var(--accent)}
   .res-xlabel{fill:#8b94a3; font-size:8px}
   .res-note{font-size:.76rem; color:var(--muted); text-align:center; padding:6px}
+  /* スピンごとの明細（横に長いので、この枠の中だけ横スクロールさせる） */
+  .res-spins-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  .res-spins{border-collapse:collapse; font-size:.72rem; width:100%; min-width:420px}
+  .res-spins th,.res-spins td{border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; white-space:nowrap}
+  .res-spins th{color:#ffd98c; font-weight:800; background:#1c2027; position:sticky; top:0}
+  .res-spins td.num{text-align:right; font-variant-numeric:tabular-nums}
+  .res-spins tr.rent td{background:#241d1a}
+  .res-spins tr.rent td:nth-child(6){color:#ffb0a0; font-weight:700}
   .shop-acts{display:grid; grid-template-columns:1fr 1fr; gap:6px}
   .shopbtn{background:#2b313a; border:1px solid var(--line); border-radius:10px; padding:8px; color:var(--text);
     font-weight:700; font-size:.78rem; cursor:pointer; touch-action:manipulation; user-select:none}
@@ -689,6 +697,7 @@
         <button id="plogCopyCur" type="button">🎮 いま遊んでいるランをコピー</button>
         <button id="plogSelAll" type="button">全選択／解除</button>
         <button id="plogCopy" type="button">選択したランを JSON でコピー</button>
+        <button id="plogDownload" type="button">⬇️ プレイログをダウンロード</button>
       </div>
       <div id="plogList" class="plog-list"></div>
       <p class="barnote">※ 保存は localStorage。全ランを貯める。容量に達したら古いランから消えるが、上の欄に必ず警告を出す（黙って消さない）。</p>
@@ -1195,6 +1204,10 @@ function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(grand()*
 let deck = [];            // 個体の集合 [{id, name, g}]
 let instSeq = 0;          // 個体IDの採番
 const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKUZAI準拠。確定ではない）
+/* ビルドの目印（Wave5 4-2）。プレイログの先頭に入れて、ログと当時のソースを突き合わせられるようにする。
+   ファイルの中に自分自身のコミットハッシュは書けないので、commit は「このビルドの index.html が入ったコミット」を
+   手で書き入れる（1つ後のコミットで更新する運用）。波ごとに label と date も手で更新する。 */
+const BUILD = { label: "Wave 5-4", commit: "496e8a6", date: "2026-08-12" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1437,6 +1450,9 @@ function applyBaseRewrites(stack, arr, inst, cuiMap){
 let discardLog = null;   // 非nullの間、廃棄はここに積む（collect が recordSpin に渡す）。null のときは即 plog へ。
 function discardInstance(inst, cause, fireHooks){
   if (!inst) return false;
+  // その山の最後の1枚は廃棄しない（Wave5 4-4）。店の取り除きが既に守っている条件を、効果の廃棄にも同じく適用する。
+  //   これが無いと、キャビア等がバンズ2枚を食い切って「組めないのにタップしても何も起きない」状態で止まる。
+  if (pileCopies(CONFIG.items[inst.name].pile) <= 1) return false;
   if (!removeInstanceById(inst.id)) return false;
   if (discardLog) discardLog.push({ name: inst.name, cause });
   else plog.recordRemove(inst.name, cause);
@@ -2248,7 +2264,11 @@ function onSkip(){
 
 function startBurger(){
   const p = buildPlan();                            // 計算層：クリック時点で結果を全部確定
-  if (!p){ $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false; }
+  if (!p){
+    // 組めないまま止まると、タップしても何も起きずランが終わらない（詰み）。調整中でなければ結果画面まで進める（Wave5 4-4）。
+    if (runActive && !tuningOpen() && !canBuild()){ $("msg").textContent = ""; endRun("broke"); return false; }
+    $("msg").textContent = "山が空です。どれかの枚数を1以上にしてください。"; return false;
+  }
   $("msg").textContent = "";
   plan = p; stack = p.stack; stackInst = p.inst; sc = p.sc; layout = p.layout; hitMeta = p.grades;   // 演出はこのplanを再生
   revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
@@ -3362,6 +3382,7 @@ function endRun(outcome){
   runActive = false; offering = false; offerQueue = [];
   const best = plog.currentBest();                   // {score,spin,stack}|null（確定前に読む）
   const daily = plog.currentDailySales();            // 営業日ごとの売上合計
+  const spinRows = plog.currentSpins();              // スピンごとの明細（得点・段数・所持金・家賃・買い物）
   plog.endRun(); plog.renderList();                  // プレイログを確定
   const cleared = outcome === "cleared";
   const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 20));
@@ -3391,7 +3412,30 @@ function endRun(outcome){
   const order = ["none", "wa", "chuka", "kaisen", "kokyu", "agemono"];
   dl.innerHTML = order.filter(k => by[k]).map(k => `<span class="res-axchip ax-${k}">${CUISINE_JA[k]} <b>${by[k]}</b>枚</span>`).join("") + `<span class="res-axtot">計 <b>${tot}</b>枚</span>`;
   dsec.appendChild(dl); wrap.appendChild(dsec);
-  // ④ 営業日ごとの売上グラフ（最後）
+  // ④ スピンごとの明細（得点・段数・所持金・家賃・買い物）。プレイログと同じ値をその場で読めるようにする（4-3）
+  const ssec = el("res-sec"); ssec.appendChild(el("res-lbl", "🧾 スピンごとの明細"));
+  if (spinRows.length){
+    const tb = document.createElement("table"); tb.className = "res-spins";
+    tb.innerHTML = `<thead><tr><th>#</th><th>営業日</th><th>得点</th><th>段</th><th>所持金</th><th>家賃</th><th>買い物・取り除き</th></tr></thead>`;
+    const body = document.createElement("tbody");
+    for (const s of spinRows){
+      const BUYJA = { reroll: "品揃えの引き直し", ingredients: "具材枠", sauces: "ソース枠" };
+      const buys = (s.bought || []).map(x => `${BUYJA[x.name] || x.name}${x.cost != null ? `(¥${fmtJP(x.cost)})` : ""}`);
+      const rems = (s.removed || []).map(x => `−${x.name}`);
+      const acts = buys.concat(rems).join("、") || "—";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${s.spin}</td><td>${s.day != null ? s.day : "—"}</td><td class="num">¥${fmtJP(s.score)}</td>`
+        + `<td class="num">${s.tiers}</td><td class="num">${s.money != null ? "¥" + fmtJP(s.money) : "—"}</td>`
+        + `<td class="num">${s.rent ? `¥${fmtJP(s.rent.amount)}` : "—"}</td><td>${acts}</td>`;
+      if (s.rent) tr.classList.add("rent");
+      body.appendChild(tr);
+    }
+    tb.appendChild(body);
+    const sc2 = document.createElement("div"); sc2.className = "res-spins-scroll"; sc2.appendChild(tb); ssec.appendChild(sc2);
+    ssec.appendChild(el("res-note", "所持金＝そのスピンの回収を終えた時点。家賃の行は色を変えている。"));
+  } else { ssec.appendChild(el("res-note", "（スピンの記録がありません。プレイログを切っていると出ません）")); }
+  wrap.appendChild(ssec);
+  // ⑤ 営業日ごとの売上グラフ（最後）
   const gsec = el("res-sec"); gsec.appendChild(el("res-lbl", "📈 営業日ごとの売上（対数目盛り）"));
   const gh = el("res-graph"); renderSalesGraph(gh, daily); gsec.appendChild(gh);
   wrap.appendChild(gsec);
@@ -4124,8 +4168,19 @@ const plog = (function(){
     cur.summary.mainAxis = mainAxisOf(dk.byAxis);
     cur.summary.finalTiers = cur.spins.length ? cur.spins[cur.spins.length - 1].tiers : 0;
     cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk; }
+  // ランの頭に残す設定の写し（Wave5 4-2）。あとで「どの設定で遊んだログか」を突き合わせるため。
+  function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
+    return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
+             tiers: { ingredients: p.tiers.ingredients, sauces: p.tiers.sauces },
+             growPer: GROW_PER, comboBonus: { threshold: (p.comboBonus||{}).threshold, perCombo: (p.comboBonus||{}).perCombo },
+             scale: JSON.parse(JSON.stringify(sh.scale || {})),
+             shopBase: { cardCost: sh.cardCost, removeCost: sh.removeCost, ingredientSlotCost: sh.ingredientSlotCost,
+                         sauceSlotCost: sh.sauceSlotCost, rerollCost: sh.rerollCost },
+             rarity: { on: (p.rarity||{}).on, prices: Object.assign({}, (p.rarity||{}).prices) } }; }
   function newRun(seed){ cumScore = 0;
-    return { summary: { date: nowISO(), seed: (seed >>> 0), spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play", status: "playing", bestBurger: null }, spins: [] }; }
+    return { summary: { build: BUILD.label, commit: BUILD.commit, buildDate: BUILD.date,   // どのビルドで遊んだログか（4-2）
+                        date: nowISO(), seed: (seed >>> 0), settings: settingsSnap(),
+                        spins: 0, finalCum: 0, mainAxis: "none", finalTiers: 0, daysSurvived: 0, source: "play", status: "playing", bestBurger: null }, spins: [] }; }
   function finalize(){ if (!cur) return; refreshSummary();               // 確定：終了印を付けて runs へ移し、進行中キーを消す。
     cur.summary.status = "ended"; delete cur.summary.resumed;
     runs.push(cur); cur = null; try { localStorage.removeItem(K_CUR); } catch(e){}
@@ -4146,7 +4201,7 @@ const plog = (function(){
     recordSpin(spinNo, score, tiers, removedEffects, stack, growth, pb, pm, sc){ // 回収ごと（1スピン）。得点・累計・デッキ・段数・所持道具＋盤面の育ち/pb/pm＋賭けの結果。
       if (!enabled || !cur) return; cumScore += score;
       const gambles = (sc && sc.hits) ? sc.hits.filter(h => h.gamble).map(h => ({ name: h.gamble, win: !!h.win, forced: !!h.forced })) : [];
-      cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, deck: deckSnap(),
+      cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, day: daysSurvived + 1, money, deck: deckSnap(),   // day/money は 4-3 のスピン一覧用
         artifacts: artifactsOwned.slice(), rent: null, bought: [], removed: (removedEffects || []).slice(),
         growth: (growth || []).slice(), pb: (pb || []).slice(), pm: (pm || []).slice(), gambles });   // Wave3：育ち／Wave4：pb・pm・賭けの結果（下から順）
       // 最高得点のバーガー1本だけを summary に保持（積み方＝下から順の配列＋育ち。全スピン分は持たない）。
@@ -4161,6 +4216,7 @@ const plog = (function(){
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
     currentBest: () => (cur && cur.summary.bestBurger) ? cur.summary.bestBurger : null,   // 進行中ランの最高得点バーガー（確定前に読む）
+    currentSpins: () => (cur ? cur.spins.slice() : []),   // 進行中ランのスピン明細（リザルトのスピン一覧用・確定前に読む）
     currentDailySales(){                              // 進行中ランの営業日ごとの売上合計（家賃発生スピンを境目に区切る）
       if (!cur) return []; const out = []; let acc = 0;
       for (const s of cur.spins){ acc += (s.score || 0); if (s.rent){ out.push(acc); acc = 0; } }
@@ -4179,6 +4235,21 @@ const plog = (function(){
       refreshSummary();
       const text = JSON.stringify(cur, null, 2);
       doCopy(text, () => { warnMsg = `進行中のラン（スピン${cur ? cur.spins.length : 0}・${text.length.toLocaleString()} 文字）をコピーしました。`; renderWarn(); });
+    },
+    download(){                                       // 全ラン（確定済み＋進行中）を1つの JSON ファイルとして保存（4-2）。
+      if (cur) refreshSummary();
+      const arr = cur ? runs.concat([cur]) : runs.slice();
+      if (!arr.length){ warnMsg = "まだ記録がありません。"; renderWarn(); return; }
+      const payload = { build: BUILD.label, commit: BUILD.commit, buildDate: BUILD.date, exportedAt: nowISO(), runs: arr };
+      const text = JSON.stringify(payload, null, 2);
+      const stamp = (payload.exportedAt || "").replace(/[:.]/g, "-").slice(0, 19) || "log";
+      try {
+        const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+        const a = document.createElement("a"); a.href = url; a.download = `burger-stack-plog-${stamp}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        warnMsg = `${arr.length} ラン（${text.length.toLocaleString()} 文字）をダウンロードしました。`; renderWarn();
+      } catch(e){ warnMsg = "ダウンロードできませんでした。JSONでコピーして退避してください。"; renderWarn(); }
     },
   };
   function doCopy(text, done){
@@ -4267,6 +4338,7 @@ plog.bootStart(gameSeed); // プレイログ：ブート＝前回の未確定ラ
   const sel = $("plogSelAll"); if (sel){ sel.addEventListener("click", () => { const cs = [...document.querySelectorAll(".plog-check")]; const all = cs.every(c => c.checked); cs.forEach(c => c.checked = !all); }); }
   const cp = $("plogCopy"); if (cp){ cp.addEventListener("click", () => plog.copySelected()); }
   const cc = $("plogCopyCur"); if (cc){ cc.addEventListener("click", () => plog.copyCurrent()); }
+  const dl = $("plogDownload"); if (dl){ dl.addEventListener("click", () => plog.download()); }
   plog.renderList();
 })();
 renderPiles();
