@@ -1207,7 +1207,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
 /* ビルドの目印（Wave5 4-2）。プレイログの先頭に入れて、ログと当時のソースを突き合わせられるようにする。
    ファイルの中に自分自身のコミットハッシュは書けないので、commit は「このビルドの index.html が入ったコミット」を
    手で書き入れる（1つ後のコミットで更新する運用）。波ごとに label と date も手で更新する。 */
-const BUILD = { label: "Wave 5-4", commit: "496e8a6", date: "2026-08-12" };
+const BUILD = { label: "Wave 5-4", commit: "1c59740", date: "2026-08-12" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
