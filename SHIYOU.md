@@ -416,8 +416,8 @@ HTML / CSS / JavaScript のみ。ビルド不要、依存ライブラリなし�
 | `effect` | 効果欄。`{ id, kind?, ...パラメータ }` | 下記 |
 | `ph` | 専用の絵をまだ持たない仮カードのフラグ（描画は汎用タイル＋名前ラベルで代用） | `true` の軸カード（初期無印は省略） |
 
-- **`effect.id`**：効果の識別子。コード側の `EFFECT_TEXT` / `applyCardEffects` と対応する。効果を持たないカード（初期デッキの無印など）は `id:null`。
-- **`effect.kind`**：効果の型（KENTO.md「カードの効果の型」）。**`items` で実際に使われている値**：`adjacent`（隣接）／`count`（枚数）／`position`（位置）／`global`（全体）／`temporal`（時間軸）／`sacrifice`（破壊・消費）／`draw`（抽選への干渉・無印の抽選カード）。`draw` は KENTO の7型には無い追加分（無印のピクルス／レタス／トマト／オニオン）。**`kind` は全カードには付いていない**（`id` だけを持ち `kind` を省くエントリが多い＝型の整理は今後の作業）。KENTO の型のうち `pile`（山系）は現状どのカードにも未使用。
+- **`effect.id`**：効果の識別子。コード側の `applyCardEffects` の分岐（`switch(e.id)`）と対応する。効果を持たないカードは `id:null`（Wave1 で全カード null にし、Wave2 で15枚に既存エンジンの id を設定した。残りは Wave3〜4 で有効化予定。対象表は LOG.md「Wave 2」）。
+- **`effect.kind`**：効果の型（KENTO.md「カードの効果の型」）は**分類のための文書上の欄で、発動処理は使わない**（`applyCardEffects` は `id` で分岐する）。**現状 Wave2 で設定した15枚を含め、どのカードにも `kind` は付けていない**（`id` とパラメータだけ）。型の整理は今後の作業。
 - **効果パラメータ**：`per` / `add` / `mult` / `need` / `max` / `ref` / `targ` / `targetCui` など、効果ごとに異なる欄を持つ。表示文（プレイヤーが読む説明）は `effectText(name)` が現在の数値から生成する（第5節の必須要件）。
 
 ### アーティファクト（`CONFIG.artifacts` の各エントリ）
