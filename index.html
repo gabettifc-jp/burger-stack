@@ -738,14 +738,14 @@ const DEFAULTS = {
     "和牛サーロイン": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:250, count:0, tier:null, rar:"jou", weight:168, effect:{id:"deckSizeAdd", per:-15}, ph:true, },  // 基礎点250。デッキ1枚につき −15
     "トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:90, count:0, tier:null, rar:"jou", weight:96, effect:{id:null}, ph:true, },  // 基礎点90。効果なし
     "熟成肉": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:132, effect:{id:"dayAdd", per:40}, ph:true, },  // 営業日をまたぐごとに +40（永続）
-    "金箔": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:1, count:0, tier:null, rar:"jou", weight:164, effect:{id:null}, ph:true, },  // 基礎点1。上下の基礎点合計100につき +90
+    "金箔": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:1, count:0, tier:null, rar:"jou", weight:164, effect:{id:"adjBaseStepAdd", step:100, per:90}, ph:true, },  // 基礎点1。上下の基礎点合計100につき +90
     "生牡蠣": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:130, count:0, tier:null, rar:"jou", weight:58, effect:{id:"gambleHalve", per:0.06}, ph:true, },  // 基礎点130。高級以外の具材1枚につき6%でバーガー半減
     "蟹カマ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:30, effect:{id:"lowToHigh"}, ph:true, },  // 最も低い基礎点が、最も高い基礎点と同じ値になる
     "飴細工": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:0, count:0, tier:null, rar:"jou", weight:84, effect:{id:"swapAdjBase"}, ph:true, },  // 基礎点0。上下2枚の基礎点を入れ替える
     "白トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:44, effect:{id:"discardCount", per:30}, ph:true, },  // 廃棄を行うたび +30（永続）
-    "伊勢海老": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:180, count:0, tier:null, rar:"jou", weight:152, effect:{id:null}, ph:true, },  // 基礎点180。他の高級具材1枚につき −40
+    "伊勢海老": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:180, count:0, tier:null, rar:"jou", weight:152, effect:{id:"otherCuiAdd", cui:"kokyu", per:-40}, ph:true, },  // 基礎点180。他の高級具材1枚につき −40
     "デミグラスソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:76, effect:{id:"flatMult", mult:1.2}, ph:true, },  // ×1.2。無条件
-    "コンソメ": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:108, effect:{id:null}, ph:true, },  // 高級1枚につき ×1.3、高級以外1枚につき ×0.9
+    "コンソメ": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:108, effect:{id:"cuiRatioMult", cui:"kokyu", mult:1.3, other:0.9}, ph:true, },  // 高級1枚につき ×1.3、高級以外1枚につき ×0.9
     "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:92, effect:{id:"perigueux", mult:2.0, bonus:1.5}, ph:true, },  // 接する高級1枚につき ×2.0。トリュフ/フォアグラなら更に ×1.5
     "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:124, effect:{id:"drawFewerMult", draw:-2, mult:2.5}, ph:true, },  // 引く枚数 −2、×2.5
     "ぎょうざ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:40, count:0, tier:null, rar:"jou", weight:102, effect:{id:"perCuiAdd", per:40}, ph:true, },  // 基礎点40。このバーガーの中華1枚につき +40
@@ -762,7 +762,7 @@ const DEFAULTS = {
     "ラーメン": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:86, effect:{id:"spinMult", per:0.15, maxMul:1.5}, ph:true, },  // スピンごとに ×0.15 ずつ育つ。引き直しでリセット
     "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:106, effect:{id:"adjCuiMult", mult:1.5}, ph:true, },  // 接する中華1枚につき ×1.5
     "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:120, effect:{id:"adjTwoCuiMult", cuiA:"kaisen", cuiB:"chuka", mult:1.8}, ph:true, },  // 接する海鮮または中華1枚につき ×1.8
-    "ソース焼きそば": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:64, effect:{id:null}, ph:true, },  // デッキ1枚につき ×1.04
+    "ソース焼きそば": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:64, effect:{id:"deckSizeMult", per:1.04, maxMul:5.0}, ph:true, },  // デッキ1枚につき ×1.04
     "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:4, count:0, tier:null, rar:"jou", weight:26, effect:{id:"dayBaseMul", mult:2}, ph:true, },  // 基礎点4。営業日をまたぐごとに基礎点2倍
     "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", weight:98, effect:{id:"growDrawn", per:1}, ph:true, },  // 基礎点20。引かれるたび育ち+1
     "昆布": { pile:"ingredient", type:"veg", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:176, effect:{id:"growUndrawn", per:1}, ph:true, },  // 引かれなかったスピンごとに育ち+1
@@ -783,8 +783,8 @@ const DEFAULTS = {
     "海老フライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:114, effect:{id:"perCuiAdd", per:25}, ph:true, },  // このバーガーの揚げ物1枚につき +25
     "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:35, count:0, tier:null, rar:"jou", weight:130, effect:{id:null}, ph:true, },  // 基礎点35。このスピンの引き直し1回につき +45
     "メンチカツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:74, effect:{id:"completeAdd", per:10}, ph:true, },  // バーガーを完成させるたび +10（永続）
-    "かぼちゃ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:107, effect:{id:null}, ph:true, },  // 上下がソースの組ごとに +80
-    "かき揚げ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:22, effect:{id:null}, ph:true, },  // 自分より下の段1つにつき +22
+    "かぼちゃ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:107, effect:{id:"adjBothSauceAdd", per:80}, ph:true, },  // 上下がソースの組ごとに +80
+    "かき揚げ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:22, effect:{id:"belowTierAdd", per:22}, ph:true, },  // 自分より下の段1つにつき +22
     "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:68, effect:{id:null}, ph:true, },  // 引き直しが1回無料になる。使うと廃棄
     "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:78, effect:{id:"treatAdjAsCui", targetCui:"agemono"}, ph:true, },  // 隣接1枚を揚げ物として扱う
     "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:136, effect:{id:"runCuiAdd", cui:"agemono", per:50}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
@@ -793,7 +793,7 @@ const DEFAULTS = {
     "カレーソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:109, effect:{id:"useMult", per:0.3, max:5}, ph:true, },  // 使うたび ×0.3 ずつ増える。5回で酸化して廃棄
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:105, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する揚げ物1枚につき ×1.6
     "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:123, effect:{id:"forceWin"}, ph:true, },  // 隣接する「賭け」の効果を必ず成功させる
-    "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:160, effect:{id:null}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
+    "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:160, effect:{id:"soloSauceMult", mult:2.5, dec:0.4, min:1.0}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
     "白米": { pile:"ingredient", type:"veg", cuisine:"wa", base:30, count:0, tier:null, rar:"jou", weight:144, effect:{id:"adjCuiAdd", per:45}, ph:true, },  // 基礎点30。隣接する和1枚につき +45
     "豆腐": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:62, effect:{id:"tofu", per:40}, ph:true, },  // 隣接2枚の基礎点を各 +40
     "油揚げ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:60, effect:{id:"drawAdjAdd", per:8}, ph:true, },  // 引かれるたび、隣接2枚に +8（永続）
@@ -810,7 +810,7 @@ const DEFAULTS = {
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
     "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
     "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
-    "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:48, effect:{id:null}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
+    "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:48, effect:{id:"antiCuiMult", cui:"wa", mult:2.8, dec:0.3, min:1.0}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
     "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
     "チーズ": { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:52, effect:{id:null}, },  // 初期デッキ。効果なし
     "きゅうり": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:38, effect:{id:null}, },  // 初期デッキ。効果なし
@@ -1579,6 +1579,15 @@ const EFFECT_TEXT = {
   runCuiAdd:      e => `${CUISINE_JA[e.cui]||e.cui}が連続して並ぶ最長の長さ1枚につき 基礎点+${e.per||50}`,
   altCuiRunAdd:   e => `違う軸が交互に並んでいる最長の長さ1枚につき 基礎点+${e.per||70}`,
   ascPairAdd:     e => `隣り合う2枚で基礎点が下から上へ増えている組1つにつき 基礎点+${e.per||65}`,
+  // Wave5 Step3（枚数比例の複合倍率・しきい値）
+  adjBaseStepAdd: e => `上下2枚の基礎点の合計${e.step||100}につき 基礎点+${e.per||90}`,
+  otherCuiAdd:    e => `自分以外の${CUISINE_JA[e.cui]||e.cui}の具材1枚につき 基礎点${(e.per||-40)>=0?'+':''}${e.per||-40}`,
+  cuiRatioMult:   e => `${CUISINE_JA[e.cui]||e.cui}1枚につき ×${e.mult||1.3}、それ以外1枚につき ×${e.other!=null?e.other:0.9}（自分は数えない）`,
+  deckSizeMult:   e => `デッキ1枚につき ×${e.per||1.04}（上限 ×${e.maxMul||5}）`,
+  adjBothSauceAdd:e => `上下2枚がどちらもソースなら 基礎点+${e.per||80}`,
+  belowTierAdd:   e => `自分より下の段1つにつき 基礎点+${e.per||22}（下のバンズも数える）`,
+  soloSauceMult:  e => `×${e.mult||2.5}。他のソース1枚につき ×${e.dec||0.4} 減（最低 ×${e.min!=null?e.min:1}）`,
+  antiCuiMult:    e => `×${e.mult||2.8}。${CUISINE_JA[e.cui]||e.cui}の具材1枚につき ×${e.dec||0.3} 減（最低 ×${e.min!=null?e.min:1}）`,
   // Wave4 Step5（賭け）
   gambleHalve:  e => `高級以外の具材1枚につき${Math.round((e.per||0.06)*100)}%の確率で、このバーガーが半分`,
   gambleAdd:    e => `具材の枚数×${Math.round((e.per||0.07)*100)}%で成功。成功で+${e.add||250}、失敗で0`,
@@ -1835,6 +1844,43 @@ function resolveCard(i, ctx){
       for (let t = 1; t < M.length; t++){ const a = M[t-1], k = M[t];
         if (k === a + 1 && baseArr[a] < baseArr[k]){ c++; if (idx[idx.length-1] !== a) idx.push(a); idx.push(k); } }
       pushAdd(nm+"：昇順の組"+(c+nb), amAdd((e.per||65) * (c + nb)), [i, ...idx]); break; }
+    // ── Wave5 Step3：枚数比例の複合倍率・しきい値 ──
+    //   のりの成立数 nb は「増えると得になる数」にだけ足す。減点・減算側の枚数には足さない（伊勢海老・中濃ソース・抹茶ソース）。
+    case "adjBaseStepAdd": {                            // 金箔：上下2枚の第1項の合計が step につき +per（育ちは読まない・D1）
+      let sum = 0; const idx=[i];
+      for (const j of neigh(i)) if (!isBunAt(j)){ sum += baseArr[j]; idx.push(j); }
+      const stp = Math.floor(sum / Math.max(1, e.step || 100)) + nb;
+      pushAdd(nm+"：上下の第1項"+sum, amAdd((e.per||90) * stp), idx); break; }
+    case "otherCuiAdd": {                               // 伊勢海老：自分以外の指定軸の具材1枚につき per（per は負でよい）
+      const want = e.cui || selfCui; let c = 0; const idx=[i];
+      for (let k = 0; k < n; k++) if (k !== i && isIng(k) && cuiAt(k) === want){ c++; idx.push(k); }
+      const cnt = c + ((e.per || 0) > 0 ? nb : 0);
+      pushAdd(nm+"：他の"+CJ(want)+cnt+"枚", amAdd((e.per||-40) * cnt), idx); break; }
+    case "cuiRatioMult": {                              // コンソメ：自分以外の中段のうち 指定軸1枚につき ×mult、それ以外1枚につき ×other
+      const want = e.cui || selfCui; let k = 0, o = 0; const idx=[i];
+      for (const j of midIdx()) if (j !== i){ if (cuiAt(j) === want) k++; else o++; idx.push(j); }
+      k += nb;
+      pushMult(nm+"："+CJ(want)+k+"枚／他"+o+"枚", amMul(Math.pow(e.mult||1.3, k) * Math.pow(e.other!=null?e.other:0.9, o)), idx); break; }
+    case "deckSizeMult": {                              // ソース焼きそば：デッキ1枚につき ×per（上限 maxMul・P4）
+      const c = ctx.deckSize + nb, cap = e.maxMul || 5.0;
+      pushMult(nm+"：デッキ"+c+"枚", amMul(Math.min(cap, Math.pow(e.per||1.04, c))), [i]); break; }
+    case "adjBothSauceAdd": {                           // かぼちゃ：上下2枚がどちらもソースなら +per
+      const a = i-1, u = i+1;
+      if (a >= 0 && u < n && !isBunAt(a) && !isBunAt(u) && typ(a) === "sauce" && typ(u) === "sauce")
+        pushAdd(nm+"：上下がソース", amAdd((e.per||80) * (1 + nb)), [i, a, u]);
+      break; }
+    case "belowTierAdd":                                // かき揚げ：自分より下の段の数（下バンズを含む）× per
+      pushAdd(nm+"：下の段"+(i+nb), amAdd((e.per||22) * (i + nb)), [i]); break;
+    case "soloSauceMult": {                             // 中濃ソース：mult から 他のソース1枚につき dec 減（下限 min）
+      let c = 0; const idx=[i];
+      for (let k = 0; k < n; k++) if (k !== i && typ(k) === "sauce"){ c++; idx.push(k); }
+      const m = Math.max(e.min!=null?e.min:1.0, (e.mult||2.5) - (e.dec||0.4) * c);
+      pushMult(nm+"：他のソース"+c+"枚", amMul(m), idx); break; }
+    case "antiCuiMult": {                               // 抹茶ソース：mult から 指定軸の具材1枚につき dec 減（下限 min）
+      const want = e.cui || selfCui; let c = 0; const idx=[i];
+      for (let k = 0; k < n; k++) if (k !== i && isIng(k) && cuiAt(k) === want){ c++; idx.push(k); }
+      const m = Math.max(e.min!=null?e.min:1.0, (e.mult||2.8) - (e.dec||0.3) * c);
+      pushMult(nm+"："+CJ(want)+"の具材"+c+"枚", amMul(m), idx); break; }
     // ── Step5：賭け（計算層で確定・同一シードで再現）。当たっても外れても内訳に出す（隠さない）。 ──
     case "gambleHalve": {                              // 生牡蠣：高級以外の具材枚数×per を1回だけ判定（Q9）。当たると全体×0.5
       let c = 0; for (let k = 0; k < n; k++) if (isIng(k) && cuiAt(k) !== "kokyu") c++;
