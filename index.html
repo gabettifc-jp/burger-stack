@@ -231,6 +231,7 @@
   .res-spins td.num{text-align:right; font-variant-numeric:tabular-nums}
   .res-spins tr.rent td{background:#241d1a}
   .res-spins tr.rent td:nth-child(6){color:#ffb0a0; font-weight:700}
+  .res-spins td.dim{color:var(--muted)}   /* 3択を見送った回 */
   .shop-acts{display:grid; grid-template-columns:1fr 1fr; gap:6px}
   .shopbtn{background:#2b313a; border:1px solid var(--line); border-radius:10px; padding:8px; color:var(--text);
     font-weight:700; font-size:.78rem; cursor:pointer; touch-action:manipulation; user-select:none}
@@ -3183,6 +3184,7 @@ function renderOfferScreen(picks, pool, nChoices){
     row.appendChild(card);
   }
   offerEl.appendChild(row);
+  plog.recordOffered(picks);                         // 提示した札を記録（Wave6 Step3・看板で4択のときも同じ形）
   if (offerRerollsLeft > 0){                         // item15：オニオンの引き直し
     const rr = el("offer-skip", `引き直す（残り${offerRerollsLeft}回）`);
     rr.addEventListener("click", () => { if (offerRerollsLeft <= 0) return; offerRerollsLeft--; renderOfferScreen(sampleOfferCards(pool, nChoices), pool, nChoices); });
@@ -3190,7 +3192,7 @@ function renderOfferScreen(picks, pool, nChoices){
   }
   const skip = document.createElement("div"); skip.className = "offer-skip";
   skip.textContent = "見送る（何もしない）";           // スキップは無料でスルーのみ。削除は店（有料）に移した。
-  skip.addEventListener("click", advanceOffer);
+  skip.addEventListener("click", () => { plog.recordPicked(null); advanceOffer(); });   // 見送りも記録する（Wave6 Step3）
   offerEl.appendChild(skip);
   offerEl.classList.add("show");
   updateProgress();
@@ -3199,6 +3201,7 @@ function renderOfferScreen(picks, pool, nChoices){
 function noteAcquire(name){ /* 旧 acquiredAt（取得時点の記録）は Wave5 で撤去。購入・3択の入口として残す。 */ }
 function chooseOffer(name){
   if (!offering) return;
+  plog.recordPicked(name);                           // 取ったカードを記録（Wave6 Step3・無料なので bought には入れない）
   noteAcquire(name);
   addInstance(name, 0); renderPiles(); renderAxisTally();   // 山に育ち0の個体を1つ足す（希釈が起きる層）
   forcedCard = name;                                 // item12：取った直後の1個に必ずこのカードを入れる（明示はしない）
@@ -3491,7 +3494,7 @@ function endRun(outcome){
   const ssec = el("res-sec"); ssec.appendChild(el("res-lbl", "🧾 スピンごとの明細"));
   if (spinRows.length){
     const tb = document.createElement("table"); tb.className = "res-spins";
-    tb.innerHTML = `<thead><tr><th>#</th><th>営業日</th><th>得点</th><th>段</th><th>所持金</th><th>家賃</th><th>買い物・取り除き</th></tr></thead>`;
+    tb.innerHTML = `<thead><tr><th>#</th><th>営業日</th><th>得点</th><th>段</th><th>所持金</th><th>家賃</th><th>3択で取った</th><th>買い物・取り除き</th></tr></thead>`;
     const body = document.createElement("tbody");
     for (const s of spinRows){
       const BUYJA = { reroll: "品揃えの引き直し", ingredients: "具材枠", sauces: "ソース枠" };
@@ -3499,15 +3502,18 @@ function endRun(outcome){
       const rems = (s.removed || []).map(x => `−${x.name}`);
       const acts = buys.concat(rems).join("、") || "—";
       const tr = document.createElement("tr");
+      // 3択は無料なので金額の列には入れない（Wave6 Step3）。見送りは「見送り」と出す。
+      const pick = s.picked ? s.picked : (s.pickSkipped ? "見送り" : "—");
       tr.innerHTML = `<td>${s.spin}</td><td>${s.day != null ? s.day : "—"}</td><td class="num">¥${fmtJP(s.score)}</td>`
         + `<td class="num">${s.tiers}</td><td class="num">${s.money != null ? "¥" + fmtJP(s.money) : "—"}</td>`
-        + `<td class="num">${s.rent ? `¥${fmtJP(s.rent.amount)}` : "—"}</td><td>${acts}</td>`;
+        + `<td class="num">${s.rent ? `¥${fmtJP(s.rent.amount)}` : "—"}</td>`
+        + `<td class="${s.pickSkipped ? "dim" : ""}">${pick}</td><td>${acts}</td>`;
       if (s.rent) tr.classList.add("rent");
       body.appendChild(tr);
     }
     tb.appendChild(body);
     const sc2 = document.createElement("div"); sc2.className = "res-spins-scroll"; sc2.appendChild(tb); ssec.appendChild(sc2);
-    ssec.appendChild(el("res-note", "所持金＝そのスピンの回収を終えた時点。家賃の行は色を変えている。"));
+    ssec.appendChild(el("res-note", "所持金＝そのスピンの回収を終えた時点。家賃の行は色を変えている。3択は無料なので金額には入らない（提示された札はプレイログの offered に残る）。"));
   } else { ssec.appendChild(el("res-note", "（スピンの記録がありません。プレイログを切っていると出ません）")); }
   wrap.appendChild(ssec);
   // ⑤ 営業日ごとの売上グラフ（最後）
@@ -4352,6 +4358,8 @@ const plog = (function(){
       const gambles = (sc && sc.hits) ? sc.hits.filter(h => h.gamble).map(h => ({ name: h.gamble, win: !!h.win, forced: !!h.forced })) : [];
       cur.spins.push({ spin: spinNo, score, cum: cumScore, tiers, day: daysSurvived + 1, money, deck: deckSnap(),   // day/money は 4-3 のスピン一覧用
         artifacts: artifactsOwned.slice(), rent: null, bought: [], removed: (removedEffects || []).slice(),
+        offered: [], picked: null, pickSkipped: false,   // 3択（Wave6 Step3）。無料なので bought とは分けて持つ
+
         growth: (growth || []).slice(), pb: (pb || []).slice(), pm: (pm || []).slice(), gambles });   // Wave3：育ち／Wave4：pb・pm・賭けの結果（下から順）
       // 最高得点のバーガー1本だけを summary に保持（積み方＝下から順の配列＋育ち。全スピン分は持たない）。
       if (stack && stack.length && (!cur.summary.bestBurger || score > cur.summary.bestBurger.score)){
@@ -4361,6 +4369,10 @@ const plog = (function(){
     },
     recordRent(amount, residual){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.rent = { amount, residual }; refreshSummary(); saveCurrent(); } },
     recordBuy(kind, name, cost){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.bought.push({ kind, name, cost }); saveCurrent(); } },
+    // 3択（Wave6 Step3）。無料なので bought には入れない（金額の集計に混ざらない）。
+    //   recordOffered は画面を出すたびに上書きする＝引き直した場合は「最後に見た3枚」が残る。
+    recordOffered(names){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.offered = (names || []).slice(); s.picked = null; s.pickSkipped = false; saveCurrent(); } },
+    recordPicked(name){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.picked = name || null; s.pickSkipped = !name; saveCurrent(); } },
     recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.removed.push({ name, cause }); saveCurrent(); } },
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
