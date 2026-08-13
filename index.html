@@ -1107,10 +1107,23 @@ const DEFAULTS = {
     //   main=主軸（距離0）／mid=中間（距離0.5）／far=遠い軸（デッキに0枚・距離1）。距離で3行を線形に補間する。
     //   枚数ではなく確率で引くので、レアリティごとの枚数を後から動かしても体感が変わらない（Wave7 §3-2）。
     rarity: { on: true,
-              rates: { main: { nami: 0.45, jou: 0.37, tokujou: 0.15, kiwami: 0.03 },
-                       mid:  { nami: 0.35, jou: 0.35, tokujou: 0.22, kiwami: 0.08 },
-                       far:  { nami: 0.25, jou: 0.30, tokujou: 0.35, kiwami: 0.10 } },
-              kiwamiMax: 0.10,   // 極の上限。傾斜やアーティファクトで押し上げてもここで止める（Wave7 §3-3）
+              // Wave8 Step1：レアリティは「進行 → 軸の距離」の2段で決める。
+              //   progress：進行度（現在の営業日 / dayGoal）に対する基準の表。dayGoal が 5 でも 10 でも
+              //     同じ曲線になるように、営業日そのものではなく正規化した進行度で持つ。
+              //     表の点の間は線形補間。進行度が最初の点より小さいときは最初の行で止める。
+              //     極の基準は最大3%＝進行がいくら進んでも基準では3%を超えない。
+              progress: [ { p: 0.2, nami: 0.78, jou: 0.20, tokujou: 0.02, kiwami: 0.00 },
+                          { p: 0.4, nami: 0.65, jou: 0.27, tokujou: 0.07, kiwami: 0.01 },
+                          { p: 0.6, nami: 0.50, jou: 0.33, tokujou: 0.15, kiwami: 0.02 },
+                          { p: 0.8, nami: 0.38, jou: 0.36, tokujou: 0.23, kiwami: 0.03 },
+                          { p: 1.0, nami: 0.30, jou: 0.37, tokujou: 0.30, kiwami: 0.03 } ],
+              //   distMul：軸の距離による修正。加算ではなく倍率。加算だと「1営業日目の極は基準0%なのに
+              //     遠い軸なら+7されて7%になる」という破綻が起きる。倍率なら 0%×3.3=0% のまま。
+              //     主軸（距離0）と遠い軸（距離1）の2行を持ち、その間は距離で線形補間する。
+              distMul: { main: { nami: 1.3, jou: 1.0, tokujou: 0.6, kiwami: 0.5 },
+                         far:  { nami: 0.7, jou: 1.0, tokujou: 1.8, kiwami: 3.3 } },
+              noneDist: 0.5,     // 無印は軸ではないので「主軸からの距離」が定義できない。中間として扱う（Wave8 §3-3）
+              kiwamiMax: 0.10,   // 極の上限。距離の倍率で押し上げてもここで止める（Wave8 §3-2 手順3）
               // アーティファクトの品揃えは軸を持たないので、上の rates（軸ごとの表）を使えない。
               //   Wave6 までカード側と共用していた重みをここに分けて、従来どおりの比率を保つ。作り替えは Step5。
               artifactWeights: { nami: 60, jou: 25, tokujou: 12, kiwami: 3 },
@@ -3736,23 +3749,66 @@ function axisDistance(cu){
   const mainN = cuisineCount(info.main); if (mainN <= 0) return 1;
   return Math.max(0, Math.min(1, 1 - n / mainN));
 }
-// 距離からレアリティの出現率表を作る。main(0) → mid(0.5) → far(1) の3点を通る折れ線で補間する。
-//   ※ mid は main と far の中点ではないので（表がそうなっている）、中点を計算するのではなく
-//     3行そのものを通す形にしてある。
-function rarityRatesFor(cu){
-  const rr = CONFIG.params.rarity || {}, R = rr.rates || {};
+/* ── Wave8 Step1：レアリティは「進行 → 軸の距離」の2段で決める ──────────────────
+   Wave7 は距離だけで表を選んでいたので、ラン開始時は5軸すべてが「遠い軸」扱いになり、
+   1営業日目からいきなり 並25・上30・特上35・極10 の表が適用されていた
+   （実プレイのログでスピン2でテリヤキソース＝極が提示された）。進行の軸を足して直した。 */
+// 進行度（現在の営業日 / dayGoal）。dayGoal が 5 でも 10 でも同じ曲線になるよう正規化する。
+function runProgress(){
+  const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 5));
+  return Math.max(0, Math.min(1, (daysSurvived + 1) / goal));   // 1営業日目＝daysSurvived 0
+}
+// 進行度から基準の4値を引く（表の点の間は線形補間・最初の点より前は最初の行で止める）。
+function rarityBaseFor(prog){
+  const rr = CONFIG.params.rarity || {};
+  const tbl = (rr.progress || []).slice().sort((a, b) => a.p - b.p);
   const one = { nami:0.25, jou:0.25, tokujou:0.25, kiwami:0.25 };
-  const A = R.main || one, B = R.mid || one, C = R.far || one;
-  const d = Math.max(0, Math.min(1, axisDistance(cu)));
-  const lo = d <= 0.5 ? A : B, hi = d <= 0.5 ? B : C, t = d <= 0.5 ? d * 2 : (d - 0.5) * 2;
-  const out = {}; for (const k of RARITY_ORDER) out[k] = (lo[k]||0) + ((hi[k]||0) - (lo[k]||0)) * t;
-  // 極の上限。超えたぶんは他の3つへ比例配分して戻す（合計は変えない）。
+  if (!tbl.length) return Object.assign({}, one);
+  if (prog <= tbl[0].p) return { nami:tbl[0].nami, jou:tbl[0].jou, tokujou:tbl[0].tokujou, kiwami:tbl[0].kiwami };
+  const last = tbl[tbl.length - 1];
+  if (prog >= last.p) return { nami:last.nami, jou:last.jou, tokujou:last.tokujou, kiwami:last.kiwami };
+  for (let i = 0; i + 1 < tbl.length; i++){
+    const a = tbl[i], b = tbl[i+1];
+    if (prog >= a.p && prog <= b.p){
+      const t = (b.p - a.p) > 0 ? (prog - a.p) / (b.p - a.p) : 0;
+      const out = {}; for (const k of RARITY_ORDER) out[k] = (a[k]||0) + ((b[k]||0) - (a[k]||0)) * t;
+      return out;
+    }
+  }
+  return Object.assign({}, one);
+}
+// 軸の距離ごとの倍率（主軸と遠い軸の2行を距離で線形補間）。
+function rarityDistMul(d){
+  const R = (CONFIG.params.rarity || {}).distMul || {};
+  const one = { nami:1, jou:1, tokujou:1, kiwami:1 };
+  const A = R.main || one, B = R.far || one;
+  const t = Math.max(0, Math.min(1, d));
+  const out = {}; for (const k of RARITY_ORDER) out[k] = (A[k] != null ? A[k] : 1) + ((B[k] != null ? B[k] : 1) - (A[k] != null ? A[k] : 1)) * t;
+  return out;
+}
+// 手順：①進行度から基準の4値 → ②距離の倍率を掛ける → ③極を上限でクランプ → ④合計1に正規化。
+function rarityRatesFor(cu){
+  const rr = CONFIG.params.rarity || {};
+  const base = rarityBaseFor(runProgress());
+  //   無印は軸ではないので「主軸からの距離」が定義できない。中間として扱う（既定 0.5・調整欄から変更可）。
+  const d = (cu === "none") ? (rr.noneDist != null ? rr.noneDist : 0.5) : Math.max(0, Math.min(1, axisDistance(cu)));
+  const mul = rarityDistMul(d);
+  const out = {}; for (const k of RARITY_ORDER) out[k] = Math.max(0, (base[k] || 0) * (mul[k] || 0));
+  // ③極の上限。倍率で押し上げてもここで止める。
   const cap = (typeof rr.kiwamiMax === "number") ? rr.kiwamiMax : 1;
+  // ④合計1に正規化（クランプの前に正規化すると上限を超えるので、この順で行う）。
+  let tot = 0; for (const k of RARITY_ORDER) tot += out[k];
+  if (tot > 0) for (const k of RARITY_ORDER) out[k] /= tot; else out.nami = 1;
   if (out.kiwami > cap){
     const over = out.kiwami - cap; out.kiwami = cap;
     let rest = 0; for (const k of RARITY_ORDER) if (k !== "kiwami") rest += out[k];
-    if (rest > 0) for (const k of RARITY_ORDER) if (k !== "kiwami") out[k] += over * (out[k] / rest);
-    else out.nami += over;
+    // ※ 波括弧を省くと else が内側の if に付き、k==="kiwami" の周で余りが二重に足される（Wave7 から
+    //   潜んでいたが、当時は極の基準が上限とちょうど同値でクランプが発火しなかったため出ていなかった）。
+    if (rest > 0){
+      for (const k of RARITY_ORDER) if (k !== "kiwami") out[k] += over * (out[k] / rest);
+    } else {
+      out.nami += over;
+    }
   }
   return out;
 }
@@ -4915,14 +4971,19 @@ function renderSettings(){
 
   // ── 進行：レアリティ（3択/店の出現率と店の値段）── Wave7 Step1・すべて仮値
   const rr = CONFIG.params.rarity;
-  const RATE_JA = { main:"主軸（距離0）", mid:"中間（距離0.5）", far:"遠い軸（デッキに0枚）" };
-  g = group("レアリティ：出現率（軸の距離ごと・合計1になるように入れる）", "run");
+  g = group("レアリティ：進行の基準（進行度＝営業日/dayGoal・各行の合計1）", "run");
   gridRow(g, "レアリティを使う", boolInput(()=>rr.on!==false, v=>rr.on=v));
   gridRow(g, "極の上限", numInput(()=>rr.kiwamiMax, v=>rr.kiwamiMax=Math.max(0,Math.min(1,v)), 0.01));
-  for (const row of ["main","mid","far"]){
+  gridRow(g, "無印の距離（軸ではないので中間扱い）", numInput(()=>rr.noneDist, v=>rr.noneDist=Math.max(0,Math.min(1,v)), 0.1));
+  rr.progress.forEach((row, i) => {
     for (const k of RARITY_ORDER)
-      gridRow(g, RATE_JA[row]+"："+RARITY_JA[k], numInput(()=>rr.rates[row][k], v=>rr.rates[row][k]=Math.max(0,Math.min(1,v)), 0.01));
-  }
+      gridRow(g, "進行度"+row.p+"："+RARITY_JA[k], numInput(()=>rr.progress[i][k], v=>rr.progress[i][k]=Math.max(0,Math.min(1,v)), 0.01));
+  });
+  g = group("レアリティ：軸の距離による倍率（加算ではなく倍率）", "run");
+  { const DM_JA = { main:"主軸（距離0）", far:"遠い軸（距離1）" };
+    for (const row of ["main","far"])
+      for (const k of RARITY_ORDER)
+        gridRow(g, DM_JA[row]+"："+RARITY_JA[k]+" ×", numInput(()=>rr.distMul[row][k], v=>rr.distMul[row][k]=Math.max(0,v), 0.1)); }
   g = group("レアリティ：アーティファクトの重み（軸を持たないので専用）", "run");
   for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の重み", numInput(()=>rr.artifactWeights[k], v=>rr.artifactWeights[k]=Math.max(0,v), 1));
   g = group("レアリティ：店の基準価格", "run");
@@ -5439,6 +5500,7 @@ window.RUN = {
   setMoney: (v) => { money = v; moneyShown = v; refreshMoney(false); },
   // 時間軸系（もち・たら＝基礎の育ち／ほたて＝倍率の育ち／白バンズ・さけ＝取得後の個数）の内部状態を計測から制御する。
   setCompleted: (v) => { completedCount = v; },
+  setDays: (v) => { daysSurvived = Math.max(0, Math.round(v)); updateRunStatus(); return daysSurvived; },   // 進行度の確認用（Wave8）
   reset: () => resetRun(),
   // シード管理：測定スクリプトからランを再生するための口。
   seed: () => gameSeed,                              // 現在のランのシードを読む（記録用）
@@ -5451,6 +5513,8 @@ window.RUN = {
   setGrowth: (id, g) => { const x = deck.find(d => d.id === id); if (x){ x.g = g|0; renderPiles(); } },
   // レアリティ（Wave7 Step1）：軸の距離と出現率表、レアリティが隣に落ちた記録を読む（記録の確認用）。
   rarityRates: (cu) => rarityRatesFor(cu),
+  rarityBase: () => rarityBaseFor(runProgress()),                             // 進行の基準（Wave8 Step1）
+  progress: () => runProgress(),
   axisRates: () => axisRates(),                                               // 5軸の出現率（Wave7 Step2）
   // バンズ（Wave7 Step4）：4枠の読み出しと、テストから枠を組む口。
   buns: () => bunSlots.map(x => ({ id:x.id, name:x.name, g:x.g||0, uses:x.uses||0 })),
@@ -5507,12 +5571,32 @@ function selfCheck(){
   const RAR_EXPECT = { nami:26, jou:39, tokujou:23, kiwami:8 };   // KENTO「96枚のレアリティ割り振り案」§3
   const rarBad = RARITY_ORDER.filter(k => rarN[k] !== RAR_EXPECT[k]);
   if (rarBad.length) warn.push("レアリティの枚数が KENTO と違う: " + rarBad.map(k => RARITY_JA[k]+" "+rarN[k]+"（想定"+RAR_EXPECT[k]+"）").join(" / "));
-  // ⑦ 出現率の表。3行それぞれ合計1（±0.005）で、極が上限を超えていないこと。
-  const rr = CONFIG.params.rarity || {}, RT = rr.rates || {};
-  for (const row of ["main","mid","far"]){
-    const t = RARITY_ORDER.reduce((s,k)=> s + ((RT[row]||{})[k] || 0), 0);
-    if (Math.abs(t - 1) > 0.005) warn.push("出現率の合計が1でない（" + row + "）: " + t.toFixed(3));
-    if (((RT[row]||{}).kiwami || 0) > (rr.kiwamiMax || 1) + 1e-9) warn.push("極が上限を超えている（" + row + "）");
+  // ⑦ 出現率（Wave8 Step1）。進行の表は各行の合計が1（±0.005）で、極の基準が上限以下・進行度が昇順。
+  //    距離の倍率は main / far の4値がそろっていること。実際に引ける率も合計1・極が上限以下であること。
+  const rr = CONFIG.params.rarity || {};
+  {
+    const tbl = rr.progress || [];
+    if (!tbl.length) warn.push("進行のレアリティ表が空");
+    let prev = -1;
+    for (const row of tbl){
+      const t = RARITY_ORDER.reduce((s,k)=> s + (row[k] || 0), 0);
+      if (Math.abs(t - 1) > 0.005) warn.push("進行の表の合計が1でない（進行度 " + row.p + "）: " + t.toFixed(3));
+      if ((row.kiwami || 0) > (rr.kiwamiMax || 1) + 1e-9) warn.push("進行の表の極が上限を超えている（進行度 " + row.p + "）");
+      if (row.p <= prev) warn.push("進行の表が昇順でない（進行度 " + row.p + "）");
+      prev = row.p;
+    }
+    const dm = rr.distMul || {};
+    for (const row of ["main","far"]){
+      const miss = RARITY_ORDER.filter(k => typeof (dm[row] || {})[k] !== "number");
+      if (miss.length) warn.push("距離の倍率が足りない（" + row + "）: " + miss.join(" "));
+    }
+    // 実際に引ける率（いまの進行度・主軸と遠い軸）でも合計1・極が上限以下
+    for (const cu of [deckMainCuisine() === "none" ? AXES[0] : deckMainCuisine(), "none"]){
+      const r = rarityRatesFor(cu);
+      const t = RARITY_ORDER.reduce((s,k)=> s + r[k], 0);
+      if (Math.abs(t - 1) > 1e-6) warn.push("引ける率の合計が1でない（" + cu + "）: " + t.toFixed(6));
+      if (r.kiwami > (rr.kiwamiMax || 1) + 1e-9) warn.push("引ける率の極が上限を超えている（" + cu + "）");
+    }
   }
   // ⑨ 軸の傾斜（Wave7 Step2）。合計1・どの軸も下限以上・主軸が上限以下、を式そのもので点検する。
   {
