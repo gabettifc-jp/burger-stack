@@ -1030,9 +1030,14 @@ const DEFAULTS = {
               scaleOnBuy: false, scaleMul: 1.2 },
     // アーティファクト（第3層・SHOKUZAI §10）。所持上限・店に並ぶ数・各効果の数値は CONFIG.artifacts。
     artifacts: { on: true, maxOwned: 5 },
-    // 3択の傾斜（item14）：既にデッキにある軸に寄せる。strength=傾斜の強さ 0（完全ランダム）〜1（自分の軸のみ）。
-    //   ramp=true で「軸が固まるほど傾斜が強まる」（序盤は全軸均等）。distinctAxes=3枚を可能な限り別々の軸から出す。
-    offerBias: { strength: 0.35, ramp: true, distinctAxes: true },
+    // 軸の傾斜（Wave7 Step2・すべて仮値）。デッキの軸構成から5軸の出現率を出す。
+    //   k     : 1.0=デッキ枚数に単純比例／0=完全均等。単純比例だと1枚取った瞬間に偏るので鈍らせる。
+    //   floor : どの軸にも最低これだけは出す。他4軸に floor ずつ配るので、主軸は最大 1-4*floor。
+    axisBias: { k: 0.6, floor: 0.10 },
+    // 3択の見せ方（item14 の残り）。distinctAxes=3枚を可能な限り別々の軸から出す。
+    //   ※ 既定を false にした。true にすると1回の3択が必ず別々の軸で埋まるので、
+    //     上の axisBias で決めた軸の出現率が3択の画面では成立しなくなる（Wave7 §4 と両立しない）。
+    offerBias: { distinctAxes: false },
     // デバッグ：3択の候補に出す軸（cuisine）を軸ごとにON/OFF。既定は全部ON。「和だけON」等の絞り込み用。
     offerCuisines: { none:true, wa:true, chuka:true, kaisen:true, kokyu:true, agemono:true },
     countUp:     0.18,  // 点数の数え上げ時間(秒)
@@ -1063,6 +1068,9 @@ const PILE_JA = { bun:"バンズ", ingredient:"具材", sauce:"ソース" };
 // 軸（cuisine）。系統(type)とは別の第2のタグ。1枚が「系統」と「軸」の両方を持つ。
 const CUISINE_JA = { none:"無印", wa:"和", chuka:"中華", kaisen:"海鮮", kokyu:"高級", agemono:"揚げ物" };
 const CUISINE_ORDER = ["none","wa","chuka","kaisen","kokyu","agemono"];
+// 「軸」は5つ。無印は軸ではない（軸の傾斜・軸別のレアリティ表に乗らない／Wave7 §4-1）。
+//   主軸が同数のときは、この順で先に来る軸を主軸とする（乱数を使わない＝再現性を守るため）。
+const AXES = ["wa","chuka","kaisen","kokyu","agemono"];
 const CUI_DIFF = "_diff";   // 五目あん：どの軸とも一致しない専用の値（「互いに違う軸として扱う」ための読み替え先）
 // レアリティ（SHOKUZAI §11）。抽選確率と店の値段に使う。
 const RARITY_JA = { nami:"並", jou:"上", tokujou:"特上", kiwami:"極" };
@@ -3070,7 +3078,7 @@ function collect(){
   }
   for (let k = 0; k < (sc.sacrificeRandom || 0); k++){   // キャビア：自分以外から無作為に1個体
     // バンズ山は対象外（Wave6 1-4）。バンズは ゴマバンズ 1種2枚しか無く、1枚失うとその場で段数が1減る。
-    //   offerPool() には入っているので3択・店に並ぶことはあるが、狙って買えず引き運任せ。
+    //   ゴマバンズは無印なので Wave7 Step2 以降は3択には出ず、店に並ぶことはある（狙って買えず引き運任せ）。
     //   プレイヤーの選択と無関係に段数が減るのは他のカードが減るのとは性質が違うため、廃棄の対象から外す。
     const pool = deck.filter(x => CONFIG.items[x.name].pile !== "bun" && CONFIG.items[x.name].effect.id !== "caviar");
     if (!pool.length) break;
@@ -3122,23 +3130,19 @@ function sample(arr, n){
 // デッキの主要軸と、その「固まり具合」（主要軸が軸カード全体に占める割合 share）。傾斜のランプに使う。
 function deckAxisInfo(){
   const c = {}; let totAx = 0;
-  for (const nm of catalogNames()){ const cu = CONFIG.items[nm].cuisine || "none"; if (cu === "none") continue; c[cu] = (c[cu]||0) + CONFIG.items[nm].count; totAx += CONFIG.items[nm].count; }
-  let main = "none", bestN = 0; for (const cu of Object.keys(c)) if (c[cu] > bestN){ bestN = c[cu]; main = cu; }
-  return { main, share: totAx > 0 ? bestN / totAx : 0, totAx };
+  for (const cu of AXES) c[cu] = 0;
+  for (const nm of catalogNames()){ const cu = CONFIG.items[nm].cuisine || "none"; if (cu === "none") continue; c[cu] += CONFIG.items[nm].count; totAx += CONFIG.items[nm].count; }
+  // 同数のときは AXES の順で先に来る軸を主軸とする（固定順＝乱数を使わない。再現性のため）。
+  //   なお同数の軸は距離も0になるので、どちらを主軸にしてもレアリティ表は同じになる。
+  let main = "none", bestN = 0; for (const cu of AXES) if (c[cu] > bestN){ bestN = c[cu]; main = cu; }
+  return { main, share: totAx > 0 ? bestN / totAx : 0, totAx, counts: c };
 }
 function deckMainCuisine(){ return deckAxisInfo().main; }
 // 軸ごとのデッキ内枚数（無印も1つの区分として数える）。
 const cuisineCount = cu => catalogNames().reduce((s,n)=> s + (((CONFIG.items[n].cuisine||"none") === cu) ? CONFIG.items[n].count : 0), 0);
-// 3択の傾斜の実効強度（item14）。0=完全ランダム / 1=自分の軸のみ。ramp で軸が固まるほど強まる。
-//   ※ item15 の「ピクルス」による上乗せは、Wave1 でカードプールが96枚に入れ替わった際に
-//     ピクルス自体がプールから消えたため撤去した（CONFIG.items に存在しない＝ずっと不発だった）。
-function offerBiasStrength(){
-  const ob = CONFIG.params.offerBias || {}; const info = deckAxisInfo();
-  if (info.main === "none") return { main:"none", strength:0 };
-  let s = Math.max(0, ob.strength || 0);
-  if (ob.ramp) s *= info.share;                     // 序盤（share小）は弱く、固まるほど強く
-  return { main: info.main, strength: Math.max(0, Math.min(1, s)) };
-}
+// ※ item14 の offerBias.strength / ramp（主軸以外の重みを下げる方式）と、item15 の「ピクルス」による
+//   上乗せは Wave7 Step2 で撤去した。軸の傾斜は axisRates()（k と下限）に一本化した。
+//   ピクルスはそもそも Wave1 でカードプールが96枚に入れ替わったときに消えており、ずっと不発だった。
 
 // ── Wave7 Step1：3択・店の抽選を「軸 → レアリティ → カード」の3段にする ────────────
 //   狙い：レアリティの出る比率を、そのレアリティの枚数から切り離す。極が8枚でも23枚でも
@@ -3180,17 +3184,43 @@ function drawRarity(cu){
   for (const k of RARITY_ORDER){ r -= Math.max(0, rates[k]); if (r <= 0) return k; }
   return "nami";
 }
-// 軸を引く重み。Step1 では「プール内の枚数 × 既存の傾斜（item14・仕入れ帳）」。
-//   Step2 でデッキ構成からの傾斜式（k・下限）に差し替える。
-function axisDrawWeights(pool){
-  const w = {};
-  for (const nm of pool){ const cu = CONFIG.items[nm].cuisine || "none"; w[cu] = (w[cu]||0) + 1; }
-  const ob = offerBiasStrength(), led = artById("ledger"), main = deckMainCuisine();
-  for (const cu of Object.keys(w)){
-    if (led && cu === main && cu !== "none") w[cu] *= (led.weight || 1);            // 仕入れ帳：主軸に寄せる（軸の段に効く）
-    if (ob.main !== "none" && cu !== ob.main) w[cu] *= Math.max(0.0001, 1 - ob.strength);
-    w[cu] = Math.max(0.0001, w[cu]);
+// ── Wave7 Step2：軸の出現率（デッキ構成からの傾斜と下限）─────────────────────
+//   デッキの軸構成から5軸の出る確率を出す。無印は3択の抽選から外す（店専用・Step3）。
+//   式（Wave7 §4-1 に式そのものが載っていなかったため、書かれている条件から起こしたもの）：
+//     share_i = c_i / C                              … C=軸カードの総枚数（C=0 なら share=1/5）
+//     q_i     = (1 - k)/5 + k * share_i               … k=1 で単純比例、k=0 で完全均等
+//     p_i     = floor + (1 - 5*floor) * q_i           … 下限を全軸に確保し、残りを q で配る
+//   これで「合計1」「どの軸も floor 以上」「主軸は最大 1-4*floor（下限10%なら60%）」
+//   「軸カードが0枚なら各20%」が同時に満たされる。
+function axisRates(){
+  const ab = CONFIG.params.axisBias || {};
+  const k = Math.max(0, Math.min(1, ab.k != null ? ab.k : 0.6));
+  const nAx = AXES.length;
+  const floor = Math.max(0, Math.min(1 / nAx, ab.floor != null ? ab.floor : 0.1));
+  const cnt = {}; let C = 0;
+  for (const cu of AXES){ cnt[cu] = cuisineCount(cu); C += cnt[cu]; }
+  const q = {};
+  for (const cu of AXES) q[cu] = (1 - k) / nAx + k * (C > 0 ? cnt[cu] / C : 1 / nAx);
+  // 仕入れ帳（アーティファクト）：主軸をさらに重くする。比例のぶん（q）に掛けて正規化するので、
+  //   下限と「主軸の上限」は壊れない。作り替えは Step5。
+  const led = artById("ledger"), main = deckMainCuisine();
+  if (led && main !== "none" && q[main] != null){
+    q[main] *= (led.weight || 1);
+    let t = 0; for (const cu of AXES) t += q[cu];
+    if (t > 0) for (const cu of AXES) q[cu] /= t;
   }
+  const out = {};
+  for (const cu of AXES) out[cu] = floor + (1 - nAx * floor) * q[cu];
+  return out;
+}
+// 軸を引く重み。プールに1枚も無い軸は落とし、残りを axisRates() の比で引く。
+function axisDrawWeights(pool){
+  const has = {};
+  for (const nm of pool){ const cu = CONFIG.items[nm].cuisine || "none"; has[cu] = true; }
+  const rates = axisRates(), w = {};
+  for (const cu of AXES) if (has[cu]) w[cu] = Math.max(0.0001, rates[cu]);
+  // 無印は3択の抽選から外す（Step3 で店専用）。ただし店のプールなど無印しか無い場合は落とせない。
+  if (has.none && Object.keys(w).length === 0) w.none = 1;
   return w;
 }
 // プールから1枚引く。軸 → レアリティ → そのレアリティ内で均等。
@@ -3230,10 +3260,15 @@ function sampleWeighted(arr, n){
   }
   return out;
 }
-// 3択の候補プール：デバッグの軸ON/OFF（offerCuisines）で有効な軸のカードだけを対象にする。
-function offerPool(){
+// 候補プール：デバッグの軸ON/OFF（offerCuisines）で有効な軸のカードだけを対象にする。
+//   noNone=true で無印を外す。3択は無印を出さない（Wave7 §4-1・無印は店専用にする）。
+function offerPool(noNone){
   const oc = CONFIG.params.offerCuisines || {};
-  return catalogNames().filter(n => { const c = CONFIG.items[n].cuisine || "none"; return oc[c] !== false; });
+  return catalogNames().filter(n => {
+    const c = CONFIG.items[n].cuisine || "none";
+    if (noNone && c === "none") return false;
+    return oc[c] !== false;
+  });
 }
 const pileTotal = key => catalogNames().reduce((s,n)=> s + (CONFIG.items[n].pile===key ? CONFIG.items[n].count : 0), 0);
 // item14：3枚（以上）を可能なかぎり別々の軸から出す。重み順に引き、まず軸が重複しないものを選ぶ。
@@ -3247,7 +3282,7 @@ function sampleOfferCards(pool, n){
 }
 let offerRerollsLeft = 0;   // item15：オニオンの引き直し残り回数（この3択の間だけ）
 function showOffer(){
-  const pool = offerPool();
+  const pool = offerPool(true);                     // 3択は無印を出さない（Wave7 Step2）
   if (pool.length === 0){ advanceOffer(); return; }  // 全軸OFFなら3択は飛ばす
   const sb = artById("signboard");                  // 看板：3択の選択肢が増える
   const tomato = CONFIG.items["トマト"];            // item15：トマトがデッキにあると選択肢が増える
@@ -4082,12 +4117,18 @@ function renderSettings(){
   g = group("完成ごとの3択（無料・毎回。削除は店へ移動）", "run");
   gridRow(g, "何スピンごとに出すか", numInput(()=>CONFIG.params.offer.every, v=>CONFIG.params.offer.every=Math.max(1,Math.round(v)), 1));
 
-  // ── 進行：3択の傾斜（item14）──
-  { const ob = CONFIG.params.offerBias;
-    g = group("3択の傾斜（デッキの軸に寄せる）", "run");
-    gridRow(g, "傾斜の強さ(0=無/1=自軸のみ)", numInput(()=>ob.strength, v=>ob.strength=Math.max(0,Math.min(1,v)), 0.05));
-    gridRow(g, "軸が固まるほど強める(ramp)", boolInput(()=>ob.ramp, v=>ob.ramp=v));
-    gridRow(g, "3枚を別々の軸から出す", boolInput(()=>ob.distinctAxes, v=>ob.distinctAxes=v)); }
+  // ── 進行：軸の傾斜（Wave7 Step2・すべて仮値）──
+  { const ab = CONFIG.params.axisBias, ob = CONFIG.params.offerBias;
+    g = group("軸の傾斜（デッキ構成から5軸の出現率を出す）", "run");
+    // いまの出現率を読み取り専用で見せる（下限と主軸の上限が効いているかを画面で確かめられるように）。
+    const view = document.createElement("input"); view.type = "text"; view.readOnly = true; view.id = "axisRateView";
+    const upd = () => { const r = axisRates();
+      view.value = AXES.map(cu => CUISINE_JA[cu] + " " + (r[cu]*100).toFixed(1) + "%").join(" / ")
+                 + "（主軸 " + (deckMainCuisine() === "none" ? "無し" : CUISINE_JA[deckMainCuisine()]) + "）"; };
+    gridRow(g, "k（1=枚数に比例／0=均等）", numInput(()=>ab.k, v=>{ab.k=Math.max(0,Math.min(1,v)); upd();}, 0.05));
+    gridRow(g, "どの軸にも出す下限", numInput(()=>ab.floor, v=>{ab.floor=Math.max(0,Math.min(1/AXES.length,v)); upd();}, 0.01));
+    gridRow(g, "3枚を別々の軸から出す", boolInput(()=>ob.distinctAxes, v=>ob.distinctAxes=v));
+    upd(); gridRow(g, "いまの出現率", view); }
 
   // ── 進行：3択に出す軸（デバッグ的だが3択内容の絞り込み） ──
   g = group("3択に出す軸（既定 全ON）", "run");
@@ -4559,6 +4600,8 @@ window.RUN = {
   setGrowth: (id, g) => { const x = deck.find(d => d.id === id); if (x){ x.g = g|0; renderPiles(); } },
   // レアリティ（Wave7 Step1）：軸の距離と出現率表、レアリティが隣に落ちた記録を読む（記録の確認用）。
   rarityRates: (cu) => rarityRatesFor(cu),
+  axisRates: () => axisRates(),                                               // 5軸の出現率（Wave7 Step2）
+  mainCuisine: () => deckMainCuisine(),
   axisDistance: (cu) => axisDistance(cu),
   rarityFallbacks: () => rarityFallbacks.slice(),
   clearRarityFallbacks: () => { rarityFallbacks = []; },
@@ -4605,6 +4648,15 @@ function selfCheck(){
     const t = RARITY_ORDER.reduce((s,k)=> s + ((RT[row]||{})[k] || 0), 0);
     if (Math.abs(t - 1) > 0.005) warn.push("出現率の合計が1でない（" + row + "）: " + t.toFixed(3));
     if (((RT[row]||{}).kiwami || 0) > (rr.kiwamiMax || 1) + 1e-9) warn.push("極が上限を超えている（" + row + "）");
+  }
+  // ⑨ 軸の傾斜（Wave7 Step2）。合計1・どの軸も下限以上・主軸が上限以下、を式そのもので点検する。
+  {
+    const ab = CONFIG.params.axisBias || {}, fl = (ab.floor != null ? ab.floor : 0.1);
+    const r = axisRates(); let t = 0, low = [], hi = [];
+    for (const cu of AXES){ t += r[cu]; if (r[cu] < fl - 1e-9) low.push(cu); if (r[cu] > 1 - (AXES.length-1)*fl + 1e-9) hi.push(cu); }
+    if (Math.abs(t - 1) > 1e-6) warn.push("軸の出現率の合計が1でない: " + t.toFixed(6));
+    if (low.length) warn.push("軸の出現率が下限を割っている: " + low.join(" "));
+    if (hi.length) warn.push("軸の出現率が上限を超えている: " + hi.join(" "));
   }
   // ⑧ どの軸にも「並」が1枚以上あること（無い軸を引くと毎回フォールバックが起きる＝設計の穴）。
   //    無印に極が無いのは設計どおりなので、ここでは並だけを見る。
