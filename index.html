@@ -802,6 +802,10 @@ const DEFAULTS = {
     "コンソメ": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:108, effect:{id:"cuiRatioMult", cui:"kokyu", mult:1.3, other:0.9}, ph:true, },  // 高級1枚につき ×1.3、高級以外1枚につき ×0.9
     "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"kiwami", weight:92, effect:{id:"perigueux", mult:2.0, bonus:1.5}, ph:true, },  // 接する高級1枚につき ×2.0。トリュフ/フォアグラなら更に ×1.5
     "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"tokujou", weight:124, effect:{id:"drawFewerMult", draw:-2, mult:2.5}, ph:true, },  // 引く枚数 −2、×2.5
+    /* ── Wave9：成長ソース5枚（各軸に1枚）。倍率が個体ごとに育つ型（KENTO「打点の物差しとソースの設計」§4）。
+       pm0＝pm の初期値（0.5＝×1.5 開始）／per＝1回あたり／pmMax＝pm の上限（5.0＝×6）。基礎点は0（ソースは乗算の層）。
+       数値はすべて仮値で、調整欄から動かせる。weight は Wave7 Step0 で未使用になったので新規カードには置かない。 */
+    "トリュフオイル": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growOnPickMain", pm0:0.5, per:0.3, pmMax:5.0}, ph:true, },  // 3択で主軸のカードを取るたび ×0.3 ずつ育つ
     "ぎょうざ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:40, count:0, tier:null, rar:"tokujou", weight:102, effect:{id:"perCuiAdd", per:40}, ph:true, },  // 基礎点40。このバーガーの中華1枚につき +40
     "もやし": { pile:"ingredient", type:"veg", cuisine:"chuka", base:5, count:0, tier:null, rar:"nami", weight:66, effect:{id:"selfDeckAdd", per:10}, ph:true, },  // 基礎点5。デッキのもやし1枚につき +10
     "エビチリ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:138, effect:{id:"deckSizeAdd", per:4}, ph:true, },  // デッキ枚数×4を加算
@@ -817,6 +821,7 @@ const DEFAULTS = {
     "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"tokujou", weight:106, effect:{id:"adjCuiMult", mult:1.5}, ph:true, },  // 接する中華1枚につき ×1.5
     "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"kiwami", weight:120, effect:{id:"adjTwoCuiMult", cuiA:"kaisen", cuiB:"chuka", mult:1.8}, ph:true, },  // 接する海鮮または中華1枚につき ×1.8
     "ソース焼きそば": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"tokujou", weight:64, effect:{id:"deckSizeMult", per:1.04, maxMul:5.0}, ph:true, },  // デッキ1枚につき ×1.04
+    "豆板醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growUndrawnMult", pm0:0.5, per:0.15, pmMax:5.0}, ph:true, },  // Wave9：盤面に出なかったスピンごとに ×0.15 ずつ育つ
     "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:4, count:0, tier:null, rar:"nami", weight:26, effect:{id:"dayBaseMul", mult:2}, ph:true, },  // 基礎点4。営業日をまたぐごとに基礎点2倍
     "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", weight:98, effect:{id:"growDrawn", per:1}, ph:true, },  // 基礎点20。引かれるたび育ち+1
     "昆布": { pile:"ingredient", type:"veg", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:176, effect:{id:"growUndrawn", per:1}, ph:true, },  // 引かれなかったスピンごとに育ち+1
@@ -833,6 +838,7 @@ const DEFAULTS = {
     "魚醤": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"tokujou", weight:95, effect:{id:"adjGrowMult", per:5, mult:1.2}, ph:true, },  // 接する具材の育ち5段階につき ×1.2
     "醤油": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"kiwami", weight:90, effect:{id:"doubleGrowBonusAdj"}, ph:true, },  // 隣接する具材の育ちを2倍として計算
     "出汁": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"tokujou", weight:110, effect:{id:"maxGrowToAdj"}, ph:true, },  // 最も育った具材の育ちを、隣接2枚にもコピーして計算
+    "イカ墨ソース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"drainAdjGrow", pm0:0.5, per:0.1, take:3, pmMax:5.0}, ph:true, },  // Wave9：隣接する具材の育ちを吸い取って育つ（参照ではなく移動）
     "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:55, count:0, tier:null, rar:"nami", weight:158, effect:{id:null}, ph:true, },  // 基礎点55。効果なし
     "海老フライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:114, effect:{id:"perCuiAdd", per:25}, ph:true, },  // このバーガーの揚げ物1枚につき +25
     "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:35, count:0, tier:null, rar:"nami", weight:130, effect:{id:null}, ph:true, },  // 基礎点35。このスピンの引き直し1回につき +45
@@ -848,6 +854,7 @@ const DEFAULTS = {
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"kiwami", weight:105, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する揚げ物1枚につき ×1.6
     "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:123, effect:{id:"forceWin"}, ph:true, },  // 隣接する「賭け」の効果を必ず成功させる
     "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"tokujou", weight:160, effect:{id:"soloSauceMult", mult:2.5, dec:0.4, min:1.0}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
+    "タルタルソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growOnRareDiscard", pm0:0.5, per:0.5, pmMax:5.0}, ph:true, },  // Wave9：特上以上のカードが失われるたび ×0.5 ずつ育つ
     "白米": { pile:"ingredient", type:"veg", cuisine:"wa", base:30, count:0, tier:null, rar:"jou", weight:144, effect:{id:"adjCuiAdd", per:45}, ph:true, },  // 基礎点30。隣接する和1枚につき +45
     "豆腐": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:62, effect:{id:"tofu", per:40}, ph:true, },  // 隣接2枚の基礎点を各 +40
     "油揚げ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"nami", weight:60, effect:{id:"drawAdjAdd", per:8}, ph:true, },  // 引かれるたび、隣接2枚に +8（永続）
@@ -865,6 +872,7 @@ const DEFAULTS = {
     "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
     "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
     "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:48, effect:{id:"antiCuiMult", cui:"wa", mult:2.8, dec:0.3, min:1.0}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
+    "ぽん酢": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growAdjNami", pm0:0.5, per:0.15, pmMax:5.0}, ph:true, },  // Wave9：盤面で並のカードと接するたび ×0.15 ずつ育つ（接している枚数ぶん）
     "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
     "チーズ": { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:52, effect:{id:null}, },  // 初期デッキ。効果なし
     "きゅうり": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:38, effect:{id:null}, },  // 初期デッキ。効果なし
@@ -1403,7 +1411,11 @@ function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name
 //   g と pb は別物：育ちは海鮮の縛り、営業日・発動回数で伸びるカードは pb/pm を使う。
 function addInstance(name, init){ if (!CONFIG.items[name]) return null;
   const o = (typeof init === "number") ? { g: init } : (init || {});
-  const inst = { id:++instSeq, name, g:(o.g|0), pb:(o.pb|0), pm:(o.pm||0), uses:(o.uses|0), charge:(o.charge|0) };
+  /* pm の初期値（Wave9）：effect.pm0 を持つカードは ×(1+pm0) から始まる（成長ソース5枚＝×1.5 開始）。
+     個体を作る経路はここ1本に集まっている（3択・店・初期デッキ・調整欄の＋・RUN の計測口）ので、この1行で全部に効く。
+     || ではなく != null で見る：明示的に pm:0 を渡した呼び出しを潰さないため。pm0 の無いカードは従来どおり 0（＝×1.0）。 */
+  const pm0 = ((CONFIG.items[name].effect || {}).pm0) || 0;
+  const inst = { id:++instSeq, name, g:(o.g|0), pb:(o.pb|0), pm:(o.pm != null ? o.pm : pm0), uses:(o.uses|0), charge:(o.charge|0) };
   deck.push(inst); syncCounts(); return inst; }
 function removeInstanceById(id){ const i = deck.findIndex(x => x.id === id); if (i>=0){ deck.splice(i,1); syncCounts(); return true; } return false; }
 function removeOneByName(name){ let idx=-1; for (let i=0;i<deck.length;i++) if (deck[i].name===name && (idx<0 || deck[i].g<deck[idx].g)) idx=i;  // 編集の −：同名なら最も育っていない個体を消す
@@ -1653,6 +1665,15 @@ function growSpinEnd(boardIds){                             // 昆布：スピ�
   const e = CONFIG.items["昆布"].effect || {}; const per = e.per || 1;
   for (const x of deck){ if (x.name === "昆布" && !boardIds.has(x.id)) grow(x, per); }
 }
+/* Wave9 豆板醤：スピン終了時、盤面に出なかった個体の「倍率」が育つ（昆布と同じ呼び出し位置・同じ判定）。
+   ソース枠より多くソースを持つ理由を作るカード（KENTO §4-3）。枠3・デッキのソース5枚なら毎回3枚出て2枚が育つ。
+   空引き（組めない回）は buildPlan が null を返して回収まで来ないので育たない。昆布と同じ扱いで、Wave4 3-6 の二重発火も踏まない。 */
+function pmSpinEnd(boardIds){
+  for (const x of deck){
+    const e = CONFIG.items[x.name].effect;
+    if (e && e.id === "growUndrawnMult" && !boardIds.has(x.id)) bumpPm(x, e, e.per || 0.15);
+  }
+}
 function growDrawn(insts){                                  // ほたて：引かれた個体の育ち+1（Wave4：空引きで発火しないよう buildPlan 側から呼ぶ）
   for (const inst of insts){ const e = CONFIG.items[inst.name].effect; if (e && e.id === "growDrawn") grow(inst, e.per || 1); }
 }
@@ -1748,8 +1769,17 @@ function discardInstance(inst, cause, fireHooks){
   if (!removeInstanceById(inst.id)) return false;
   if (discardLog) discardLog.push({ name: inst.name, cause });
   else plog.recordRemove(inst.name, cause);
-  if (fireHooks !== false){ onDiscardSelf(inst); onAnyDiscard(inst); }   // 店の取り除きだけ false（D3）
+  if (fireHooks !== false){ onDiscardSelf(inst); onAnyDiscard(inst); onRareLost(inst); }   // 店の取り除きだけ false（D3）
   return true;
+}
+/* Wave9 タルタルソース：特上以上のカードが失われるたび、デッキのタルタルソースすべての倍率が育つ。
+   D3（店の取り除きは廃棄ではない＝フックを走らせない）は本体をそのまま守り、店の取り除きだけ呼び出し側から明示的にここを呼ぶ。
+   理由：このカードの狙いは「削除に積極的な理由をつける」ことであり（KENTO §4-3・M1/M2 で取り除きは一度も使われなかった）、
+   店の取り除きこそが主要な削除経路のため。天かす・白トリュフ（D3 の本体）の挙動には影響しない。
+   失われた当人は既にデッキから外れているので、自分自身が消えるときは数えない。 */
+function onRareLost(inst){
+  const r = rarityOf(inst.name); if (r !== "tokujou" && r !== "kiwami") return;
+  for (const x of deck){ const e = CONFIG.items[x.name].effect; if (e && e.id === "growOnRareDiscard") bumpPm(x, e, e.per || 0.5); }
 }
 // 天かす：自分が廃棄されたとき、デッキの揚げ物すべての pb を上げる（店の取り除きでは走らない・D3）。
 function onDiscardSelf(inst){
@@ -1765,6 +1795,14 @@ function onAnyDiscard(inst){
 /* ── ラン状態のフック（Wave4）。呼び出し位置は固定。中身は Step1〜5 で入れる。 ── */
 // ①スピン開始：永続の倍率（pm）が伸びるカード。上限は effect.pmMax（D4・仮値1.5＝×2.5）。
 //   pmMax は「pm の上限」で、倍率としては ×(1+pmMax)。倍率そのものの上限は maxMul（ソース焼きそば）＝別物（Wave6 1-1）。
+// pm の上限（effect.pmMax・既定 1.5）と、上限で止めながら pm を増やす共通口（Wave9）。実際に増えた量を返す。
+function pmCap(e){ return (e && e.pmMax != null) ? e.pmMax : 1.5; }
+function bumpPm(inst, e, amount){
+  if (!inst || !amount) return 0;
+  const before = inst.pm || 0;
+  inst.pm = Math.min(pmCap(e), before + amount);
+  return inst.pm - before;
+}
 function onSpinStart(){
   for (const x of deck){
     const e = CONFIG.items[x.name].effect; if (!e || !e.id) continue;
@@ -1799,6 +1837,18 @@ function onBoard(inst, stack){   // ④盤面成長：かに・あわび（Step1
       pendingForced.push({ kind:"rarestAxis" });     // ロースハム：次に引く1枚をデッキで最も少ない軸にする（枠は増えない）
     } else if (e.id === "useMult"){                  // カレーソース：使うたび pm が増える。上限回数で回収時に廃棄
       inst[i].uses += 1; inst[i].pm += (e.per || 0.3);
+    } else if (e.id === "drainAdjGrow"){             // イカ墨ソース：上下の具材から育ちを吸い取り、そのぶん自分の倍率が育つ（Wave9・参照ではなく移動）
+      const take = (e.take != null) ? e.take : 3; let got = 0;
+      for (const j of [i-1, i+1]){
+        if (j < 0 || j >= n || items[stack[j]].pile === "bun") continue;
+        const q = Math.min(take, inst[j].g || 0); if (q <= 0) continue;
+        inst[j].g -= q; got += q;                    // 吸われた側は育ちが減る＝内蔵された代償。減少なので さけ（加速）の対象外
+      }
+      if (got) bumpPm(inst[i], e, got * (e.per || 0.1));
+    } else if (e.id === "growAdjNami"){              // ぽん酢：上下に接する並のカード1枚につき倍率が育つ（Wave9）
+      let k = 0;
+      for (const j of [i-1, i+1]) if (j >= 0 && j < n && items[stack[j]].pile !== "bun" && rarityOf(stack[j]) === "nami") k++;
+      if (k) bumpPm(inst[i], e, k * (e.per || 0.15));
     } else if (e.id === "sacrificeBelowGrow"){       // あわび：下1枚の第1項を0にし、その半分（切り捨て）ぶん自分が育つ。下1枚は回収時に廃棄（Q6）
       const j = i - 1;
       if (j >= 0 && items[stack[j]].pile !== "bun"){
@@ -2005,6 +2055,12 @@ const EFFECT_TEXT = {
   spinMult:     e => `スピンごとに ×${e.per||0.15} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
   spinAxisMult: e => `毎スピン、デッキの軸の種類×${e.per||0.04} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
   useMult:      e => `使うたび ×${e.per||0.3} ずつ増える。${e.max||5}回使うと廃棄される`,
+  // Wave9（成長ソース5枚）。開始は pm0（×1.5）で、条件を満たすたび per ずつ育つ。上限は pmMax。現在の倍率はバッジ（×2.1）が出す。
+  growOnPickMain:   e => `3択でデッキの主軸のカードを取るたび ×${e.per||0.3} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
+  growUndrawnMult:  e => `盤面に出なかったスピンごとに ×${e.per||0.15} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
+  drainAdjGrow:     e => `上下に接する具材から育ちを1枚につき最大${(e.take!=null)?e.take:3}段階 吸い取り、吸った1段階につき ×${e.per||0.1} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
+  growOnRareDiscard:e => `特上以上のカードが失われるたび ×${e.per||0.5} ずつ育つ（店の取り除きも数える・上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
+  growAdjNami:      e => `上下に接する並のカード1枚につき ×${e.per||0.15} ずつ育つ（上限 ×${r2(1+((e.pmMax!=null)?e.pmMax:1.5))}）`,
   // Wave4 Step1（廃棄・盤面操作）
   discardCount: e => `廃棄が起きるたび 基礎点+${e.per||30}（永続）`,
   onDiscardBoost: e => `廃棄されると デッキの${CUISINE_JA[e.targetCui]||e.targetCui}すべてに 基礎点+${e.per||20}（永続）`,
@@ -2956,7 +3012,11 @@ function buildPlan(){
       }
     }
   }
-  return { stack: st, inst, rawG, boardIds: new Set(inst.map(x => x.id)), pendingDiscard: spinPendingDiscard.slice(), sc: score, layout: lay, grades, steps,
+  /* boardIds は「デッキの個体のうち、この盤面に出たもの」。バンズは所持枠（bunSlots）の別個体で、id が別連番（bunSeq）なので
+     そのまま混ぜるとデッキ側の id と衝突する。衝突すると盤面に出ていない個体が「出た」と誤判定され、
+     昆布（引かれなかったスピンごとに育つ）が黙って育たない回ができる。Wave9 で豆板醤を足したときに露見したので、ここでバンズを外す。 */
+  return { stack: st, inst, rawG, boardIds: new Set(inst.filter(x => (CONFIG.items[x.name]||{}).pile !== "bun").map(x => x.id)),
+           pendingDiscard: spinPendingDiscard.slice(), sc: score, layout: lay, grades, steps,
            final: { base: score.base, add: score.add, mult: score.mult, total: score.total, band: steps[n-1].bandTo } };
 }
 
@@ -3591,6 +3651,7 @@ function collect(){
   const boardPb = (plan && plan.inst) ? plan.inst.map(x => x.pb || 0) : [];   // 同：pb
   const boardPm = (plan && plan.inst) ? plan.inst.map(x => r2(x.pm || 0)) : []; // 同：pm
   growSpinEnd(plan ? plan.boardIds : new Set());    // ⑥スピン終了：昆布（盤面に出なかった個体+1）
+  pmSpinEnd(plan ? plan.boardIds : new Set());      // 同：豆板醤（盤面に出なかった個体の倍率が育つ・Wave9）
   discardLog = null;
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（育ち／除外を反映）
   awaitingCollect = false;
@@ -3988,10 +4049,20 @@ function renderOfferScreen(picks, pool, nChoices){
 }
 // 取得を記録（count が 0→>0 の瞬間に、その時点の completedCount を控える。白バンズ・さけの「取得後に作った個数」用）。
 function noteAcquire(name){ /* 旧 acquiredAt（取得時点の記録）は Wave5 で撤去。購入・3択の入口として残す。 */ }
+/* Wave9 トリュフオイル：3択でデッキの主軸のカードを取るたび育つ。店での購入では育たない（3択は毎スピン来るので回数が安定する）。
+   主軸は「取る前のデッキ」で判定する（deckAxisInfo は CONFIG.items[].count を読むので、addInstance の後に呼ぶと取った1枚が既に数に入る）。
+   プレイヤーが3択の画面で見ていた主軸＝取る前の主軸なので、そちらに揃えた。取った1枚が主軸を入れ替える瞬間は、入れ替わる前の軸で判定する。
+   ラン開始直後などデッキに軸カードが0枚のとき（main === "none"）は、何を取っても育たない。 */
+function onOfferPick(name){
+  const main = deckMainCuisine(); if (main === "none") return;
+  if ((CONFIG.items[name].cuisine || "none") !== main) return;
+  for (const x of deck){ const e = CONFIG.items[x.name].effect; if (e && e.id === "growOnPickMain") bumpPm(x, e, e.per || 0.3); }
+}
 function chooseOffer(name){
   if (!offering) return;
   plog.recordPicked(name);                           // 取ったカードを記録（Wave6 Step3・無料なので bought には入れない）
   noteAcquire(name);
+  onOfferPick(name);                                 // トリュフオイル（Wave9）：取る前の主軸で判定するので addInstance の前に呼ぶ
   addInstance(name, 0); renderPiles(); renderAxisTally();   // 山に育ち0の個体を1つ足す（希釈が起きる層）
   forcedCard = name;                                 // item12：取った直後の1個に必ずこのカードを入れる（明示はしない）
   // 初志貫徹：最初に取った軸を覚える。常連客：同じ軸を続けて取った回数を数える。
@@ -4390,7 +4461,9 @@ function showShopRemove(cost){
       setMoney(money - cost); bumpBuy("remove"); useShopDay("remove");
       const mk = artById("removeMoney");             // 見切り品：基礎点の ratio ぶんが金になる
       if (mk) setMoney(money + Math.max(0, Math.round(baseOf(inst.name) * (mk.ratio || 0.5))));
-      discardInstance(inst, "shop", false); renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
+      // タルタルソース（Wave9）だけは店の取り除きも数える。D3 の本体（天かす・白トリュフ）は fireHooks=false のまま。
+      if (discardInstance(inst, "shop", false)) onRareLost(inst);
+      renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
     list.appendChild(rowEl);
   }
   offerEl.appendChild(list);
@@ -4957,6 +5030,14 @@ function renderSettings(){
   gridRow(g, "pmMax：ラーメンの pm 上限（×1+値）", numInput(()=>effOf("ラーメン").pmMax, v=>effOf("ラーメン").pmMax=Math.max(0,v), 0.1));
   gridRow(g, "pmMax：継ぎ足しのタレの pm 上限（×1+値）", numInput(()=>effOf("継ぎ足しのタレ").pmMax, v=>effOf("継ぎ足しのタレ").pmMax=Math.max(0,v), 0.1));
   gridRow(g, "maxMul：ソース焼きそばの倍率上限（×値）", numInput(()=>effOf("ソース焼きそば").maxMul, v=>effOf("ソース焼きそば").maxMul=Math.max(1,v), 0.5));
+  // Wave9：成長ソース5枚。pm0＝開始の pm（×1+値・既定0.5＝×1.5）／per＝1回あたり／pmMax＝上限（×1+値・既定5.0＝×6）。すべて仮値。
+  for (const nm of ["トリュフオイル","豆板醤","イカ墨ソース","タルタルソース","ぽん酢"]){
+    gridRow(g, "pm0："+nm+" の開始（×1+値）", numInput(()=>effOf(nm).pm0, v=>effOf(nm).pm0=Math.max(0,v), 0.1));
+    gridRow(g, "per："+nm+" の1回あたり", numInput(()=>effOf(nm).per, v=>effOf(nm).per=Math.max(0,v), 0.05));
+    gridRow(g, "pmMax："+nm+" の pm 上限（×1+値）", numInput(()=>effOf(nm).pmMax, v=>effOf(nm).pmMax=Math.max(0,v), 0.5));
+  }
+  // イカ墨ソースだけ「1枚から吸える育ちの上限」を持つ。1スピンの上限は別に設けていない（上下2枚 × take で自然に頭打ちになる）。
+  gridRow(g, "take：イカ墨ソースが1枚から吸う段階の上限", numInput(()=>effOf("イカ墨ソース").take, v=>effOf("イカ墨ソース").take=Math.max(0,Math.round(v)), 1));
   // 価格スケールは要素ごとに独立（段数スロット・カード・引き直し・アーティファクト・取り除き）。初期は全て切＝現状と同じ挙動。
   const scaleRow = (label, elem) => {
     gridRow(g, label+"：購入で値上げ", boolInput(()=>sh.scale[elem].onBuy, v=>sh.scale[elem].onBuy=v));
@@ -5541,7 +5622,9 @@ window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハー�
    Wave3 で育ち系10枚の効果文が抜けていたのに Wave4 の作業中まで気づかなかったため、読み込み時に自動で見る。 ── */
 // resolveCard の外で処理する id（育ちエンジン＝フック／並びの抽選＝arrangeStack）。③の判定から除く。
 const HOOK_HANDLED_IDS = ["growDrawn","growUndrawn","growAdjKaisen","growAllSpin","growAccel","doubleGrowBonusAdj","maxGrowToAdj",
-                          "adjSameCui"];
+                          "adjSameCui",
+                          // Wave9 の成長ソース5枚。倍率が育つだけで得点式には現れない（pm は evaluate ⑥が一括で掛ける）。
+                          "growOnPickMain","growUndrawnMult","drainAdjGrow","growOnRareDiscard","growAdjNami"];
 function selfCheck(){
   // names はカードだけ（catalogNames が bunOnly＝バンズの入れ物を除く）。バンズは⑪で別に点検する。
   const items = CONFIG.items, names = catalogNames(), warn = [];
@@ -5562,12 +5645,13 @@ function selfCheck(){
   // ⑤ 軸が既知の6値以外
   const badC = names.filter(n => CUISINE_ORDER.indexOf(items[n].cuisine) < 0);
   if (badC.length) warn.push("未知の cuisine: " + badC.join(" / "));
-  // ⑥ レアリティ（Wave7 Step1）。未知の値・KENTO の枚数（極8・特上23・上39・並26）との食い違いを見る。
+  // ⑥ レアリティ（Wave7 Step1）。未知の値・想定の枚数との食い違いを見る。
+  //    101枚（96 + Wave9 の成長ソース5・すべて特上）。内訳は 極8・特上28・上39・並26。
   const badR = names.filter(n => RARITY_ORDER.indexOf(items[n].rar) < 0);
   if (badR.length) warn.push("未知の rar: " + badR.join(" / "));
   const rarN = {}; for (const k of RARITY_ORDER) rarN[k] = 0;
   for (const n of names) if (RARITY_ORDER.indexOf(items[n].rar) >= 0) rarN[items[n].rar]++;
-  const RAR_EXPECT = { nami:26, jou:39, tokujou:23, kiwami:8 };   // KENTO「96枚のレアリティ割り振り案」§3
+  const RAR_EXPECT = { nami:26, jou:39, tokujou:28, kiwami:8 };   // KENTO「96枚のレアリティ割り振り案」§3 ＋ Wave9 の成長ソース5（特上）＝101枚
   const rarBad = RARITY_ORDER.filter(k => rarN[k] !== RAR_EXPECT[k]);
   if (rarBad.length) warn.push("レアリティの枚数が KENTO と違う: " + rarBad.map(k => RARITY_JA[k]+" "+rarN[k]+"（想定"+RAR_EXPECT[k]+"）").join(" / "));
   // ⑦ 出現率（Wave8 Step1）。進行の表は各行の合計が1（±0.005）で、極の基準が上限以下・進行度が昇順。
