@@ -1005,15 +1005,23 @@ const DEFAULTS = {
             //   等比の値上げでは得点の伸び（積）に追いつかない（実プレイで枠5枚まで買われ 2,984→45,569 に跳ねた）。
             //   上限3・初期1なので購入は生涯2回だけ。等比の式をやめて固定価格の配列にした（2-2・どちらも仮値）。
             sauceSlotMax: 3, sauceSlotPrices: [2000, 12000],
-            cardsShown: 3, artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
+            // Wave7 Step3：並ぶカードは6枚。うち noneSlots 枚は無印で固定する（無印は3択に出ないので、
+            //   出てこないものは強さを判断できない＝店で必ず見せる）。残りは5軸から傾斜つきで引く。
+            cardsShown: 6, noneSlots: 2,
+            // Wave7 Step3：値上がりではなく回数で切る。1営業日あたりの上限（すべて仮値・調整欄から変更可）。
+            //   序盤の残金は中央値 ¥225 で値上がりが効かず、後半の ¥1万には無意味だった（M1 実測）。
+            dayLimits: { reroll: 1, ing: 1, sau: 1, remove: 1 },
+            artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
             // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
             scale: { slot:     { onBuy: true,  mul: 2.0 },   // 具材枠（購入で2倍ずつ：150→300→600→…）※試験値
                      sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠：Wave6 2-2 で固定価格（sauceSlotPrices）に移したので**使っていない**。後方互換で残置
                      card:     { onBuy: false, mul: 1.2 },   // カード（既定のまま）
-                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ）
+                     // 引き直しと取り除きは Wave7 Step3 で回数制にしたので、値上がりを止めた（常に基準価格）。
+                     //   回数で切ったうえに値上がりも掛かると、営業日をまたぐごとに実質使えなくなる。
+                     reroll:   { onBuy: false, mul: 2.0 },   // 品揃えの引き直し（回数制・固定価格）
                      artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
-                     remove:   { onBuy: true,  mul: 2.0 } } },// デッキから取り除く（購入で2倍ずつ）
+                     remove:   { onBuy: false, mul: 2.0 } } },// デッキから取り除く（回数制・固定価格 ¥75）
     // レアリティ（Wave7 Step1・すべて仮値）。3択/店の出現率(rates)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
     //   抽選は「軸 → レアリティ → カード」の3段。rates は軸の「主軸からの距離」ごとの表で、
     //   main=主軸（距離0）／mid=中間（距離0.5）／far=遠い軸（デッキに0枚・距離1）。距離で3行を線形に補間する。
@@ -1621,6 +1629,7 @@ function onDay(){
     }
   }
   rollDayAxis();                                                                                          // マッシュルームの指定軸を引き直す（Q12）
+  resetShopDay();                                                                                         // 店の1営業日あたりの回数を回復（Wave7 Step3）
 }
 function onBuyCard(inst){
   for (const x of deck){ const e = CONFIG.items[x.name].effect; if (e && e.id === "buyAdd") x.pb += (e.per || 10); }   // 搾菜（買われたのが搾菜自身でなくてよい）
@@ -3413,9 +3422,26 @@ function showRent(){
 // 店：残った所持金で買い物。カード追加／削除（有料）／枠+1／引き直し／アーティファクト。複製・店員は未実装。
 let shopStock = null;
 const rarChipHTML = rar => `<span class="rar rar-${rar}">${RARITY_JA[rar]||rar}</span>`;   // レアリティのチップ
-function rerollStock(){ const pool = offerPool();                       // レアリティ重み＋仕入れ帳の傾斜で品揃えを引く
-  const menu = artById("menu"); const nCards = Math.max(1, Math.round(((CONFIG.params.shop || {}).cardsShown || 3) + (menu ? (menu.extra||0) : 0)));
-  shopStock = sampleWeighted(pool, nCards); rerollArtifacts(); }
+// ── Wave7 Step3：店の各行為は「1営業日に N 回」。値上がりではなく回数で切る ──────────
+//   序盤も後半も同じ「1回だけやり直せる」にするため。営業日が変わると回復する（onDay で reset）。
+let dayShopUses = {};
+const shopDayLimit = key => { const d = (CONFIG.params.shop || {}).dayLimits || {}; return Math.max(0, Math.round(d[key] != null ? d[key] : 1)); };
+const shopDayLeft  = key => shopDayLimit(key) - (dayShopUses[key] || 0);
+const useShopDay   = key => { dayShopUses[key] = (dayShopUses[key] || 0) + 1; };
+function resetShopDay(){ dayShopUses = {}; }
+// 品揃えを引く。無印は3択に出ないので、店では noneSlots 枚を無印で固定して必ず見せる（Wave7 §5-1）。
+function rerollStock(){
+  const sh = CONFIG.params.shop || {};
+  const menu = artById("menu");                                        // メニュー表：並ぶ数が増える
+  const nCards = Math.max(1, Math.round((sh.cardsShown || 6) + (menu ? (menu.extra || 0) : 0)));
+  const nNone  = Math.max(0, Math.min(nCards, Math.round(sh.noneSlots != null ? sh.noneSlots : 2)));
+  const nonePool = offerPool().filter(n => (CONFIG.items[n].cuisine || "none") === "none");
+  const axisPool = offerPool(true);                                    // 5軸ぶん（傾斜つき）
+  const none = sampleWeighted(nonePool, Math.min(nNone, nonePool.length));
+  const axis = sampleWeighted(axisPool, Math.max(0, nCards - none.length));
+  shopStock = axis.concat(none);                                       // 無印枠は末尾にまとめる（固定枠だと分かるように）
+  rerollArtifacts();
+}
 function showShop(){
   const sh = CONFIG.params.shop || {};
   if (!shopStock) rerollStock();
@@ -3462,12 +3488,21 @@ function showShop(){
     if (aff) b.addEventListener("click", fn); return b; };
   const rc = removeCostBase(), ic = shopPrice("ing", sh.ingredientSlotCost), rr = shopPrice("reroll", sh.rerollCost);
   const sCap = sauceSlotAtMax(), scst = sauceSlotPrice();          // ソース枠は上限つき・固定価格（Wave6）
-  acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), money >= rc));
-  acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), money >= ic));
-  // 上限に達しても消さない。買えないことが見えるほうがよい（2-1）。
+  // Wave7 Step3：打ち止めでもボタンを消さない。無効表示にして理由を出す。買えないことが見えるほうがよい。
+  const why = (key, cost, extra) => {
+    if (extra) return extra;
+    if (shopDayLeft(key) <= 0) return "今日はもう買えません";
+    if (cost != null && money < cost) return "所持金が足りません";
+    return null;
+  };
+  const canDo = (key, cost, blocked) => !blocked && shopDayLeft(key) > 0 && money >= cost;
+  acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), canDo("remove", rc), why("remove", rc)));
+  acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), canDo("ing", ic), why("ing", ic)));
   acts.appendChild(mkbtn("ソース枠 +1", sCap ? null : scst, () => buySlot("sauces", "sau", scst),
-    !sCap && money >= scst, sCap ? `ソース枠は${sauceSlotMax()}枚まで` : null));
-  acts.appendChild(mkbtn("品揃えの引き直し", rr, () => { setMoney(money - rr); bumpBuy("reroll"); plog.recordBuy("reroll", "reroll", rr); rerollStock(); showShop(); }, money >= rr));
+    canDo("sau", scst, sCap), why("sau", scst, sCap ? `ソース枠は${sauceSlotMax()}枚まで` : null)));
+  acts.appendChild(mkbtn("品揃えの引き直し", rr,
+    () => { setMoney(money - rr); bumpBuy("reroll"); useShopDay("reroll"); plog.recordBuy("reroll", "reroll", rr); rerollStock(); showShop(); },
+    canDo("reroll", rr), why("reroll", rr)));
   offerEl.appendChild(acts);
   const leave = el("offer-skip", "店を出る →"); leave.addEventListener("click", () => { shopStock = null; artifactStock = null; advanceOffer(); });
   offerEl.appendChild(leave);
@@ -3494,7 +3529,8 @@ function buyArtifact(name, cost){
 function buySlot(field, key, cost){
   if (money < cost) return;
   if (field === "sauces" && sauceSlotAtMax()) return;   // 上限（Wave6 2-1）。ボタンは無効表示だが二重の守り
-  setMoney(money - cost); bumpBuy(key);
+  if (shopDayLeft(key) <= 0) return;                    // 1営業日の回数（Wave7 Step3）。同上の二重の守り
+  setMoney(money - cost); bumpBuy(key); useShopDay(key);
   CONFIG.params.tiers[field] = Math.max(0, Math.round(CONFIG.params.tiers[field]) + 1);
   plog.recordBuy("slot", field, cost);
   updateProgress(); if (tuningOpen()) renderSettings(); Sound.coinChink(4, 0.5); showShop();
@@ -3517,7 +3553,10 @@ function showShopRemove(cost){
     const pmTag = (inst.pm || 0) > 0 ? `<span class="pm-inline">×${r2(1+inst.pm)}</span>` : "";
     rowEl.innerHTML = `<span class="nm">${inst.name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}${gTag}${pbTag}${pmTag}`;
     // 店の取り除きは「廃棄」ではない（D3）。白トリュフ・天かすのフックを走らせない（fireHooks=false）。
-    if (!last) rowEl.addEventListener("click", () => { setMoney(money - cost); bumpBuy("remove"); discardInstance(inst, "shop", false); renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
+    if (!last) rowEl.addEventListener("click", () => {
+      if (money < cost || shopDayLeft("remove") <= 0) return;          // 1営業日の回数（Wave7 Step3）
+      setMoney(money - cost); bumpBuy("remove"); useShopDay("remove");
+      discardInstance(inst, "shop", false); renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
     list.appendChild(rowEl);
   }
   offerEl.appendChild(list);
@@ -3668,7 +3707,7 @@ function resetRun(){
   plog.startRun(gameSeed);                           // プレイログ：新しいランの記録を開始（前ランが未確定なら確定してから）
   restoreDefaultDeck(); rollDayAxis();               // マッシュルームの指定軸：ラン開始時にも1回引く（1営業日目から働かせる）
   pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
-  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null;
+  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; artifactsOwned = []; forcedCard = null;
   refreshMoney(false); clearPiledCoins();
   offering = false; offerEl.classList.remove("show", "result", "cleared", "broke"); offerEl.innerHTML = "";
@@ -4070,7 +4109,12 @@ function renderSettings(){
   gridRow(g, "ソース枠 2回目の値段", numInput(()=>sh.sauceSlotPrices[1], v=>sh.sauceSlotPrices[1]=Math.max(0,Math.round(v)), 100));
   gridRow(g, "引き直しの値段", numInput(()=>sh.rerollCost, v=>sh.rerollCost=Math.max(0,Math.round(v)), 10));
   gridRow(g, "店に並ぶカード枚数", numInput(()=>sh.cardsShown, v=>sh.cardsShown=Math.max(1,Math.round(v)), 1));
+  gridRow(g, "そのうち無印で固定する枠", numInput(()=>sh.noneSlots, v=>sh.noneSlots=Math.max(0,Math.round(v)), 1));
   gridRow(g, "店に並ぶ道具の数", numInput(()=>sh.artifactsShown, v=>sh.artifactsShown=Math.max(0,Math.round(v)), 1));
+  // Wave7 Step3：1営業日あたりの回数（値上がりではなく回数で切る）。カードの購入枚数には上限を置かない。
+  { const DL_JA = { reroll:"引き直し", ing:"具材枠", sau:"ソース枠", remove:"取り除き" };
+    for (const k of ["reroll","ing","sau","remove"])
+      gridRow(g, DL_JA[k]+"：1営業日の回数", numInput(()=>sh.dayLimits[k], v=>sh.dayLimits[k]=Math.max(0,Math.round(v)), 1)); }
   // 倍率の上限は2種類ある（Wave6 1-1）。pmMax＝永続の倍率(pm)の上限（倍率としては ×(1+pmMax)）／maxMul＝倍率そのものの上限。
   const effOf = nm => (CONFIG.items[nm] || {}).effect || {};
   gridRow(g, "pmMax：ラーメンの pm 上限（×1+値）", numInput(()=>effOf("ラーメン").pmMax, v=>effOf("ラーメン").pmMax=Math.max(0,v), 0.1));
@@ -4406,7 +4450,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4601,6 +4645,8 @@ window.RUN = {
   // レアリティ（Wave7 Step1）：軸の距離と出現率表、レアリティが隣に落ちた記録を読む（記録の確認用）。
   rarityRates: (cu) => rarityRatesFor(cu),
   axisRates: () => axisRates(),                                               // 5軸の出現率（Wave7 Step2）
+  shopDayLeft: (k) => shopDayLeft(k),                                         // 店の1営業日の残り回数（Wave7 Step3）
+  shopStock: () => (shopStock ? shopStock.slice() : null),
   mainCuisine: () => deckMainCuisine(),
   axisDistance: (cu) => axisDistance(cu),
   rarityFallbacks: () => rarityFallbacks.slice(),
@@ -4657,6 +4703,17 @@ function selfCheck(){
     if (Math.abs(t - 1) > 1e-6) warn.push("軸の出現率の合計が1でない: " + t.toFixed(6));
     if (low.length) warn.push("軸の出現率が下限を割っている: " + low.join(" "));
     if (hi.length) warn.push("軸の出現率が上限を超えている: " + hi.join(" "));
+  }
+  // ⑩ 店の作り（Wave7 Step3）。無印固定枠が並ぶ枚数を超えていないか、無印がその枚数あるか。
+  {
+    const sh = CONFIG.params.shop || {};
+    const nCards = Math.max(1, Math.round(sh.cardsShown || 6)), nNone = Math.max(0, Math.round(sh.noneSlots != null ? sh.noneSlots : 2));
+    if (nNone > nCards) warn.push("店の無印固定枠が並ぶ枚数を超えている: " + nNone + " > " + nCards);
+    const noneN = names.filter(n => (items[n].cuisine || "none") === "none").length;
+    if (noneN < nNone) warn.push("無印のカードが固定枠より少ない: " + noneN + " < " + nNone);
+    const dl = sh.dayLimits || {};
+    const missing = ["reroll","ing","sau","remove"].filter(k => typeof dl[k] !== "number");
+    if (missing.length) warn.push("店の1営業日の回数が未設定: " + missing.join(" "));
   }
   // ⑧ どの軸にも「並」が1枚以上あること（無い軸を引くと毎回フォールバックが起きる＝設計の穴）。
   //    無印に極が無いのは設計どおりなので、ここでは並だけを見る。
