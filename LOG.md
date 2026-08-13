@@ -1414,7 +1414,7 @@ Wave 2〜6 で84枚に効果を入れたが、#44 以降一度も測定してい
 | | |
 | --- | --- |
 | 対象コミット | **`5f46c5d`**（Wave 6・PR #79）。このハッシュが無いと再現できない |
-| スクリプト | `tools/m1-measure.mjs`（ハーネス）／`tools/m1-report.mjs`（集計）。ブランチ `claude/burger-stack-spec-mv9xei` の **`3b1ab07`** にある |
+| スクリプト | `tools/m1-measure.mjs`（ハーネス）／`tools/m1-report.mjs`（集計）。main の **`212c5c8`** で入った |
 | 経路 | 実プレイ経路（playwright-core / Chromium で実UI操作）。内部関数の直接呼び出しで代替していない |
 | 変えた設定 | **`skipFx: true`（演出の省略）と `dayGoal` だけ。それ以外はすべて既定** |
 | 設定値 | `dayGoal` 5（および 10）／`rentEvery` 5／`rentBase` 300／`rentMul` 1.4／ソース枠 上限3・¥2,000・¥12,000／具材枠 ×2 スケール（150→300→600→…） |
