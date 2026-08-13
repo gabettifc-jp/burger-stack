@@ -3840,15 +3840,14 @@ function axisRates(){
   const cnt = {}; let C = 0;
   for (const cu of AXES){ cnt[cu] = cuisineCount(cu); C += cnt[cu]; }
   // Wave8 Step0：share の分母に m を足す。こうすると1枚目で頭打ちにならず、枚数に応じて寄っていく。
-  //   share の合計は C/(C+m) で1未満になる。余り（m/(C+m)）は「まだ取っていない軸」に均等に配る。
-  //   全部の軸が0枚のときは5軸すべてが「まだ取っていない軸」なので、各 1/5 になる（＝各20%）。
-  //   どの軸も1枚以上あるときは配る先が無いので、そのときだけ5軸に均等に配る。
+  //   share の合計は C/(C+m) で1未満になる。余り（m/(C+m)）は5軸すべてに均等に配る。
+  //   「まだ取っていない軸」だけに配る案もあったが、それだと0枚→1枚でその軸の率が下がってしまう
+  //   （取った瞬間に余りの配分から外れるため）。1枚目こそ軸を決める瞬間なので、そこで逆に働くのは
+  //   傾斜の目的に反する。5軸に均等に配れば単調増加が保証される。
   const share = {}, denom = C + m;
   for (const cu of AXES) share[cu] = denom > 0 ? cnt[cu] / denom : 1 / nAx;
-  const zeros = AXES.filter(cu => cnt[cu] === 0);
   let left = 1; for (const cu of AXES) left -= share[cu];
-  const spread = zeros.length ? zeros : AXES;
-  for (const cu of spread) share[cu] += left / spread.length;   // これで share の合計は必ず1
+  for (const cu of AXES) share[cu] += left / nAx;               // これで share の合計は必ず1
   const q = {};
   for (const cu of AXES) q[cu] = (1 - k) / nAx + k * share[cu];
   // アーティファクト（Wave7 Step5）：暖簾＝選んだ軸の重み×mul／老舗の暖簾＝大きく寄せて他軸は下限まで／
