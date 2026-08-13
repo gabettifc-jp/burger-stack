@@ -887,21 +887,57 @@ const DEFAULTS = {
   // アーティファクト（第3層・SHOKUZAI §10）。盤面の枠を使わない＝希釈しない。店で購入、所持上限まで持てる。数値は暫定・調整欄で変更可。
   //   id=効果の識別子（コード側と対応）／rar=レアリティ。効果の適用箇所：得点(applyArtifacts)・抽選・経営(家賃/店)。
   artifacts: {
-    "厨房の火力":  { id:"meatBase",  rar:"jou",    add:15 },   // 肉系の基礎点+15
-    "製氷機":      { id:"vegBase",   rar:"jou",    add:15 },   // 野菜系の基礎点+15
-    "常連客":      { id:"regular",   rar:"tokujou",need:3, mult:1.5 }, // 盤面に同じ軸が3枚+で全体×1.5
-    "衛生管理":    { id:"hygiene",   rar:"nami",   add:10 },   // 毎回、基礎点+10
-    "暖簾":        { id:"axisWa",    rar:"tokujou",mult:1.3 },   // 和軸カードの効果を1.3倍（item6：2→1.3・1.2〜1.6推奨）
-    "調理師免許":  { id:"axisAgemono",rar:"tokujou",mult:1.3 },  // 揚げ物軸カードの効果を1.3倍
-    "中華鍋":      { id:"axisChuka", rar:"tokujou",mult:1.3 },   // 中華軸カードの効果を1.3倍
-    "生簀":        { id:"axisKaisen",rar:"tokujou",mult:1.3 },   // 海鮮軸カードの効果を1.3倍
-    "ミシュラン":  { id:"axisKokyu", rar:"tokujou",mult:1.3 },   // 高級軸カードの効果を1.3倍
-    "看板":        { id:"signboard", rar:"tokujou",extra:1 }, // 3択の選択肢が+1（4つになる）
-    "仕入れ帳":    { id:"ledger",    rar:"kiwami", weight:4 }, // 3択がデッキの軸に寄る（傾斜が強まる）
-    "メニュー表":  { id:"menu",      rar:"jou",    extra:1 },  // 店に並ぶ商品が+1
-    "レジ係":      { id:"register",  rar:"jou",    ratio:0.1 },// 家賃支払い後、支払額の10%が戻る
-    "冷蔵庫":      { id:"fridge",    rar:"jou",    ratio:0.5 },// 店での削除が半額
-    "深夜営業":    { id:"nightshift",rar:"kiwami", extra:1 }   // 家賃までに作れる数が+1
+    // ── A. 軸の供給（12）──
+    "暖簾":            { id:"axisWeight",   rar:"jou",    mul:2.0, pick:true },
+    "老舗の暖簾":      { id:"axisWeightBig",rar:"kiwami", mul:4.0, pick:true },
+    "常連の好み":      { id:"fixIfHas",     rar:"jou",    need:3, n:1, pick:true },
+    "見習いの舌":      { id:"fixZero",      rar:"jou",    n:1 },
+    "日替わり":        { id:"fixDaily",     rar:"jou",    n:1 },
+    "初志貫徹":        { id:"fixFirst",     rar:"tokujou",n:1 },
+    "一点張り":        { id:"fixPick",      rar:"tokujou",n:2, pick:true },
+    "予約票":          { id:"fixShopOnce",  rar:"tokujou",n:3, pick:true, once:true },
+    "下ごしらえ":      { id:"fixAllOnce",   rar:"tokujou",pick:true, once:true },
+    "献立表":          { id:"distinctAxes", rar:"jou" },
+    "裏メニュー":      { id:"shopNone",     rar:"jou",    slots:4 },
+    "仕入れ先の分散":  { id:"shopPerAxis",  rar:"tokujou",per:1 },
+    // ── B. 削除と入れ替え（8）──
+    "まかない":        { id:"removeTimes",  rar:"jou",    times:2 },
+    "廃棄業者":        { id:"removeFree",   rar:"jou" },
+    "新陳代謝":        { id:"pickPushOut",  rar:"tokujou" },
+    "目利き":          { id:"rarUpRandom",  rar:"tokujou",step:1 },
+    "大量仕入れ":      { id:"pickDiscard2", rar:"jou",    n:2 },
+    "在庫整理":        { id:"removeFreeBig",rar:"tokujou",need:20 },
+    "見切り品":        { id:"removeMoney",  rar:"jou",    ratio:0.5 },
+    "大型フライヤー":  { id:"ingNoRemove",  rar:"kiwami", ing:2 },
+    // ── C. 枠（6）──
+    "作業台":          { id:"ingSlot",      rar:"jou",    ing:1 },
+    "調理台":          { id:"ingSlotBun",   rar:"tokujou",ing:2, bunSlots:3 },
+    "ソース棚":        { id:"sauceFree",    rar:"jou",    n:1 },
+    "寸胴鍋":          { id:"sauceOver",    rar:"kiwami", sauce:1, ing:-2 },
+    "仕込み台":        { id:"ingPerDay",    rar:"tokujou",ing:1, deck:1 },
+    "屋台":            { id:"ingHalfDeck",  rar:"kiwami" },
+    // ── D. 3択と店の構造（8）──
+    "看板":            { id:"signboard",    rar:"jou",    extra:1 },
+    "立て看板":        { id:"signboardBig", rar:"tokujou",extra:2, shopCards:3 },
+    "回転台":          { id:"rerollTimes",  rar:"jou",    times:2 },
+    "問屋の顔":        { id:"rerollFree",   rar:"jou" },
+    "売り子":          { id:"shopCards",    rar:"tokujou",shopCards:9 },
+    "予約帳":          { id:"shopKeep",     rar:"tokujou" },
+    "値札の張り替え":  { id:"shopCheapest", rar:"jou",    once:true },
+    "常連客":          { id:"streakWeight", rar:"tokujou",per:1.5 },
+    // ── E. バンズ（6）──
+    "バンズケース":    { id:"bunSlotUp",    rar:"jou",    slots:5 },
+    "二段バンズ":      { id:"bunBoardUp",   rar:"kiwami", onBoard:4, ing:-2 },
+    "のれん分け":      { id:"bunRarUp",     rar:"tokujou",mul:3 },
+    "選り好み":        { id:"bunChoice",    rar:"tokujou",n:2 },
+    "夜の仕込み":      { id:"bunSkipPush",  rar:"jou",    once:true },
+    "朝の仕込み":      { id:"bunTwice",     rar:"tokujou",n:2 },
+    // ── F. 経済とラン構造（5）──
+    "深夜営業":        { id:"nightshift",   rar:"kiwami", extra:2, offer:2 },
+    "朝市":            { id:"shopHalfOnce", rar:"jou",    ratio:0.5, once:true },
+    "常連の要求":      { id:"forcedDaily",  rar:"tokujou",ratio:0.5 },
+    "前借り":          { id:"rentSkip",     rar:"tokujou",mul:2, once:true },
+    "見習いの独立":    { id:"deckHalve",    rar:"kiwami", extra:2, once:true }
   },
   // ── バンズ（Wave7 Step4・KENTO「バンズの設計」§6 の30種＋つなぎのゴマバンズ）─────────
   //   バンズはデッキとは別の領域（4枠）に持ち、そこから2枚が盤面に出る。軸を持たず、
@@ -1081,7 +1117,7 @@ const DEFAULTS = {
               prices:  { nami: 100, jou: 250, tokujou: 600, kiwami: 1500 },
               scaleOnBuy: false, scaleMul: 1.2 },
     // アーティファクト（第3層・SHOKUZAI §10）。所持上限・店に並ぶ数・各効果の数値は CONFIG.artifacts。
-    artifacts: { on: true, maxOwned: 5 },
+    artifacts: { on: true, maxOwned: 3 },   // Wave7 Step5：3枠（仮）。入れ替えは自由・回数制限なし・払い戻しなし
     // バンズ（Wave7 Step4・すべて仮値）。デッキとは別領域。営業日ごとに1枚入手して1枚押し出す。
     //   slots=所持枠／onBoard=盤面に出る枚数／weights=バンズ専用のレアリティ抽選（軸には乗らない）。
     buns: { on: true, slots: 4, onBoard: 2, weights: { common: 60, rare: 34, kyoku: 6 } },
@@ -1365,7 +1401,15 @@ let forcedCard = null;   // item12：3択で取った直後の1個に必ず入�
    対象は具材枠のみ（ソース枠は変えない）。下限1・上限なし。使ったら0に戻す。 ── */
 let pendingDraw = 0;       // 次のスピンの具材枠に足す枚数（負もあり）
 let pendingForced = [];    // 次のスピンで確定で引く指定（{kind:"topBase"}＝ツナ／{kind:"rarestAxis"}＝ロースハム）
-function effIngSlots(){ return Math.max(1, Math.round(CONFIG.params.tiers.ingredients) + pendingDraw); }
+function effIngSlots(){                              // 具材枠（Wave7 Step5：C群・E群のアーティファクトが増減させる）
+  let n = Math.round(CONFIG.params.tiers.ingredients) + pendingDraw;
+  for (const id of ["ingSlot","ingSlotBun","sauceOver","bunBoardUp","ingNoRemove"]){
+    const a = artById(id); if (a && typeof a.ing === "number") n += a.ing;
+  }
+  const ya = artById("ingHalfDeck");                 // 屋台：具材枠が常にデッキ枚数の半分（増減する）
+  if (ya) n = Math.floor(deck.length / 2);
+  return Math.max(1, n);
+}
 // 確定引きの対象を「個体id」に解決する。増えた枠は具材枠なので、具材の山から選ぶ。
 function resolvePendingForcedIds(){
   const ids = [];
@@ -1501,8 +1545,17 @@ let bunSeq = 0;             // バンズ個体の連番
 let bunPushed = 0;          // このランで押し出した枚数（#27 入替のバンズ）
 let bunStreak = 0;          // 連続で得点を更新している回数（#22 連勝のバンズ）
 let bunPendingDraw = 0;     // #17 先読みのバンズ：次スピンだけ引きが増える
-const bunCap     = () => Math.max(1, Math.round((CONFIG.params.buns || {}).slots || 4));
-const bunOnBoard = () => Math.max(1, Math.round((CONFIG.params.buns || {}).onBoard || 2));
+const bunCap     = () => {                           // バンズの所持枠（バンズケース＝5／調理台＝3）
+  let n = Math.round((CONFIG.params.buns || {}).slots || 4);
+  const up = artById("bunSlotUp"); if (up) n = (up.slots || n);
+  const dn = artById("ingSlotBun"); if (dn) n = (dn.bunSlots || n);
+  return Math.max(1, n);
+};
+const bunOnBoard = () => {                           // 盤面に出るバンズ（二段バンズ＝4）
+  let n = Math.round((CONFIG.params.buns || {}).onBoard || 2);
+  const a = artById("bunBoardUp"); if (a) n = (a.onBoard || n);
+  return Math.max(1, n);
+};
 const bunDef     = nm => CONFIG.buns[nm] || null;
 const bunEff     = nm => (bunDef(nm) || {}).effect || { id:null };
 function makeBun(name){ return { id: ++bunSeq, name, g:0, uses:0 }; }
@@ -1514,7 +1567,10 @@ function resetBuns(){
 }
 // バンズ専用のレアリティ抽選 → そのレアリティの中から1枚（軸・カードのレアリティには乗らない）。
 function drawBunName(){
-  const w = (CONFIG.params.buns || {}).weights || {};
+  const w0 = (CONFIG.params.buns || {}).weights || {};
+  const w = Object.assign({}, w0);
+  const nw = artById("bunRarUp");                    // のれん分け：レアリティの高いものが選ばれやすくなる
+  if (nw){ w.rare = (w.rare || 0) * (nw.mul || 1); w.kyoku = (w.kyoku || 0) * (nw.mul || 1); }
   const byRar = {}; for (const r of BUN_RAR_ORDER) byRar[r] = [];
   for (const nm of Object.keys(CONFIG.buns)){ if (nm === "ゴマバンズ") continue; const r = CONFIG.buns[nm].rar; if (byRar[r]) byRar[r].push(nm); }
   let tot = 0; for (const r of BUN_RAR_ORDER) if (byRar[r].length) tot += Math.max(0, w[r] || 0);
@@ -1763,6 +1819,19 @@ function onDay(){
   }
   rollDayAxis();                                                                                          // マッシュルームの指定軸を引き直す（Q12）
   resetShopDay();                                                                                         // 店の1営業日あたりの回数を回復（Wave7 Step3）
+  // アーティファクト（Wave7 Step5）：日替わり／仕込み台／常連の要求／朝市の割引の準備。
+  if (hasArt("fixDaily")) artDayAxis = AXES[Math.floor(grand() * AXES.length)];
+  { const a = artById("ingPerDay");                  // 仕込み台：具材枠+1、ただしデッキも1枚増える（抽選）
+    if (a){ CONFIG.params.tiers.ingredients = Math.round(CONFIG.params.tiers.ingredients) + (a.ing || 1);
+      for (let k = 0; k < (a.deck || 1); k++){ const nm = drawOffer(offerPool(true)); if (nm){ addInstance(nm, 0); plog.recordBuy("artifact-add", nm, 0); } } } }
+  { const a = artById("forcedDaily");                // 常連の要求：指定された軸のカードを1枚デッキに入れる（拒否できない）
+    if (a){ const cu = AXES[Math.floor(grand() * AXES.length)];
+      const pool = offerPool(true).filter(n => (CONFIG.items[n].cuisine || "none") === cu);
+      const nm = pool.length ? drawOffer(pool) : null;
+      if (nm){ addInstance(nm, 0); plog.recordBuy("forced", nm, 0); } } }
+  if (hasArt("shopHalfOnce")) artShopDiscount = (artById("shopHalfOnce").ratio != null ? artById("shopHalfOnce").ratio : 0.5);
+  shopBuys.sauFree = 0;                              // ソース棚の無料ぶんは営業日ごとに戻す
+  renderPiles(); renderAxisTally();
 }
 function onBuyCard(inst){
   for (const x of deck){ const e = CONFIG.items[x.name].effect; if (e && e.id === "buyAdd") x.pb += (e.per || 10); }   // 搾菜（買われたのが搾菜自身でなくてよい）
@@ -1772,8 +1841,66 @@ const rarityOf = name => (CONFIG.items[name] && CONFIG.items[name].rar) || "nami
 function artById(id){ for (const nm of artifactsOwned){ const a = CONFIG.artifacts[nm]; if (a && a.id === id) return a; } return null; }
 function hasArt(id){ return !!artById(id); }
 // 軸ごとの効果倍率（暖簾/中華鍋 等のアーティファクトで、その軸のカード効果を強める）。既定1。
-const AXIS_ART = { wa:"axisWa", chuka:"axisChuka", kaisen:"axisKaisen", kokyu:"axisKokyu", agemono:"axisAgemono" };
-function axisMul(cui){ const a = artById(AXIS_ART[cui]); return a ? (a.mult || 1) : 1; }
+/* ── アーティファクトの層（Wave7 Step5）─────────────────────────────────────
+   得点には触らない。変えるのは「できること」＝供給・選択の回数・枠・店の構造・ラン構造。
+   得点を増幅する型（旧 暖簾／中華鍋 等の「軸の効果を×1.3」）は撤去した。 */
+function axisMul(cui){ return 1; }   // 旧「軸カードの効果を×1.3」は廃止（Wave7 Step5）。呼び出し側の形は変えない
+let artAxis = {};            // 軸を選ぶ型のアーティファクト（暖簾・一点張り 等）が選んだ軸。キー＝アーティファクト名
+let artFirstAxis = null;     // 初志貫徹：最初に取った軸
+let artDayAxis = null;       // 日替わり：その営業日の軸
+let artOnceUsed = {};        // 〈使い切り〉を今のスピン／営業日で使ったか（消費の記録）
+let artPendingFix = null;    // 予約票・下ごしらえ：次の1回だけ効く確定枠 { kind:"offer"|"shop", cui, n, from }
+let artPickStreak = { cui:null, n:0 };   // 常連客：同じ軸を続けて取った回数
+let shopKeepStock = null;    // 予約帳：次の営業日も並べる売れ残り
+let artShopDiscount = null;  // 朝市：次の1回だけ効く店の割引
+let artChipArmed = null;     // 所持中のチップ：軸の選び直しを1回はさむための印
+let artRentMul = 1;          // 前借り：次の家賃の倍率
+// 〈使い切り〉を消費して所持枠から外す。
+function consumeArtifact(id){
+  const nm = artifactsOwned.find(n => (CONFIG.artifacts[n] || {}).id === id);
+  if (!nm) return false;
+  artifactsOwned = artifactsOwned.filter(n => n !== nm);
+  delete artAxis[nm];
+  plog.recordArtifactUse(nm); updateRunStatus();
+  return true;
+}
+// 軸を選ぶ型が選んだ軸（未選択ならデッキの主軸、それも無ければ AXES の先頭）。
+function artAxisOf(id){
+  const nm = artifactsOwned.find(n => (CONFIG.artifacts[n] || {}).id === id);
+  if (!nm) return null;
+  if (artAxis[nm]) return artAxis[nm];
+  const m = deckMainCuisine();
+  return m !== "none" ? m : AXES[0];
+}
+/* 「確定枠」の仕組み（1つに統一）。3択・店の並びのうち、指定の軸で必ず埋まる枠を返す。
+   返り値は [{ cui, n }]。残りの枠は通常の抽選。全部の確定枠系がこれを使う。 */
+function guaranteedSlots(kind){
+  const out = [];
+  const push = (cui, n) => { if (cui && AXES.indexOf(cui) >= 0 && n > 0) out.push({ cui, n }); };
+  if (artPendingFix && artPendingFix.kind === kind) push(artPendingFix.cui, artPendingFix.n);
+  if (kind === "offer"){
+    { const a = artById("fixIfHas"); if (a){ const cu = artAxisOf("fixIfHas"); if (cu && cuisineCount(cu) >= (a.need || 3)) push(cu, a.n || 1); } }
+    { const a = artById("fixZero");  if (a){ const zero = AXES.filter(c => cuisineCount(c) === 0); if (zero.length) push(zero[Math.floor(grand()*zero.length)], a.n || 1); } }
+    { const a = artById("fixDaily"); if (a) push(artDayAxis || AXES[0], a.n || 1); }
+    { const a = artById("fixFirst"); if (a) push(artFirstAxis || deckMainCuisine(), a.n || 1); }
+    { const a = artById("fixPick");  if (a) push(artAxisOf("fixPick"), a.n || 2); }
+  }
+  return out;
+}
+// 確定枠のぶんだけを引く（残りは呼び出し側が通常の抽選で埋める）。
+//   軸で絞った結果その軸のカードが無ければ、その枠はあきらめて通常の抽選に回す。
+function guaranteedPicks(pool, n, kind){
+  const out = [];
+  for (const g of guaranteedSlots(kind)){
+    for (let k = 0; k < g.n && out.length < n; k++){
+      const sub = pool.filter(x => (CONFIG.items[x].cuisine || "none") === g.cui && out.indexOf(x) < 0);
+      if (!sub.length) break;
+      const nm = drawOffer(sub); if (nm == null) break;
+      out.push(nm);
+    }
+  }
+  return out;
+}
 const r2 = x => Math.round(x * 100) / 100;           // 表示用の丸め
 // 効果の説明文（現在の数値から生成）。id ごとに1つ。
 const sgn = v => ((v >= 0 ? "+" : "") + v);   // 「+15」「-15」を作る。per が負のカードがあるので "+"+per では "+-15" になる
@@ -1883,22 +2010,60 @@ function effectText(name){
 }
 // アーティファクト（第3層）の効果説明文（現在の数値から生成）。
 const ARTIFACT_TEXT = {
-  meatBase:   a => `肉系の基礎点+${a.add}`,
-  vegBase:    a => `野菜系の基礎点+${a.add}`,
-  regular:    a => `盤面に同じ軸が${a.need}枚以上あれば 全体×${a.mult}`,
-  hygiene:    a => `毎回 基礎点+${a.add}`,
-  axisWa:     a => `和軸カードの効果を${a.mult}倍`,
-  axisAgemono:a => `揚げ物軸カードの効果を${a.mult}倍`,
-  axisChuka:  a => `中華軸カードの効果を${a.mult}倍`,
-  axisKaisen: a => `海鮮軸カードの効果を${a.mult}倍`,
-  axisKokyu:  a => `高級軸カードの効果を${a.mult}倍`,
-  signboard:  a => `3択の選択肢が${a.extra}つ増える`,
-  ledger:     a => `3択がデッキの主要軸に寄る（重み×${a.weight}）`,
-  menu:       a => `店に並ぶ商品が${a.extra}つ増える`,
-  register:   a => `家賃の支払い後、支払額の${Math.round((a.ratio||0)*100)}%が戻る`,
-  fridge:     a => `店での削除が${Math.round((a.ratio||0)*100)}%の値段になる`,
-  nightshift: a => `家賃までに作れる数が${a.extra}増える`,
+  // A. 軸の供給。「確定枠」＝3択や店の並びのうち、指定の条件を満たすカードで必ず埋まる枠（残りは通常の抽選）。
+  axisWeight:    a => `選んだ軸が出やすくなる（軸の重み×${a.mul}）`,
+  axisWeightBig: a => `選んだ軸が大きく出やすくなる（重み×${a.mul}）。他の軸は下限まで落ちる`,
+  fixIfHas:      a => `デッキに選んだ軸が${a.need}枚以上あるとき、3択の${a.n}枠がその軸で確定`,
+  fixZero:       a => `3択の${a.n}枠が、デッキに0枚の軸で確定`,
+  fixDaily:      a => `営業日ごとに軸が抽選され、その営業日は3択の${a.n}枠がその軸で確定`,
+  fixFirst:      a => `最初に取った軸に固定。以後、3択の${a.n}枠がその軸で確定`,
+  fixPick:       a => `3択の${a.n}枠が、選んだ軸で確定`,
+  fixShopOnce:   a => `〈使い切り〉次の店の並びのうち${a.n}枠を、選んだ軸で確定させる`,
+  fixAllOnce:    a => `〈使い切り〉次の3択を全部、選んだ軸にする`,
+  distinctAxes:  a => `3択の3枚が必ず違う軸になる`,
+  shopNone:      a => `店の無印枠が${a.slots}になる`,
+  shopPerAxis:   a => `デッキの軸の種類1つにつき、店に並ぶカードが+${a.per}`,
+  // B. 削除と入れ替え
+  removeTimes:   a => `削除が1営業日${a.times}回になる`,
+  removeFree:    a => `削除が無料になる（回数は変わらない）`,
+  pickPushOut:   a => `3択で取ると、デッキから1枚が押し出される（捨てる1枚は自分で選ぶ）`,
+  rarUpRandom:   a => `3択にレアリティの高いカードが出やすくなる（${a.step}段ぶん）。ただし取るとデッキから無作為に1枚消える`,
+  pickDiscard2:  a => `3択で取ると、デッキから無作為に${a.n}枚消える`,
+  removeFreeBig: a => `デッキが${a.need}枚以上のとき、削除が無料・回数無制限`,
+  removeMoney:   a => `削除すると、そのカードの基礎点の${Math.round((a.ratio||0)*100)}%が金になる`,
+  ingNoRemove:   a => `具材枠+${a.ing}。削除が使えなくなる`,
+  // C. 枠
+  ingSlot:       a => `具材枠+${a.ing}`,
+  ingSlotBun:    a => `具材枠+${a.ing}。バンズの所持枠が${a.bunSlots}になる`,
+  sauceFree:     a => `ソース枠+${a.n}（上限は変わらない。1回ぶん無料になるだけ）`,
+  sauceOver:     a => `ソース枠+${a.sauce}（上限を超える）。具材枠${a.ing}`,
+  ingPerDay:     a => `営業日ごとに具材枠+${a.ing}。ただし同時にデッキも${a.deck}枚増える（抽選）`,
+  ingHalfDeck:   a => `具材枠が常にデッキ枚数の半分になる（増減する）`,
+  // D. 3択と店の構造
+  signboard:     a => `3択の選択肢が${a.extra}つ増える`,
+  signboardBig:  a => `3択の選択肢が${a.extra}つ増える。店に並ぶカードが${a.shopCards}になる`,
+  rerollTimes:   a => `リロールが1営業日${a.times}回になる`,
+  rerollFree:    a => `リロールが無料になる（回数は変わらない）`,
+  shopCards:     a => `店に並ぶカードが${a.shopCards}になる`,
+  shopKeep:      a => `店で買わなかったカードが、次の営業日も並ぶ`,
+  shopCheapest:  a => `〈使い切り〉その営業日、店のカードが全部いちばん安い値段になる`,
+  streakWeight:  a => `同じ軸のカードを続けて取るほど、次の3択がその軸に寄る（連続1回ごとに重み×${a.per}）`,
+  // E. バンズ
+  bunSlotUp:     a => `バンズの所持枠が${a.slots}になる`,
+  bunBoardUp:    a => `盤面に出るバンズが${a.onBoard}枚になる。具材枠${a.ing}`,
+  bunRarUp:      a => `バンズの抽選でレアリティの高いものが選ばれやすくなる（重み×${a.mul}）`,
+  bunChoice:     a => `バンズの入手が${a.n}択になる`,
+  bunSkipPush:   a => `〈使い切り〉押し出しを1回飛ばす`,
+  bunTwice:      a => `バンズの入手が1営業日${a.n}回になる（押し出しも${a.n}回）`,
+  // F. 経済とラン構造
+  nightshift:    a => `家賃までに作れる数が${a.extra}増える。3択が${a.offer}択になる`,
+  shopHalfOnce:  a => `〈使い切り〉次の1回、店が${Math.round((a.ratio||0)*100)}%の値段になる`,
+  forcedDaily:   a => `毎営業日、指定された軸のカードを1枚デッキに入れる（拒否できない）。その代わり店が常に${Math.round((a.ratio||0)*100)}%の値段`,
+  rentSkip:      a => `〈使い切り〉家賃を1回踏み倒す。次の家賃が${a.mul}倍`,
+  deckHalve:     a => `〈使い切り〉デッキを半分にする（残す札は自分で選ぶ）。以後、3択の選択肢が${a.extra}つ増える`,
 };
+// 〈使い切り〉は使うと所持枠から消える（3枠しかないので、枠が空くこと自体が価値になる）。
+const ARTIFACT_ONCE = ["fixShopOnce","fixAllOnce","shopCheapest","bunSkipPush","shopHalfOnce","rentSkip","deckHalve"];
 function artifactText(name){ const a = CONFIG.artifacts[name]; if (!a || !ARTIFACT_TEXT[a.id]) return ""; return ARTIFACT_TEXT[a.id](a); }
 // バンズの効果文（Wave7 Step4）。効果文の無いバンズは入れない（SHIYOU 第5節）。
 //   すべて「バーガー全体」に掛かる。表示は現在の数値から作る（調整欄で変えたら文も変わる）。
@@ -2268,10 +2433,6 @@ function applyCardEffects(stack, acc){
   // ⑧ アーティファクト（第3層・盤面を希釈しない）。盤面の形に効くものはここで適用。数値は CONFIG.artifacts。
   const pushAddA = (label, a, idx) => { if (a === 0) return; acc.add += a; acc.hits.push({ label, effect:(a>=0?"+":"")+a, idx, kind:"add", add:a, src:-1 }); };
   const pushMultA = (label, m, idx) => { if (m === 1) return; acc.mult *= m; acc.hits.push({ label, effect:"×"+r2(m), idx, kind:"mult", mult:m, src:-1 }); };
-  { const a = artById("meatBase"); if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (items[m].type==="meat" && !side.absorbedIdx.has(i)){ s+=a.add; idx.push(i);} }); pushAddA("厨房の火力：肉", s, idx); } }
-  { const a = artById("vegBase");  if (a){ let s=0, idx=[]; stack.forEach((m,i)=>{ if (items[m].type==="veg"  && !side.absorbedIdx.has(i)){ s+=a.add; idx.push(i);} }); pushAddA("製氷機：野菜", s, idx); } }
-  { const a = artById("hygiene");  if (a) pushAddA("衛生管理", a.add, []); }
-  { const a = artById("regular");  if (a){ const hit = CUISINE_ORDER.some(c => c!=="none" && ctx.cuiInBurger(c) >= (a.need||3)); if (hit) pushMultA("常連客：同軸"+(a.need||3)+"+", a.mult, []); } }
   // ⑨ メロンパン：最大の乗算ヒットを1つ無効化
   if (side.disableMult){
     let best = null;
@@ -3457,22 +3618,37 @@ function advanceOffer(){ offerQueue.shift(); showNextOffer(); }   // 現在の�
 
 /* バンズの入手（Wave7 Step4）。営業日の最後のスピンの報酬。スキップできない。
    4枠が埋まっているときは、押し出す1枚をプレイヤーが選ぶ。空きがあればそのまま入る。 */
-let pendingBun = null;
+let pendingBun = null;        // 入手待ちのバンズ（選り好みのときは複数＝2択）
+let bunChosen = null;         // 選り好みで選んだ番号
+let bunRoundsLeft = 0;        // 朝の仕込み：1営業日に2回入手するときの残り回数
 function showBunOffer(){
   if ((CONFIG.params.buns || {}).on === false){ advanceOffer(); return; }
-  if (!pendingBun) pendingBun = makeBun(drawBunName());
-  const nb = pendingBun, d = bunDef(nb.name) || {};
+  // 夜の仕込み〈使い切り〉：押し出しを1回飛ばす（入手はするが枠から捨てない）。
+  const skipPush = hasArt("bunSkipPush");
+  const ch = artById("bunChoice");                   // 選り好み：入手が n 択になる
+  const nCand = Math.max(1, ch ? (ch.n || 2) : 1);
+  if (!pendingBun) pendingBun = Array.from({ length:nCand }, () => makeBun(drawBunName()));
   offerEl.innerHTML = "";
-  offerEl.appendChild(el("offer-title", "バンズを1枚入手（見送れません）"));
+  offerEl.appendChild(el("offer-title", nCand > 1 ? `バンズを1枚入手（${nCand}択・見送れません）` : "バンズを1枚入手（見送れません）"));
   const row = document.createElement("div"); row.className = "offer-cards";
-  const card = document.createElement("div"); card.className = "offer-card bunnew";
-  card.innerHTML = `<div class="pl">バンズ<span class="rar rar-${d.rar}">${BUN_RAR_JA[d.rar]||d.rar}</span></div>`
-                 + `<div class="nm">${nb.name}</div><div class="ef">${bunText(nb.name)}</div>`;
-  row.appendChild(card); offerEl.appendChild(row);
-  const free = bunSlots.length < bunCap();
-  offerEl.appendChild(el("offer-subtitle", free
-    ? `所持枠に空きがあります（${bunSlots.length}/${bunCap()}）。そのまま入ります`
-    : `所持枠は ${bunSlots.length}/${bunCap()}。押し出す1枚をタップで選ぶ`));
+  pendingBun.forEach((nb, i) => {
+    const d = bunDef(nb.name) || {};
+    const card = document.createElement("div"); card.className = "offer-card bunnew" + (bunChosen === i ? " picked" : "");
+    card.innerHTML = `<div class="pl">バンズ<span class="rar rar-${d.rar}">${BUN_RAR_JA[d.rar]||d.rar}</span></div>`
+                   + `<div class="nm">${nb.name}</div><div class="ef">${bunText(nb.name)}</div>`;
+    if (nCand > 1) card.addEventListener("click", () => { bunChosen = i; showBunOffer(); });
+    row.appendChild(card);
+  });
+  offerEl.appendChild(row);
+  if (nCand > 1 && bunChosen == null){
+    offerEl.appendChild(el("offer-subtitle", "受け取る1枚をタップで選ぶ"));
+    offerEl.classList.add("show"); updateProgress(); return;
+  }
+  const free = bunSlots.length < bunCap() || skipPush;
+  offerEl.appendChild(el("offer-subtitle", skipPush
+    ? `夜の仕込み：この1回は押し出しを飛ばします（${bunSlots.length}/${bunCap()}）`
+    : free ? `所持枠に空きがあります（${bunSlots.length}/${bunCap()}）。そのまま入ります`
+           : `所持枠は ${bunSlots.length}/${bunCap()}。押し出す1枚をタップで選ぶ`));
   const list = document.createElement("div"); list.className = "remove-list bunslots";
   for (const b of bunSlots){
     const bd = bunDef(b.name) || {};
@@ -3489,15 +3665,22 @@ function showBunOffer(){
   offerEl.classList.add("show"); updateProgress();
 }
 function takeBun(pushOutId){
-  if (!pendingBun) { advanceOffer(); return; }
+  if (!pendingBun || !pendingBun.length) { advanceOffer(); return; }
+  const nb = pendingBun[bunChosen != null ? bunChosen : 0];
   if (pushOutId != null){
     const i = bunSlots.findIndex(x => x.id === pushOutId);
     if (i < 0) return;
-    plog.recordBunSwap(pendingBun.name, bunSlots[i].name);
+    plog.recordBunSwap(nb.name, bunSlots[i].name);
     bunSlots.splice(i, 1); bunPushed++;
-  } else plog.recordBunSwap(pendingBun.name, null);
-  bunSlots.push(pendingBun); pendingBun = null;
-  renderBunView(); Sound.coinChink(4, 0.5); advanceOffer();
+  } else plog.recordBunSwap(nb.name, null);
+  if (hasArt("bunSkipPush")) consumeArtifact("bunSkipPush");   // 夜の仕込み〈使い切り〉
+  bunSlots.push(nb); pendingBun = null; bunChosen = null;
+  renderBunView(); Sound.coinChink(4, 0.5);
+  // 朝の仕込み：1営業日に n 回入手する（押し出しも n 回）。
+  const tw = artById("bunTwice");
+  if (bunRoundsLeft <= 0 && tw) bunRoundsLeft = Math.max(0, (tw.n || 2) - 1);
+  if (bunRoundsLeft > 0){ bunRoundsLeft--; showBunOffer(); return; }
+  advanceOffer();
 }
 // 所持している4枚の効果が常に読める表示（デッキ一覧と同じ形）。
 function renderBunView(){
@@ -3572,11 +3755,14 @@ function rarityRatesFor(cu){
 }
 function drawRarity(cu){
   const rates = rarityRatesFor(cu);
+  //   目利き（アーティファクト）：引いたレアリティを step 段ぶり上げる。極の上限はそのまま。
+  const mk = artById("rarUpRandom");
   let tot = 0; for (const k of RARITY_ORDER) tot += Math.max(0, rates[k]);
   if (tot <= 0) return "nami";
-  let r = grand() * tot;
-  for (const k of RARITY_ORDER){ r -= Math.max(0, rates[k]); if (r <= 0) return k; }
-  return "nami";
+  let r = grand() * tot, got = "nami";
+  for (const k of RARITY_ORDER){ r -= Math.max(0, rates[k]); if (r <= 0){ got = k; break; } }
+  if (mk){ const i = Math.min(RARITY_ORDER.length - 1, RARITY_ORDER.indexOf(got) + (mk.step || 1)); got = RARITY_ORDER[i]; }
+  return got;
 }
 // ── Wave7 Step2：軸の出現率（デッキ構成からの傾斜と下限）─────────────────────
 //   デッキの軸構成から5軸の出る確率を出す。無印は3択の抽選から外す（店専用・Step3）。
@@ -3595,14 +3781,17 @@ function axisRates(){
   for (const cu of AXES){ cnt[cu] = cuisineCount(cu); C += cnt[cu]; }
   const q = {};
   for (const cu of AXES) q[cu] = (1 - k) / nAx + k * (C > 0 ? cnt[cu] / C : 1 / nAx);
-  // 仕入れ帳（アーティファクト）：主軸をさらに重くする。比例のぶん（q）に掛けて正規化するので、
-  //   下限と「主軸の上限」は壊れない。作り替えは Step5。
-  const led = artById("ledger"), main = deckMainCuisine();
-  if (led && main !== "none" && q[main] != null){
-    q[main] *= (led.weight || 1);
-    let t = 0; for (const cu of AXES) t += q[cu];
-    if (t > 0) for (const cu of AXES) q[cu] /= t;
-  }
+  // アーティファクト（Wave7 Step5）：暖簾＝選んだ軸の重み×mul／老舗の暖簾＝大きく寄せて他軸は下限まで／
+  //   常連客＝同じ軸を続けて取るほどその軸に寄る。比例のぶん（q）に掛けて正規化するので、
+  //   下限と「主軸の上限」は壊れない。
+  let bigTo = null;
+  { const a = artById("axisWeight");    const cu = artAxisOf("axisWeight");    if (a && cu) q[cu] *= (a.mul || 1); }
+  { const a = artById("axisWeightBig"); const cu = artAxisOf("axisWeightBig"); if (a && cu){ q[cu] *= (a.mul || 1); bigTo = cu; } }
+  { const a = artById("streakWeight");  const st = artPickStreak;
+    if (a && st.cui && st.n > 0 && q[st.cui] != null) q[st.cui] *= Math.pow(a.per || 1.5, st.n); }
+  { let t = 0; for (const cu of AXES) t += q[cu]; if (t > 0) for (const cu of AXES) q[cu] /= t; }
+  // 老舗の暖簾：他の軸は下限まで落ちる（残りを選んだ軸に寄せる）。
+  if (bigTo){ for (const cu of AXES) q[cu] = (cu === bigTo) ? 1 : 0; }
   const out = {};
   for (const cu of AXES) out[cu] = floor + (1 - nAx * floor) * q[cu];
   return out;
@@ -3668,22 +3857,32 @@ function offerPool(noNone){
 const pileTotal = key => catalogNames().reduce((s,n)=> s + (CONFIG.items[n].pile===key ? CONFIG.items[n].count : 0), 0);
 // item14：3枚（以上）を可能なかぎり別々の軸から出す。重み順に引き、まず軸が重複しないものを選ぶ。
 function sampleOfferCards(pool, n){
-  if (!((CONFIG.params.offerBias||{}).distinctAxes)) return sampleWeighted(pool, n);
-  const ordered = sampleWeighted(pool, Math.min(pool.length, Math.max(n, n*4)));
-  const out = [], used = new Set();
-  for (const nm of ordered){ if (out.length>=n) break; const cu = CONFIG.items[nm].cuisine||"none"; if (!used.has(cu)){ out.push(nm); used.add(cu); } }
-  for (const nm of ordered){ if (out.length>=n) break; if (!out.includes(nm)) out.push(nm); }
-  return out.slice(0, n);
+  // 確定枠（Wave7 Step5・1つの仕組みに統一）を先に埋める。残りを通常の抽選で埋める。
+  const out = guaranteedPicks(pool, n, "offer");
+  const rest = pool.filter(x => out.indexOf(x) < 0);
+  if (out.length >= n) return out.slice(0, n);
+  // 献立表（アーティファクト）／offerBias.distinctAxes：残りを可能なかぎり別々の軸から出す。
+  if ((CONFIG.params.offerBias||{}).distinctAxes || hasArt("distinctAxes")){
+    const ordered = sampleWeighted(rest, Math.min(rest.length, Math.max(n, n*4)));
+    const used = new Set(out.map(nm => CONFIG.items[nm].cuisine || "none"));
+    for (const nm of ordered){ if (out.length>=n) break; const cu = CONFIG.items[nm].cuisine||"none"; if (!used.has(cu)){ out.push(nm); used.add(cu); } }
+    for (const nm of ordered){ if (out.length>=n) break; if (!out.includes(nm)) out.push(nm); }
+    return out.slice(0, n);
+  }
+  return out.concat(sampleWeighted(rest, n - out.length)).slice(0, n);
 }
 let offerRerollsLeft = 0;   // item15：オニオンの引き直し残り回数（この3択の間だけ）
 function showOffer(){
   const pool = offerPool(true);                     // 3択は無印を出さない（Wave7 Step2）
   if (pool.length === 0){ advanceOffer(); return; }  // 全軸OFFなら3択は飛ばす
-  const sb = artById("signboard");                  // 看板：3択の選択肢が増える
   const tomato = CONFIG.items["トマト"];            // item15：トマトがデッキにあると選択肢が増える
   const onion  = CONFIG.items["オニオン"];          // item15：オニオンがデッキにあると引き直せる
-  const nChoices = 3 + (sb ? (sb.extra || 0) : 0)
-                     + (tomato && tomato.count>0 && tomato.effect ? (tomato.effect.extra||0)*tomato.count : 0);
+  // 3択の枚数（Wave7 Step5）：看板+1／立て看板+2／見習いの独立+2／深夜営業は2択に絞る
+  let nChoices = 3;
+  for (const id of ["signboard","signboardBig","deckHalve"]){ const a = artById(id); if (a) nChoices += (a.extra || 0); }
+  nChoices += (tomato && tomato.count>0 && tomato.effect ? (tomato.effect.extra||0)*tomato.count : 0);
+  { const ns = artById("nightshift"); if (ns && ns.offer) nChoices = Math.min(nChoices, ns.offer); }
+  nChoices = Math.max(1, nChoices);
   offerRerollsLeft = (onion && onion.count>0 && onion.effect ? (onion.effect.rerolls||0)*onion.count : 0);
   renderOfferScreen(sampleOfferCards(pool, nChoices), pool, nChoices);
 }
@@ -3726,7 +3925,47 @@ function chooseOffer(name){
   noteAcquire(name);
   addInstance(name, 0); renderPiles(); renderAxisTally();   // 山に育ち0の個体を1つ足す（希釈が起きる層）
   forcedCard = name;                                 // item12：取った直後の1個に必ずこのカードを入れる（明示はしない）
+  // 初志貫徹：最初に取った軸を覚える。常連客：同じ軸を続けて取った回数を数える。
+  { const cu = CONFIG.items[name].cuisine || "none";
+    if (cu !== "none"){
+      if (artFirstAxis == null) artFirstAxis = cu;
+      artPickStreak = (artPickStreak.cui === cu) ? { cui:cu, n:artPickStreak.n + 1 } : { cui:cu, n:1 };
+    } }
+  if (artPendingFix && artPendingFix.kind === "offer") artPendingFix = null;   // 下ごしらえ〈使い切り〉はこの1回で終わり
+  // 目利き・大量仕入れ：取ると無作為に消える。新陳代謝：押し出す1枚を自分で選ぶ。
+  let n = 0;
+  { const a = artById("rarUpRandom");  if (a) n += 1; }
+  { const a = artById("pickDiscard2"); if (a) n += (a.n || 2); }
+  for (let k = 0; k < n; k++){
+    const pool = deck.filter(x => x.name !== name);
+    if (!pool.length) break;
+    const victim = pool[Math.floor(grand() * pool.length)];
+    discardInstance(victim, "artifact", false); plog.recordRemove(victim.name, "artifact");
+  }
+  if (n){ renderPiles(); renderAxisTally(); }
+  if (hasArt("pickPushOut")){ showPushOut(name); return; }   // 押し出しを選ぶ画面へ（advanceOffer はそのあと）
   advanceOffer();
+}
+// 新陳代謝：3択で取ったあと、デッキから押し出す1枚をプレイヤーが選ぶ。
+function showPushOut(justTook){
+  offerEl.innerHTML = "";
+  offerEl.appendChild(el("offer-title", "新陳代謝：デッキから1枚を押し出す（選んでください）"));
+  const list = document.createElement("div"); list.className = "remove-list";
+  const order = { bun:0, ingredient:1, sauce:2 };
+  const insts = deck.slice().sort((a,b)=> (order[CONFIG.items[a.name].pile]-order[CONFIG.items[b.name].pile]) || a.name.localeCompare(b.name));
+  for (const inst of insts){
+    const it = CONFIG.items[inst.name]; const last = pileTotal(it.pile) <= 1;
+    const r = document.createElement("div"); r.className = "remove-row" + (last ? " off" : "");
+    r.innerHTML = `<span class="nm">${inst.name}</span><span class="pl">${PILE_JA[it.pile]}</span>`
+                + (it.cuisine !== "none" ? `<span class="tag cui">${CUISINE_JA[it.cuisine]}</span>` : "");
+    if (!last) r.addEventListener("click", () => {
+      discardInstance(inst, "artifact", false); plog.recordRemove(inst.name, "artifact");
+      renderPiles(); renderAxisTally(); advanceOffer();
+    });
+    list.appendChild(r);
+  }
+  offerEl.appendChild(list);
+  offerEl.classList.add("show");
 }
 
 function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
@@ -3734,7 +3973,7 @@ function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 /* ===== ラン制（家賃・店・失敗）＝仮メカニクス。数値はすべて調整欄から変えられる。 ===== */
 function el(cls, text){ const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; return d; }
 function cuiTagHTML(it){ return it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : ""; }
-function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived)); }
+function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived) * artRentMul); }   // artRentMul＝前借りの次回倍率
 // 家賃までに作れる数＝rentEvery。深夜営業（アーティファクト）があれば +extra 個ぶん延びる。
 function effRentEvery(){ const rn = CONFIG.params.run || {}; const ns = artById("nightshift"); return Math.max(1, Math.round((rn.rentEvery || 5) + (ns ? (ns.extra || 0) : 0))); }
 // 購入キー → 価格スケールの要素（具材枠/ソース枠は段数スロットとして slot に統合）。
@@ -3744,7 +3983,11 @@ function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = 
   return Math.max(0, Math.round((base || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
 function bumpBuy(key){ if (key === "sau" || scaleFor(scaleElemOf(key)).on) shopBuys[key] = (shopBuys[key] || 0) + 1; }   // sau は固定価格なので何回目かを常に数える
 // ソース枠：上限（枚数）と、何回目かで決まる固定価格（Wave6 2-1/2-2）。scale.sslot は使わない。
-function sauceSlotMax(){ const sh = CONFIG.params.shop || {}; return Math.max(1, Math.round(sh.sauceSlotMax != null ? sh.sauceSlotMax : 3)); }
+function sauceSlotMax(){                             // ソース枠の上限（寸胴鍋は上限を超える）
+  const sh = CONFIG.params.shop || {}; let n = Math.round(sh.sauceSlotMax != null ? sh.sauceSlotMax : 3);
+  const z = artById("sauceOver"); if (z) n += (z.sauce || 1);
+  return Math.max(1, n);
+}
 function sauceSlotAtMax(){ return Math.round(CONFIG.params.tiers.sauces || 0) >= sauceSlotMax(); }
 function sauceSlotPrice(){                          // 上限を手で上げたときは最後の値段を使い回す（買えなくならないように）
   const sh = CONFIG.params.shop || {}; const arr = sh.sauceSlotPrices || [];
@@ -3759,12 +4002,28 @@ function rarityPrice(rar, buyKey){
   const sc = scaleFor(buyKey === "artifact" ? "artifact" : "card"); const n = buyKey ? (shopBuys[buyKey] || 0) : 0;
   return Math.max(0, Math.round(base * (sc.on ? Math.pow(sc.mul, n) : 1)));
 }
-const cardPriceOf = name => rarityPrice(rarityOf(name), "card");
-const artPriceOf  = name => rarityPrice((CONFIG.artifacts[name]||{}).rar || "nami", "artifact");
-// 冷蔵庫（アーティファクト）：店の削除が ratio 倍（既定 0.5＝半額）。
-function removeCostBase(){ const sh = CONFIG.params.shop || {}; const c = shopPrice("remove", sh.removeCost); const fr = artById("fridge"); return Math.max(0, Math.round(c * (fr ? (fr.ratio != null ? fr.ratio : 1) : 1))); }
+// カードの値段。値札の張り替え〈使い切り〉＝いちばん安いレアリティの値段／朝市・常連の要求＝割引。
+const cardPriceOf = name => {
+  const rar = hasArt("shopCheapest") ? RARITY_ORDER[0] : rarityOf(name);
+  return Math.max(0, Math.round(rarityPrice(rar, "card") * shopPriceMul()));
+};
+const artPriceOf  = name => Math.max(0, Math.round(rarityPrice((CONFIG.artifacts[name]||{}).rar || "nami", "artifact") * shopPriceMul()));
+function removeCostBase(){                          // 取り除きの値段（Wave7 Step5：廃棄業者・在庫整理・見切り品）
+  const sh = CONFIG.params.shop || {}; let c = shopPrice("remove", sh.removeCost);
+  if (hasArt("removeFree")) c = 0;                                            // 廃棄業者：無料
+  const big = artById("removeFreeBig");
+  if (big && deck.length >= (big.need || 20)) c = 0;                          // 在庫整理：デッキが多いとき無料
+  return Math.max(0, Math.round(c * shopPriceMul()));
+}
+// 店の値段の倍率（朝市＝次の1回だけ半額／常連の要求＝常に半額／値札の張り替えはカード側で扱う）。
+function shopPriceMul(){
+  let m = 1;
+  if (artShopDiscount != null) m *= artShopDiscount;
+  const f = artById("forcedDaily"); if (f) m *= (f.ratio != null ? f.ratio : 1);
+  return m;
+}
 let artifactStock = null;                            // 店に並ぶアーティファクト（未所持から抽選）
-function artifactsShownN(){ const sh = CONFIG.params.shop || {}; const menu = artById("menu"); return Math.max(0, Math.round((sh.artifactsShown || 0) + (menu ? (menu.extra || 0) : 0))); }
+function artifactsShownN(){ const sh = CONFIG.params.shop || {}; return Math.max(0, Math.round(sh.artifactsShown || 0)); }
 function rerollArtifacts(){
   const owned = new Set(artifactsOwned);
   const pool = Object.keys(CONFIG.artifacts).filter(nm => !owned.has(nm));
@@ -3785,18 +4044,23 @@ function showRent(){
   const due = rentDue();
   offerEl.appendChild(el("offer-title", `家賃の支払い（${daysSurvived + 1}営業日目）`));
   offerEl.appendChild(el("offer-runinfo", `家賃 ¥${due}　／　所持金 ¥${money}`));
-  const reg = artById("register");                  // レジ係：支払い後、支払額の ratio ぶんが戻る
-  const rebate = reg ? Math.round(due * (reg.ratio || 0)) : 0;
+  const payDay = () => {                             // 支払い後の共通処理（営業日をまたぐ）
+    daysSurvived++; onDay();                                                                     // 営業日トリガ：熟成肉・しらす・かまぼこ・キムチ・マッシュルーム
+    plog.recordRent(due, money); Sound.coinChink(0, 0.5); renderPiles(); updateRunStatus();
+    const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 20));
+    if (daysSurvived >= goal){ endRun("cleared"); return; }   // 目標営業日に到達＝完走。ここで終わる（続行させない）。
+    advanceOffer();
+  };
   if (money >= due){
-    const pay = el("offer-buy", `支払う（¥${due}）` + (rebate ? `　→ ¥${rebate} 戻る` : ""));
-    pay.addEventListener("click", () => {
-      setMoney(money - due + rebate); daysSurvived++; onDay();                                   // 営業日トリガ：熟成肉・しらす・かまぼこ・キムチ・マッシュルーム
-      plog.recordRent(due, money); Sound.coinChink(0, 0.5); renderPiles(); updateRunStatus();
-      const goal = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 20));
-      if (daysSurvived >= goal){ endRun("cleared"); return; }   // 目標営業日に到達＝完走。ここで終わる（続行させない）。
-      advanceOffer();
-    });
+    const pay = el("offer-buy", `支払う（¥${due}）`);
+    pay.addEventListener("click", () => { setMoney(money - due); artRentMul = 1; payDay(); });
     offerEl.appendChild(pay);
+  } else if (hasArt("rentSkip")){                     // 前借り〈使い切り〉：家賃を1回踏み倒す。次の家賃が mul 倍
+    const a = artById("rentSkip");
+    const btn = el("offer-buy", `前借りで踏み倒す（次の家賃が${a.mul || 2}倍）`);
+    btn.addEventListener("click", () => { artRentMul = (a.mul || 2); consumeArtifact("rentSkip"); payDay(); });
+    offerEl.appendChild(btn);
+    offerEl.appendChild(el("offer-runinfo warn", "家賃を払えません。前借りを使えます。"));
   } else {
     offerEl.appendChild(el("offer-runinfo warn", "家賃を払えません。ラン終了。"));
     const btn = el("offer-buy", "結果を見る"); btn.addEventListener("click", () => endRun("broke"));
@@ -3811,21 +4075,53 @@ const rarChipHTML = rar => `<span class="rar rar-${rar}">${RARITY_JA[rar]||rar}<
 // ── Wave7 Step3：店の各行為は「1営業日に N 回」。値上がりではなく回数で切る ──────────
 //   序盤も後半も同じ「1回だけやり直せる」にするため。営業日が変わると回復する（onDay で reset）。
 let dayShopUses = {};
-const shopDayLimit = key => { const d = (CONFIG.params.shop || {}).dayLimits || {}; return Math.max(0, Math.round(d[key] != null ? d[key] : 1)); };
+const shopDayLimit = key => {                        // 1営業日の回数（Wave7 Step5：B群・D群が変える）
+  const d = (CONFIG.params.shop || {}).dayLimits || {};
+  let n = Math.round(d[key] != null ? d[key] : 1);
+  if (key === "remove"){
+    const mk = artById("removeTimes"); if (mk) n = Math.max(n, mk.times || n);            // まかない
+    const big = artById("removeFreeBig"); if (big && deck.length >= (big.need || 20)) n = 99;  // 在庫整理：回数無制限
+    if (hasArt("ingNoRemove")) n = 0;                                                     // 大型フライヤー：削除が使えなくなる
+  }
+  if (key === "reroll"){ const kt = artById("rerollTimes"); if (kt) n = Math.max(n, kt.times || n); }  // 回転台
+  return Math.max(0, n);
+};
 const shopDayLeft  = key => shopDayLimit(key) - (dayShopUses[key] || 0);
 const useShopDay   = key => { dayShopUses[key] = (dayShopUses[key] || 0) + 1; };
 function resetShopDay(){ dayShopUses = {}; }
 // 品揃えを引く。無印は3択に出ないので、店では noneSlots 枚を無印で固定して必ず見せる（Wave7 §5-1）。
-function rerollStock(){
+function shopCardsN(){                                // 店に並ぶカードの枚数（Wave7 Step5：D群・#12 が変える）
   const sh = CONFIG.params.shop || {};
-  const menu = artById("menu");                                        // メニュー表：並ぶ数が増える
-  const nCards = Math.max(1, Math.round((sh.cardsShown || 6) + (menu ? (menu.extra || 0) : 0)));
-  const nNone  = Math.max(0, Math.min(nCards, Math.round(sh.noneSlots != null ? sh.noneSlots : 2)));
+  let n = Math.round(sh.cardsShown || 6);
+  for (const id of ["signboardBig","shopCards"]){ const a = artById(id); if (a && a.shopCards) n = a.shopCards; }
+  const sp = artById("shopPerAxis");                 // 仕入れ先の分散：デッキの軸の種類1つにつき+1
+  if (sp){ let k = 0; for (const cu of AXES) if (cuisineCount(cu) > 0) k++; n += k * (sp.per || 1); }
+  return Math.max(1, n);
+}
+function shopNoneN(){                                // 無印固定枠（裏メニュー＝2→4）
+  const sh = CONFIG.params.shop || {};
+  const a = artById("shopNone");
+  return Math.max(0, Math.round(a ? (a.slots || 2) : (sh.noneSlots != null ? sh.noneSlots : 2)));
+}
+function rerollStock(){
+  const nCards = shopCardsN();
+  const nNone  = Math.min(nCards, shopNoneN());
   const nonePool = offerPool().filter(n => (CONFIG.items[n].cuisine || "none") === "none");
   const axisPool = offerPool(true);                                    // 5軸ぶん（傾斜つき）
   const none = sampleWeighted(nonePool, Math.min(nNone, nonePool.length));
-  const axis = sampleWeighted(axisPool, Math.max(0, nCards - none.length));
-  shopStock = axis.concat(none);                                       // 無印枠は末尾にまとめる（固定枠だと分かるように）
+  //   予約票〈使い切り〉：店の並びのうち n 枠を選んだ軸で確定させる（確定枠の仕組みを共用）。
+  const fixed = guaranteedPicks(axisPool, Math.max(0, nCards - none.length), "shop");
+  const rest = axisPool.filter(x => fixed.indexOf(x) < 0);
+  const axis = fixed.concat(sampleWeighted(rest, Math.max(0, nCards - none.length - fixed.length)));
+  let stock = axis.concat(none);                                       // 無印枠は末尾にまとめる（固定枠だと分かるように）
+  // 予約帳：前の営業日に買わなかったカードを先に並べる（重複は落とす）。
+  if (shopKeepStock && shopKeepStock.length){
+    const keep = shopKeepStock.filter(nm => CONFIG.items[nm]);
+    stock = keep.concat(stock.filter(nm => keep.indexOf(nm) < 0)).slice(0, Math.max(nCards, keep.length));
+    shopKeepStock = null;
+  }
+  shopStock = stock;
+  if (artPendingFix && artPendingFix.kind === "shop") artPendingFix = null;   // 使い切りの効果はこの1回で終わり
   rerollArtifacts();
 }
 function showShop(){
@@ -3847,9 +4143,9 @@ function showShop(){
   offerEl.appendChild(row);
   // アーティファクト（第3層）。盤面を希釈しない。所持上限まで買える。
   if ((CONFIG.params.artifacts || {}).on !== false && artifactStock && artifactStock.length){
-    offerEl.appendChild(el("offer-subtitle", `アーティファクト（所持 ${artifactsOwned.length}/${(CONFIG.params.artifacts||{}).maxOwned||5}・盤面を希釈しない）`));
+    offerEl.appendChild(el("offer-subtitle", `アーティファクト（所持 ${artifactsOwned.length}/${(CONFIG.params.artifacts||{}).maxOwned||3}・得点には触らない・捨てても金は戻らない）`));
     const arow = document.createElement("div"); arow.className = "offer-cards";
-    const full = artifactsOwned.length >= ((CONFIG.params.artifacts||{}).maxOwned || 5);
+    const full = artifactsOwned.length >= ((CONFIG.params.artifacts||{}).maxOwned || 3);
     for (const name of artifactStock){
       const a = CONFIG.artifacts[name]; const cost = artPriceOf(name); const aff = money >= cost && !full;
       const card = document.createElement("div"); card.className = "offer-card shopcard artcard" + (aff ? "" : " cant");
@@ -3864,16 +4160,32 @@ function showShop(){
   if (artifactsOwned.length){
     const owned = document.createElement("div"); owned.className = "art-owned";
     owned.appendChild(el("lbl2", "所持中（タップで手放す）"));
-    for (const name of artifactsOwned){ const chip = el("artchip", name); chip.title = artifactText(name);
-      chip.addEventListener("click", () => { artifactsOwned = artifactsOwned.filter(x => x !== name); rerollArtifacts(); updateRunStatus(); showShop(); }); owned.appendChild(chip); }
+    for (const name of artifactsOwned){
+      const a = CONFIG.artifacts[name] || {};
+      const ax = a.pick && artAxis[name] ? `（${CUISINE_JA[artAxis[name]]}）` : "";
+      const chip = el("artchip", name + ax); chip.title = artifactText(name) + (a.pick ? "／長押しではなく2回目のタップで手放す" : "");
+      // 軸を選ぶ型は1回目のタップで軸の選び直し、2回目で手放す。それ以外は1回で手放す（金は戻らない）。
+      chip.addEventListener("click", () => {
+        if (a.pick && artChipArmed !== name){ artChipArmed = name; showAxisPick(name); return; }
+        artifactsOwned = artifactsOwned.filter(x => x !== name); delete artAxis[name]; artChipArmed = null;
+        plog.recordArtifactDrop(name); rerollArtifacts(); updateRunStatus(); showShop();
+      });
+      owned.appendChild(chip);
+    }
     offerEl.appendChild(owned);
   }
   const acts = document.createElement("div"); acts.className = "shop-acts";
   const mkbtn = (label, cost, fn, aff, note) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
     b.innerHTML = `${label}` + (note ? `<span class="reason">${note}</span>` : "") + (cost != null ? `<span class="price">¥${cost}</span>` : "");
     if (aff) b.addEventListener("click", fn); return b; };
-  const rc = removeCostBase(), ic = shopPrice("ing", sh.ingredientSlotCost), rr = shopPrice("reroll", sh.rerollCost);
-  const sCap = sauceSlotAtMax(), scst = sauceSlotPrice();          // ソース枠は上限つき・固定価格（Wave6）
+  const rc = removeCostBase();
+  const ic = Math.round(shopPrice("ing", sh.ingredientSlotCost) * shopPriceMul());
+  const rr = hasArt("rerollFree") ? 0 : Math.round(shopPrice("reroll", sh.rerollCost) * shopPriceMul());   // 問屋の顔：リロール無料
+  const sCap = sauceSlotAtMax();
+  //   ソース棚（アーティファクト）：ソース枠を n 回ぶん無料にする（上限は変わらない）。
+  const sf = artById("sauceFree");
+  const sfLeft = sf ? Math.max(0, (sf.n || 1) - (shopBuys.sauFree || 0)) : 0;
+  const scst = sfLeft > 0 ? 0 : Math.round(sauceSlotPrice() * shopPriceMul());
   // Wave7 Step3：打ち止めでもボタンを消さない。無効表示にして理由を出す。買えないことが見えるほうがよい。
   const why = (key, cost, extra) => {
     if (extra) return extra;
@@ -3886,11 +4198,21 @@ function showShop(){
   acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), canDo("ing", ic), why("ing", ic)));
   acts.appendChild(mkbtn("ソース枠 +1", sCap ? null : scst, () => buySlot("sauces", "sau", scst),
     canDo("sau", scst, sCap), why("sau", scst, sCap ? `ソース枠は${sauceSlotMax()}枚まで` : null)));
+  // 見習いの独立〈使い切り〉：デッキを半分にする（残す札はプレイヤーが選ぶ）。以後3択が増える。
+  if (hasArt("deckHalve"))
+    acts.appendChild(mkbtn("見習いの独立（デッキを半分にする）", null, () => showDeckHalve(), deck.length >= 2,
+      deck.length < 2 ? "デッキが少なすぎます" : null));
   acts.appendChild(mkbtn("品揃えの引き直し", rr,
     () => { setMoney(money - rr); bumpBuy("reroll"); useShopDay("reroll"); plog.recordBuy("reroll", "reroll", rr); rerollStock(); showShop(); },
     canDo("reroll", rr), why("reroll", rr)));
   offerEl.appendChild(acts);
-  const leave = el("offer-skip", "店を出る →"); leave.addEventListener("click", () => { shopStock = null; artifactStock = null; advanceOffer(); });
+  const leave = el("offer-skip", "店を出る →");
+  leave.addEventListener("click", () => {
+    if (hasArt("shopKeep")) shopKeepStock = shopStock ? shopStock.slice() : null;   // 予約帳：売れ残りを次の営業日へ
+    if (artShopDiscount != null){ artShopDiscount = null; consumeArtifact("shopHalfOnce"); }   // 朝市〈使い切り〉：この1回で終わり
+    if (hasArt("shopCheapest")) consumeArtifact("shopCheapest");                   // 値札の張り替え〈使い切り〉：その営業日ぶん
+    shopStock = null; artifactStock = null; advanceOffer();
+  });
   offerEl.appendChild(leave);
   offerEl.classList.add("show"); updateProgress();
 }
@@ -3906,16 +4228,71 @@ function buyCard(name, cost){
 }
 function buyArtifact(name, cost){
   if (money < cost) return;
-  if (artifactsOwned.length >= ((CONFIG.params.artifacts||{}).maxOwned || 5)) return;
+  if (artifactsOwned.length >= ((CONFIG.params.artifacts||{}).maxOwned || 3)) return;
   setMoney(money - cost); bumpBuy("artifact");
   artifactsOwned.push(name); plog.recordBuy("artifact", name, cost);
   artifactStock = artifactStock.filter(x => x !== name);
-  updateRunStatus(); Sound.coinChink(6, 0.6); showShop();
+  updateRunStatus(); Sound.coinChink(6, 0.6);
+  const a = CONFIG.artifacts[name] || {};
+  if (a.pick){ showAxisPick(name); return; }          // 軸を選ぶ型（暖簾・一点張り 等）は買った直後に選ぶ
+  showShop();
+}
+/* 見習いの独立〈使い切り〉：デッキを半分になるまで、捨てる札をプレイヤーが選ぶ。 */
+function showDeckHalve(){
+  const target = Math.max(1, Math.ceil(deck.length / 2));
+  offerEl.innerHTML = "";
+  offerEl.appendChild(el("offer-title", `見習いの独立：デッキを${target}枚まで減らす（捨てる札を選ぶ）`));
+  offerEl.appendChild(el("offer-subtitle", `いま ${deck.length}枚。あと ${Math.max(0, deck.length - target)}枚`));
+  if (deck.length <= target){
+    const done = el("offer-buy", "終わる");
+    done.addEventListener("click", () => { consumeArtifact("deckHalve"); showShop(); });
+    offerEl.appendChild(done); offerEl.classList.add("show"); return;
+  }
+  const list = document.createElement("div"); list.className = "remove-list";
+  const order = { bun:0, ingredient:1, sauce:2 };
+  const insts = deck.slice().sort((a,b)=> (order[CONFIG.items[a.name].pile]-order[CONFIG.items[b.name].pile]) || a.name.localeCompare(b.name));
+  for (const inst of insts){
+    const it = CONFIG.items[inst.name]; const last = pileTotal(it.pile) <= 1;
+    const r = document.createElement("div"); r.className = "remove-row" + (last ? " off" : "");
+    r.innerHTML = `<span class="nm">${inst.name}</span><span class="pl">${PILE_JA[it.pile]}</span>`;
+    if (!last) r.addEventListener("click", () => {
+      discardInstance(inst, "artifact", false); plog.recordRemove(inst.name, "artifact");
+      renderPiles(); renderAxisTally(); showDeckHalve();
+    });
+    list.appendChild(r);
+  }
+  offerEl.appendChild(list);
+  offerEl.classList.add("show");
+}
+/* 軸を選ぶ画面（1つの仕組みを全部の「選んだ軸」系が使う）。買った直後と、所持中のタップから開く。 */
+function showAxisPick(name){
+  offerEl.innerHTML = "";
+  offerEl.appendChild(el("offer-title", `${name}：軸を選ぶ`));
+  offerEl.appendChild(el("offer-subtitle", artifactText(name)));
+  const row = document.createElement("div"); row.className = "offer-cards";
+  for (const cu of AXES){
+    const card = document.createElement("div"); card.className = "offer-card" + (artAxis[name] === cu ? " picked" : "");
+    card.innerHTML = `<div class="pl">軸</div><div class="nm">${CUISINE_JA[cu]}</div>`
+                   + `<div class="bs">デッキに${cuisineCount(cu)}枚</div>`;
+    card.addEventListener("click", () => {
+      artAxis[name] = cu; plog.recordArtifactAxis(name, cu);
+      const a = CONFIG.artifacts[name] || {};
+      // 使い切りの確定枠（予約票＝次の店／下ごしらえ＝次の3択）は、選んだ時点で予約される。
+      if (a.id === "fixShopOnce") artPendingFix = { kind:"shop",  cui:cu, n:a.n || 3 };
+      if (a.id === "fixAllOnce")  artPendingFix = { kind:"offer", cui:cu, n:99 };
+      if (a.id === "fixShopOnce" || a.id === "fixAllOnce") consumeArtifact(a.id);
+      showShop();
+    });
+    row.appendChild(card);
+  }
+  offerEl.appendChild(row);
+  offerEl.classList.add("show");
 }
 function buySlot(field, key, cost){
   if (money < cost) return;
   if (field === "sauces" && sauceSlotAtMax()) return;   // 上限（Wave6 2-1）。ボタンは無効表示だが二重の守り
   if (shopDayLeft(key) <= 0) return;                    // 1営業日の回数（Wave7 Step3）。同上の二重の守り
+  if (key === "sau" && cost === 0 && hasArt("sauceFree")) shopBuys.sauFree = (shopBuys.sauFree || 0) + 1;   // ソース棚：無料ぶんを消費
   setMoney(money - cost); bumpBuy(key); useShopDay(key);
   CONFIG.params.tiers[field] = Math.max(0, Math.round(CONFIG.params.tiers[field]) + 1);
   plog.recordBuy("slot", field, cost);
@@ -3942,6 +4319,8 @@ function showShopRemove(cost){
     if (!last) rowEl.addEventListener("click", () => {
       if (money < cost || shopDayLeft("remove") <= 0) return;          // 1営業日の回数（Wave7 Step3）
       setMoney(money - cost); bumpBuy("remove"); useShopDay("remove");
+      const mk = artById("removeMoney");             // 見切り品：基礎点の ratio ぶんが金になる
+      if (mk) setMoney(money + Math.max(0, Math.round(baseOf(inst.name) * (mk.ratio || 0.5))));
       discardInstance(inst, "shop", false); renderPiles(); renderAxisTally(); Sound.coinChink(4, 0.5); showShop(); });
     list.appendChild(rowEl);
   }
@@ -4095,7 +4474,9 @@ function resetRun(){
   pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; artifactsOwned = []; forcedCard = null;
-  pendingBun = null; bunBestScore = 0;               // バンズの入手待ち・最高得点（#22 連勝）もリセット
+  pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0;   // バンズの入手待ち・最高得点（#22 連勝）
+  artAxis = {}; artFirstAxis = null; artDayAxis = null; artOnceUsed = {}; artPendingFix = null;   // アーティファクトの状態（Wave7 Step5）
+  artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; artChipArmed = null;
   refreshMoney(false); clearPiledCoins();
   offering = false; offerEl.classList.remove("show", "result", "cleared", "broke"); offerEl.innerHTML = "";
   updateStats(); renderBars(); renderPiles(); renderAxisTally(); updateRunStatus();
@@ -4554,10 +4935,12 @@ function renderSettings(){
   g = group("アーティファクト（第3層・盤面を希釈しない）", "run");
   gridRow(g, "アーティファクトを使う", boolInput(()=>ar.on!==false, v=>{ar.on=v; updateRunStatus();}));
   gridRow(g, "所持できる上限", numInput(()=>ar.maxOwned, v=>{ar.maxOwned=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
-  g = group("アーティファクトの効果（暫定値・変更可）", "run");
+  g = group("アーティファクト45種の数値（すべて仮値）", "run");
   for (const nm of Object.keys(CONFIG.artifacts)){ const a = CONFIG.artifacts[nm];
-    for (const k of Object.keys(a)){ if (k==="id"||k==="rar"||typeof a[k]!=="number") continue;
-      gridRow(g, `${nm}·${k}`, numInput(()=>CONFIG.artifacts[nm][k], v=>CONFIG.artifacts[nm][k]=v, 0.1)); } }
+    for (const key of ["mul","need","n","per","times","step","ing","bunSlots","sauce","deck","slots","onBoard","shopCards","extra","offer","ratio"])
+      if (typeof a[key] === "number") gridRow(g, nm+"："+key, numInput(()=>a[key], v=>a[key]=v, 0.5));
+    continue;
+  }
 
   // ── 進行：3択 ──
   g = group("完成ごとの3択（無料・毎回。削除は店へ移動）", "run");
@@ -4852,7 +5235,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   updateProgress();
 }));
 $("resetCfg").addEventListener("click", () => { CONFIG = fresh(); installBunItems(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; resetBuns(); pendingBun = null; bunBestScore = 0; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; resetBuns(); pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0; artAxis = {}; artFirstAxis = null; artDayAxis = null; artPendingFix = null; artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4966,6 +5349,10 @@ const plog = (function(){
     // Wave7 Step4：そのスピンの盤面に出たバンズと、所持している4枠。
     recordBuns(board, slots){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.buns = { board:(board||[]).slice(), slots:(slots||[]).slice() }; saveCurrent(); } },
     recordBunSwap(gained, pushed){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.bunSwaps = s.bunSwaps || []).push({ gained, pushed }); saveCurrent(); } },
+    // Wave7 Step5：アーティファクトの使い切り・手放し・選んだ軸。
+    recordArtifactUse(nm){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.artUsed = s.artUsed || []).push(nm); saveCurrent(); } },
+    recordArtifactDrop(nm){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.artDropped = s.artDropped || []).push(nm); saveCurrent(); } },
+    recordArtifactAxis(nm, cu){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.artAxes = s.artAxes || []).push({ name:nm, cuisine:cu }); saveCurrent(); } },
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
     currentBest: () => (cur && cur.summary.bestBurger) ? cur.summary.bestBurger : null,   // 進行中ランの最高得点バーガー（確定前に読む）
@@ -5055,6 +5442,12 @@ window.RUN = {
   setBuns: (names) => { bunSlots = (names||[]).filter(n => CONFIG.buns[n]).map(n => makeBun(n)); renderBunView(); return bunSlots.map(x=>x.name); },
   bunText: (nm) => bunText(nm),
   bunStats: () => ({ pushed: bunPushed, streak: bunStreak, pendingDraw: bunPendingDraw, best: bunBestScore }),
+  // アーティファクト（Wave7 Step5）：確定枠と選んだ軸をテストから読む／組む口。
+  setArtAxis: (nm, cu) => { if (CONFIG.artifacts[nm] && AXES.indexOf(cu) >= 0) artAxis[nm] = cu; return artAxis[nm]; },
+  artAxes: () => Object.assign({}, artAxis),
+  guaranteed: (kind) => guaranteedSlots(kind),
+  artState: () => ({ firstAxis: artFirstAxis, dayAxis: artDayAxis, streak: Object.assign({}, artPickStreak),
+                     pendingFix: artPendingFix, shopDiscount: artShopDiscount, rentMul: artRentMul, keep: shopKeepStock }),
   shopDayLeft: (k) => shopDayLeft(k),                                         // 店の1営業日の残り回数（Wave7 Step3）
   shopStock: () => (shopStock ? shopStock.slice() : null),
   mainCuisine: () => deckMainCuisine(),
@@ -5147,6 +5540,29 @@ function selfCheck(){
     for (const nm of bn){ if (nm === "ゴマバンズ") continue; if (c[bs[nm].rar] != null) c[bs[nm].rar]++; }
     if (c.common !== 12 || c.rare !== 15 || c.kyoku !== 3)
       warn.push("バンズ30種の内訳が KENTO と違う: コモン" + c.common + "・レア" + c.rare + "・極" + c.kyoku + "（想定 12・15・3）");
+  }
+  // ⑫ アーティファクト（Wave7 Step5）。効果文の欠落・レアリティ・45種の内訳・〈使い切り〉の数を点検する。
+  {
+    const A = CONFIG.artifacts || {}, an = Object.keys(A);
+    if (an.length !== 45) warn.push("アーティファクトが45種でない: " + an.length + "種");
+    const noText = an.filter(nm => !artifactText(nm));
+    if (noText.length) warn.push("効果文が無いアーティファクト: " + noText.join(" / "));
+    const badR = an.filter(nm => RARITY_ORDER.indexOf(A[nm].rar) < 0);
+    if (badR.length) warn.push("未知のアーティファクトのレアリティ: " + badR.join(" / "));
+    const dead = Object.keys(ARTIFACT_TEXT).filter(id => !an.some(nm => A[nm].id === id));
+    if (dead.length) warn.push("使われていない ARTIFACT_TEXT: " + dead.join(" "));
+    const dupId = {}; for (const nm of an) dupId[A[nm].id] = (dupId[A[nm].id] || 0) + 1;
+    const dups = Object.keys(dupId).filter(k => dupId[k] > 1);
+    if (dups.length) warn.push("アーティファクトの id が重複: " + dups.join(" "));
+    const once = an.filter(nm => ARTIFACT_ONCE.indexOf(A[nm].id) >= 0);
+    if (once.length !== 7) warn.push("〈使い切り〉が7種でない: " + once.length + "種（" + once.join(" ") + "）");
+    const onceNoMark = once.filter(nm => !/〈使い切り〉/.test(artifactText(nm)));
+    if (onceNoMark.length) warn.push("〈使い切り〉の表記が効果文に無い: " + onceNoMark.join(" / "));
+    // 廃止した4種が残っていないこと（得点に直接触る型）
+    const banned = ["meatBase","vegBase","hygiene","regular","axisWa","axisChuka","axisKaisen","axisKokyu","axisAgemono"];
+    const left = an.filter(nm => banned.indexOf(A[nm].id) >= 0);
+    if (left.length) warn.push("廃止・作り替えのはずのアーティファクトが残っている: " + left.join(" / "));
+    if (Math.round((CONFIG.params.artifacts || {}).maxOwned || 0) !== 3) warn.push("アーティファクトの所持枠が3でない");
   }
   // ⑧ どの軸にも「並」が1枚以上あること（無い軸を引くと毎回フォールバックが起きる＝設計の穴）。
   //    無印に極が無いのは設計どおりなので、ここでは並だけを見る。
