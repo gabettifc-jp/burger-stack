@@ -783,7 +783,8 @@ const DEFAULTS = {
   items: {
     // ── Wave1：カード定義を95枚プール（SHOKUZAI §15）に差し替え。旧75枚は撤去（git履歴に残る）。 ──
     //   base=基礎点（仮値）：SHOKUZAI に「基礎点N」明記があればその値、無ければ 具材10/ソース3。rar は全カード仮の "jou"。
-    //   weight=重さ（SHOKUZAI §15・重いほど下に整列）。effect は全カード id:null（Wave1は基礎点のみ・効果は Wave2 以降で新設）。行末コメント＝将来の効果文。
+    //   ※ weight（重さ）は Wave7 Step0 で未使用になった。並びは grand() の抽選で決まる（KENTO「並びの重さ制を撤回」）。
+    //     値は当時の設計の記録として残しているが、コードのどこからも読まれない（cardWeight() も撤去した）。
     "フォアグラ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:118, effect:{id:"foiegras", mult:2.0}, ph:true, },  // 下の1枚を消して、その基礎点の2倍を加算（バンズ不可）
     "キャビア": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:72, effect:{id:"caviar", mult:2.5}, ph:true, },  // ×2.5。発動のたびデッキから無作為に1枚廃棄
     "和牛サーロイン": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:250, count:0, tier:null, rar:"jou", weight:168, effect:{id:"deckSizeAdd", per:-15}, ph:true, },  // 基礎点250。デッキ1枚につき −15
@@ -823,7 +824,7 @@ const DEFAULTS = {
     "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:104, effect:{id:"growAllSpin", per:3, halveChance:0.2}, ph:true, },  // 毎スピン育ち+3。ただし20%で育ちが半減
     "フグ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:130, count:0, tier:null, rar:"jou", weight:126, effect:{id:"gambleZero", chance:0.10}, ph:true, },  // 基礎点130。10%でこのバーガーが0点
     "かまぼこ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:150, count:0, tier:null, rar:"jou", weight:46, effect:{id:"dayAdd", per:-30}, ph:true, },  // 基礎点150。営業日をまたぐごとに −30
-    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:156, effect:{id:"drawMoreHeaviest", draw:1}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も重いカード
+    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:156, effect:{id:"drawMoreHeaviest", draw:1}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も基礎点が高いカード
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:88, effect:{id:"adjKaisenGrowAdd", base:30, perG:6}, ph:true, },  // 隣接する海鮮1枚につき +30。育ち1段階につきこの値 +6
     "さけ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:82, effect:{id:"growAccel"}, ph:true, },  // 育ちが1増えるたび、さらに+1（加速）
     "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:148, effect:{id:"grownCountAdd", per:45}, ph:true, },  // 育った具材（育ち1以上）1枚につき +45
@@ -852,8 +853,8 @@ const DEFAULTS = {
     "かつおぶし": { pile:"ingredient", type:"meat", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:103, effect:{id:"katsuobushiTwice"}, ph:true, },  // 自分を消して廃棄。隣接2枚の効果を今回2回発動
     "こんにゃく": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:40, effect:{id:"konjacMeat", per:60}, ph:true, },  // 引いた肉は段に乗らず消える。1枚につき和すべて +60（永続）
     "のり": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:34, effect:{id:"noriCount", add:1}, ph:true, },  // 上下の条件付き効果の成立数を+1として数えさせる
-    "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:174, effect:{id:null}, ph:true, },  // 真下1枚の重さを +100 として扱う
-    "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:24, effect:{id:null}, ph:true, },  // 真上1枚の重さを −100 として扱う
+    "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:174, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
+    "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:24, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
     "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:42, effect:{id:"matsutakeTwice"}, ph:true, },  // 最初に引かれた具材の効果が2回発動
     "茶碗蒸し": { pile:"ingredient", type:"dairy", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:140, effect:{id:"runCuiAdd", cui:"wa", per:55}, ph:true, },  // 和が連続して並ぶ長さ×55
     "お好み焼き": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:154, effect:{id:"ascPairAdd", per:65}, ph:true, },  // 基礎点が下から昇順の組ごとに +65
@@ -1275,7 +1276,7 @@ let forcedCard = null;   // item12：3択で取った直後の1個に必ず入�
 /* ── 引く枚数の増減（Wave4・D5）。盤面に出た次のスピンだけ効く（デッキにあるだけでは変わらない）。
    対象は具材枠のみ（ソース枠は変えない）。下限1・上限なし。使ったら0に戻す。 ── */
 let pendingDraw = 0;       // 次のスピンの具材枠に足す枚数（負もあり）
-let pendingForced = [];    // 次のスピンで確定で引く指定（{kind:"heaviest"}＝ツナ／{kind:"rarestAxis"}＝ロースハム）
+let pendingForced = [];    // 次のスピンで確定で引く指定（{kind:"topBase"}＝ツナ／{kind:"rarestAxis"}＝ロースハム）
 function effIngSlots(){ return Math.max(1, Math.round(CONFIG.params.tiers.ingredients) + pendingDraw); }
 // 確定引きの対象を「個体id」に解決する。増えた枠は具材枠なので、具材の山から選ぶ。
 function resolvePendingForcedIds(){
@@ -1283,9 +1284,10 @@ function resolvePendingForcedIds(){
   for (const req of pendingForced){
     const pool = deck.filter(x => CONFIG.items[x.name].pile === "ingredient" && !ids.includes(x.id));
     if (!pool.length) continue;
-    if (req.kind === "heaviest"){                                  // ツナ：デッキで最も重いカード（同値は id の小さい方）
+    if (req.kind === "topBase"){                                   // ツナ：デッキで最も基礎点が高いカード（同値は id の小さい方）
+      //   Wave7 Step0：もとは「最も重いカード」だったが、重さ制の撤回で判定できなくなったので基礎点に置き換えた。
       let best = pool[0];
-      for (const x of pool){ const w = cardWeight(x.name), bw = cardWeight(best.name); if (w > bw || (w === bw && x.id < best.id)) best = x; }
+      for (const x of pool){ const w = baseOf(x.name), bw = baseOf(best.name); if (w > bw || (w === bw && x.id < best.id)) best = x; }
       ids.push(best.id);
     } else if (req.kind === "rarestAxis"){                          // ロースハム：デッキで最も少ない軸（none 除く・0枚は数えない）。同数は grand()
       const cnt = {}; for (const x of pool){ const c = CONFIG.items[x.name].cuisine; if (c && c !== "none") cnt[c] = (cnt[c] || 0) + 1; }
@@ -1322,30 +1324,34 @@ function drawPile(pileKey, cap, forced, forcedIds){
   }
   return out;   // 個体（{id,name,g}）の配列
 }
-// 中段の並びを決める（Wave1・重さで整列。旧 orderFix＝得点最大化の自動並べ替えは撤去）。重いほど下（配列の先頭側＝index0寄り）。
-//   top が null（バンズ1枚）のときは上バンズ無しで組む（下バンズ＋中段のみ）。空段は作らない。バンズは対象外（上下固定）。
-//   同じ重さは引いた順（安定ソート）。もち／麩の補正は「印字重さで整列 → 補正を1回 → 再整列を1回」で確定（再帰させない）。
-function cardWeight(name){ const it = CONFIG.items[name]; return (it && typeof it.weight === "number") ? it.weight : 0; }   // 盤面の並び用の「重さ」（rarity 抽選の weightOf とは別物）
+// 中段の並びを決める（Wave7 Step0・抽選）。重さによる整列は撤回した（KENTO「並びの重さ制を撤回」）。
+//   プレイヤーが決められるのはデッキの中身だけ。構築で確率を作り、盤面で振る。
+//   抽選は buildPlan()（計算層）の中でここが呼ばれた1回だけ。段が落ちるたびに振らない（演出が結果を作らない＝再現性を守る）。
+//   バンズも上下どちらに来るかを抽選する。top が null（バンズ1枚）のときは上バンズ無しで組む。
+function shuffled(arr){                              // Fisher-Yates（grand() のみ・Math.random は使わない）
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(grand() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
 function arrangeStack(bottom, mids, top){   // bottom/top/mids は「個体」（{id,name,g}）。返り値も個体の配列。
   const wrap = m => (top != null ? [bottom, ...m, top] : [bottom, ...m]);
-  const M = mids.length;
-  if (M === 0) return wrap(mids);
-  // 引いた順(index)を安定ソートのタイブレークに使う（重い→軽い）。重いほど下＝配列の先頭側。
-  const sortBy = wf => mids.map((inst,i)=>({inst,i})).sort((a,b)=> (wf(b.inst)-wf(a.inst)) || (a.i-b.i)).map(o=>o.inst);
-  // 1) 印字された重さで整列
-  let sorted = sortBy(x => cardWeight(x.name));
-  // 2) もち／麩の補正を1回だけ算出（印字重さの整列結果に対して）。full: index0=下バンズ, 1..M=中段, M+1=上バンズ。
-  //    真下＝1つ下の段（配列で手前・index-1）、真上＝1つ上の段（index+1）。相手がバンズ（枠外）のときは補正しない。補正は個体単位（Mapで保持）。
-  const full = wrap(sorted);
-  const delta = new Map();
-  for (let fi = 1; fi <= M; fi++){
-    if (full[fi].name === "もち" && fi - 1 >= 1){ const b = full[fi-1]; delta.set(b, (delta.get(b)||0) + 100); }   // 真下の重さ +100（沈める）
-    if (full[fi].name === "麩"  && fi + 1 <= M){ const a = full[fi+1]; delta.set(a, (delta.get(a)||0) - 100); }     // 真上の重さ −100（浮かせる）
+  if (mids.length === 0) return wrap(mids);
+  let ord = shuffled(mids);                          // ①まず中段を丸ごとシャッフル
+  // ②もち・麩：盤面に自分と同じ軸のカードがあるとき、必ずその隣に来る（複数あればランダムに1枚）。無ければ通常の抽選のまま。
+  //   引いた順で1枚ずつ処理する。2枚とも居て取り合いになった場合は後の1枚が勝つ（静的な並べ替えなので両立を保証しない）。
+  const isMover = nm => (CONFIG.items[nm].effect || {}).id === "adjSameCui";
+  for (const mv of mids){
+    if (!isMover(mv.name)) continue;
+    const cu = CONFIG.items[mv.name].cuisine;
+    const cand = ord.filter(x => x !== mv && CONFIG.items[x.name].cuisine === cu);
+    if (!cand.length) continue;                      // 同軸が居ない＝通常の抽選のまま
+    const tgt = cand[Math.floor(grand() * cand.length)];
+    const above = grand() < 0.5;                     // 上に付くか下に付くか
+    ord = ord.filter(x => x !== mv);
+    const ti = ord.indexOf(tgt);
+    ord.splice(above ? ti + 1 : ti, 0, mv);
   }
-  if (delta.size === 0) return wrap(sorted);
-  // 3) 実効重さで再整列を1回だけ（再帰させない＝ここで確定）
-  sorted = sortBy(x => cardWeight(x.name) + (delta.get(x)||0));
-  return wrap(sorted);
+  return wrap(ord);
 }
 // 乱数を使わずに「このデッキ・枠でバーガーを組めるか」を判定する（buildBurger が null を返す条件と同じ）。
 //   成長（うに等）を引きの前に安全に走らせるために使う（Wave4 3-6：空引きの回に二重発火させない）。
@@ -1364,7 +1370,7 @@ function buildBurger(){
   pendingDraw = 0; pendingForced = [];                          // 使ったら戻す
   const nSauce = Math.max(0, Math.round(t.sauces));             // ソースの段数スロット（上限）
   const f = forcedCard;                                         // item12：この1個に確定で入れるカード（山に応じて割り当て）
-  const buns  = drawPile("bun", 2, f);                          // バンズも非復元＝所持個体ぶんだけ引く（他の具材と同じ扱い・複製しない）
+  const buns  = shuffled(drawPile("bun", 2, f));                // バンズも非復元＝所持個体ぶんだけ引く。上下どちらに来るかも抽選（Wave7 Step0）
   let   ings  = drawPile("ingredient", nIng, f, fIds);         // 引けた具材（個体・≤ nIng・デッキの具材数まで）
   const sauces= drawPile("sauce", nSauce, f);                   // 引けたソース（個体・≤ nSauce・デッキのソース数まで）
   if (buns.length === 0 || (ings.length + sauces.length) === 0) return null;   // バンズ0枚／中身を1枚も引けない＝組めない
@@ -1380,7 +1386,7 @@ function buildBurger(){
   const drawn = [...buns, ...ings, ...sauces];                  // 引いた順（整列前）。成長の適用と「最初に引かれた具材」（まつたけ）の判定に使う
   const mids = [...ings, ...sauces];                            // 具材とソースを中段に（引いた順のまま渡す＝重さ同値のタイブレーク用。空段は無い＝詰めて組む）
   const top  = buns.length >= 2 ? buns[1] : null;              // バンズ1枚なら上バンズ無し（下バンズだけで組む＝得点0にはしない）
-  const arranged = arrangeStack(buns[0], mids, top);           // index0=最下段（下バンズ）。並びは重さ順（arrangeStack）で決まる
+  const arranged = arrangeStack(buns[0], mids, top);           // index0=最下段（下バンズ）。並びは抽選（arrangeStack・Wave7 Step0）
   // 成長（ほたて等）は buildPlan 側で適用する（空引きの回に発火させないため・Wave4 3-6）。
   return { inst: arranged, drawn, konjac, stack: arranged.map(x => x.name) };  // inst＝盤面の個体（育ち保持）／stack＝名前（描画・レイアウト用）
 }
@@ -1557,7 +1563,7 @@ function onBoard(inst, stack){   // ④盤面成長：かに・あわび（Step1
       }
     } else if (e.id === "drawFewerMult" || e.id === "drawFewerCuiMult" || e.id === "nextDrawMore" || e.id === "drawMoreHeaviest"){
       pendingDraw += (e.draw || 0);                  // 引く枚数の増減は「次のスピン」だけ（見返りが先・対価が後・D5）
-      if (e.id === "drawMoreHeaviest") pendingForced.push({ kind:"heaviest" });      // ツナ：増えた1枚はデッキで最も重いカード
+      if (e.id === "drawMoreHeaviest") pendingForced.push({ kind:"topBase" });       // ツナ：増えた1枚はデッキで最も基礎点が高いカード
     } else if (e.id === "nextDrawRareAxis"){
       pendingForced.push({ kind:"rarestAxis" });     // ロースハム：次に引く1枚をデッキで最も少ない軸にする（枠は増えない）
     } else if (e.id === "useMult"){                  // カレーソース：使うたび pm が増える。上限回数で回収時に廃棄
@@ -1648,6 +1654,8 @@ const EFFECT_TEXT = {
   axisKindsMult:  e => `乗算 = ${e.base!=null?e.base:0.65} + ${e.per||0.45} × 軸の種類数`,
   adjDiffCuiMult: e => `上下2枚が互いに違う軸なら ×${e.mult||1.45}`,
   adjDiffCuiAdd:  e => `上下2枚が互いに違う軸なら、その2枚の基礎点を各+${e.per||55}`,
+  // Wave7 Step0（並びの抽選。並びを動かすだけで得点は持たない）
+  adjSameCui:     e => `盤面に自分と同じ軸があれば、必ずその隣に来る（複数ならランダムに1枚）`,
   // Wave5 Step2（連続・並び。長さは1枚から数える）
   runCuiAdd:      e => `${CUISINE_JA[e.cui]||e.cui}が連続して並ぶ最長の長さ1枚につき +${e.per||50}`,
   altCuiRunAdd:   e => `違う軸が交互に並んでいる最長の長さ1枚につき +${e.per||70}`,
@@ -1679,7 +1687,7 @@ const EFFECT_TEXT = {
   drawFewerMult:    e => `×${e.mult||2.5}。次のスピンだけ引く枚数${e.draw||-2}`,
   drawFewerCuiMult: e => `このバーガーの和1枚につき ×${e.mult||1.3}。次のスピンだけ引く枚数${e.draw||-1}`,
   nextDrawMore:     e => `次のスピンだけ引く枚数+${e.draw||1}`,
-  drawMoreHeaviest: e => `次のスピンだけ引く枚数+${e.draw||1}。増えた1枚はデッキで最も重いカード`,
+  drawMoreHeaviest: e => `次のスピンだけ引く枚数+${e.draw||1}。増えた1枚はデッキで最も基礎点が高いカード`,
   nextDrawRareAxis: e => `次のスピンで引く1枚を、デッキで最も少ない軸のカードにする`,
   // Wave4 Step2（営業日・発動回数）
   dayAdd:       e => (e.per >= 0 ? `営業日をまたぐごとに 基礎点+${e.per}（永続）` : `営業日をまたぐごとに 基礎点${e.per}（永続・0で下げ止め）`),
@@ -3180,7 +3188,7 @@ function renderOfferScreen(picks, pool, nChoices){
     const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : "";
     const eff = effectText(name) || "効果なし（暫定）";
     card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTag}${rarChipHTML(rarityOf(name))}</div><div class="nm">${name}</div>`
-                   + `<div class="bs">基礎${baseOf(name)}${sysTag}${it.pile === "bun" ? "" : `・重さ${cardWeight(name)}`}</div>`   // 重さ＝並びが決まる値（Wave6 3-2）
+                   + `<div class="bs">基礎${baseOf(name)}${sysTag}</div>`   // 重さの表示は撤去（Wave7 Step0：並びは抽選）
                    + `<div class="ef">${eff}</div>`;
     card.addEventListener("click", () => chooseOffer(name));
     row.appendChild(card);
@@ -3301,7 +3309,7 @@ function showShop(){
     const card = document.createElement("div"); card.className = "offer-card shopcard" + (aff ? "" : " cant");
     const eff = effectText(name) || "効果なし（暫定）";
     card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTagHTML(it)}${rarChipHTML(rarityOf(name))}</div><div class="nm">${name}</div>`
-                   + `<div class="bs">基礎${baseOf(name)}${it.pile === "bun" ? "" : `・重さ${cardWeight(name)}`}</div>`   // 重さ＝並びが決まる値（Wave6 3-2）
+                   + `<div class="bs">基礎${baseOf(name)}</div>`   // 重さの表示は撤去（Wave7 Step0：並びは抽選）
                    + `<div class="ef">${eff}</div><div class="price">¥${cost}</div>`;
     if (aff) card.addEventListener("click", () => buyCard(name, cost));
     row.appendChild(card);
@@ -3813,13 +3821,13 @@ function renderAxisTally(){
    軸バッジをタップで開く。取り除きは店（有料）のままで、ここは何をタップしてもカードが消えない。
    並びは「引かれたときの上下関係」＝デッキ全体を並べても、実際に積まれるのは引かれた数枚だけ。
    既定は重さ順で軽いものが一番上（＝上バンズ寄り）。バーガーの絵と向きを合わせる。 */
-const DV_SORTS = ["weight", "score", "cuisine", "pile"];
-const DV_SORT_JA = { weight:"重さ順", score:"点数順", cuisine:"軸順", pile:"山順" };
+// 重さ順は撤去した（Wave7 Step0）。並びは抽選なので「上下関係」を一覧で見せる意味が無くなった。既定は軸順。
+const DV_SORTS = ["cuisine", "score", "pile"];
+const DV_SORT_JA = { score:"点数順", cuisine:"軸順", pile:"山順" };
 const DV_NOTE = {
-  weight: "重いほど下に沈む。軽いものが上（上バンズ寄り）。同じ重さは引いた順で決まるので、並びだけでは区別できない。",
-  score:  "実効値（印字の基礎点 ＋ pb ＋ 育ち×" + GROW_PER + "）の高い順。上下の位置とは関係ない。",
-  cuisine:"軸ごとにまとめた順。軸の中は重さ順（軽い→重い）。",
-  pile:   "山ごと（具材 → ソース → バンズ）。山の中は重さ順（軽い→重い）。",
+  score:  "実効値（印字の基礎点 ＋ pb ＋ 育ち×" + GROW_PER + "）の高い順。",
+  cuisine:"軸ごとにまとめた順。軸の中は名前順。",
+  pile:   "山ごと（具材 → ソース → バンズ）。山の中は名前順。",
 };
 let dvSort = 0;
 const deckViewOpen = () => { const el = document.getElementById("deckView"); return !!el && el.classList.contains("show"); };
@@ -3830,13 +3838,13 @@ function dvRow(inst, isBun){
   const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="tag">${CUISINE_JA[it.cuisine]}</span>` : `<span class="tag">無印</span>`;
   const pb = inst.pb || 0;
   const bs = `<span class="bs">基礎点<b>${it.base || 0}</b>${pb !== 0 ? `（${sgn(pb)}）` : ""}</span>`;
-  const w  = isBun ? `<span class="w">重さ—</span>` : `<span class="w">重さ${cardWeight(inst.name)}</span>`;
+
   const g  = (inst.g || 0) > 0 ? `<span class="up">育${inst.g}</span>` : "";
   const pm = (inst.pm || 0) > 0 ? `<span class="up">×${r2(1 + inst.pm)}</span>` : "";
   // もち・麩は「そのとき何が引かれたか」で相手が変わるので、静的な一覧には並びを描けない。印だけ付けて効果文で読ませる。
-  const mark = (inst.name === "もち" || inst.name === "麩") ? `<span class="mark">↕並びを変える</span>` : "";
+  const mark = ((it.effect || {}).id === "adjSameCui") ? `<span class="mark">↕同軸の隣に来る</span>` : "";
   const row = document.createElement("div"); row.className = "dv-row" + (isBun ? " bun" : "");
-  row.innerHTML = `<span class="nm">${inst.name}</span><span class="tag">${PILE_JA[it.pile]}</span>${cuiTag}${bs}${w}${g}${pm}${mark}`;
+  row.innerHTML = `<span class="nm">${inst.name}</span><span class="tag">${PILE_JA[it.pile]}</span>${cuiTag}${rarChipHTML(rarityOf(inst.name))}${bs}${g}${pm}${mark}`;
   row.title = effectText(inst.name) || "";
   return row;
 }
@@ -3848,7 +3856,7 @@ function renderDeckView(){
   const note = document.getElementById("dvNote"); if (note) note.textContent = "引かれたときの上下関係。" + DV_NOTE[mode];
   const cnt = document.getElementById("dvCount"); if (cnt) cnt.textContent = `（${deck.length}枚）`;
   const isBun = x => CONFIG.items[x.name].pile === "bun";
-  const byW  = (a, b) => cardWeight(a.name) - cardWeight(b.name) || a.name.localeCompare(b.name) || (a.id - b.id);
+  const byW  = (a, b) => a.name.localeCompare(b.name) || (a.id - b.id);   // 重さは撤去したので名前順（Wave7 Step0）
   const add = (arr, bun) => { for (const x of arr) host.appendChild(dvRow(x, bun)); };
   const label = t => { const d = document.createElement("div"); d.className = "dv-end"; d.textContent = t; host.appendChild(d); };
   if (mode === "weight"){
@@ -4464,7 +4472,9 @@ window.buildBurger = buildBurger; window.evaluate = evaluate;   // 計測ハー�
 
 /* ── 起動時の自己点検（Wave5）。console.warn にだけ出す（画面には出さない）。検出0件なら何も出さない。
    Wave3 で育ち系10枚の効果文が抜けていたのに Wave4 の作業中まで気づかなかったため、読み込み時に自動で見る。 ── */
-const HOOK_HANDLED_IDS = ["growDrawn","growUndrawn","growAdjKaisen","growAllSpin","growAccel","doubleGrowBonusAdj","maxGrowToAdj"];
+// resolveCard の外で処理する id（育ちエンジン＝フック／並びの抽選＝arrangeStack）。③の判定から除く。
+const HOOK_HANDLED_IDS = ["growDrawn","growUndrawn","growAdjKaisen","growAllSpin","growAccel","doubleGrowBonusAdj","maxGrowToAdj",
+                          "adjSameCui"];
 function selfCheck(){
   const items = CONFIG.items, names = Object.keys(items), warn = [];
   const usedIds = new Set(); for (const n of names){ const e = items[n].effect; if (e && e.id) usedIds.add(e.id); }
@@ -4480,10 +4490,7 @@ function selfCheck(){
   const src = resolveCard.toString();
   const notHandled = [...usedIds].filter(id => HOOK_HANDLED_IDS.indexOf(id) < 0 && src.indexOf('"' + id + '"') < 0);
   if (notHandled.length) warn.push("resolveCard が処理していない id: " + notHandled.join(" "));
-  // ④ 重さ（整列が壊れる）
-  const badW = names.filter(n => { const it = items[n]; if (typeof it.weight !== "number") return true;
-    return it.pile !== "bun" && it.weight === 0; });
-  if (badW.length) warn.push("weight が未設定/0 のカード: " + badW.join(" / "));
+  // ④ 重さの判定は撤去した（Wave7 Step0：並びは抽選になり weight はどこからも読まれない）。
   // ⑤ 軸が既知の6値以外
   const badC = names.filter(n => CUISINE_ORDER.indexOf(items[n].cuisine) < 0);
   if (badC.length) warn.push("未知の cuisine: " + badC.join(" / "));
