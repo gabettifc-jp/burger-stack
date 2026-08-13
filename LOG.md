@@ -2144,8 +2144,8 @@ Wave 8 時点で「初日の壁」がどうなっているか、1営業日目に
 
 シードだけでは再現できない。カード構成が変わると乱数の消費順が変わるため、次を揃える必要がある。
 
-- **対象コミット**：main の先端 `dcc8ce0`（Wave 8 取り込み後・`BUILD.label` が `"Wave 8"`）。
-- **測定スクリプト**：`tools/m2-measure.mjs`（ハーネス）／`tools/m2-report.mjs`（集計）。ブランチ `claude/burger-stack-spec-mv9xei` のコミット `e9c86af` にある。
+- **対象コミット**：測定した時点の main の先端 `dcc8ce0`（Wave 8 取り込み後・`BUILD.label` が `"Wave 8"`）。
+- **測定スクリプト**：`tools/m2-measure.mjs`（ハーネス）／`tools/m2-report.mjs`（集計）。main のコミット `d2d73cc` で入った（`index.html` は変えていないので、この2つを足しても対象コミットの `index.html` と同じものを測っている）。
 - **実プレイ経路**（playwright-core / Chromium で実UI操作）。`skipFx: true` で演出だけ省略し、それ以外は既定。
 - **`dayGoal` は 5 のまま、10スピンで打ち切った。**
   - 理由：`dayGoal` を 2 にするとレアリティの進行度が `営業日 / dayGoal` で正規化され、**1営業日目がいきなり進行度0.5になる。** 5営業日プレイの序盤と違う表が使われてしまうため、進行度が実プレイと同じになることを優先した。
