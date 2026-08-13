@@ -785,102 +785,102 @@ const DEFAULTS = {
     //   base=基礎点（仮値）：SHOKUZAI に「基礎点N」明記があればその値、無ければ 具材10/ソース3。rar は全カード仮の "jou"。
     //   ※ weight（重さ）は Wave7 Step0 で未使用になった。並びは grand() の抽選で決まる（KENTO「並びの重さ制を撤回」）。
     //     値は当時の設計の記録として残しているが、コードのどこからも読まれない（cardWeight() も撤去した）。
-    "フォアグラ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:118, effect:{id:"foiegras", mult:2.0}, ph:true, },  // 下の1枚を消して、その基礎点の2倍を加算（バンズ不可）
-    "キャビア": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:72, effect:{id:"caviar", mult:2.5}, ph:true, },  // ×2.5。発動のたびデッキから無作為に1枚廃棄
+    "フォアグラ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"tokujou", weight:118, effect:{id:"foiegras", mult:2.0}, ph:true, },  // 下の1枚を消して、その基礎点の2倍を加算（バンズ不可）
+    "キャビア": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"kiwami", weight:72, effect:{id:"caviar", mult:2.5}, ph:true, },  // ×2.5。発動のたびデッキから無作為に1枚廃棄
     "和牛サーロイン": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:250, count:0, tier:null, rar:"jou", weight:168, effect:{id:"deckSizeAdd", per:-15}, ph:true, },  // 基礎点250。デッキ1枚につき −15
-    "トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:90, count:0, tier:null, rar:"jou", weight:96, effect:{id:null}, ph:true, },  // 基礎点90。効果なし
+    "トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:90, count:0, tier:null, rar:"nami", weight:96, effect:{id:null}, ph:true, },  // 基礎点90。効果なし
     "熟成肉": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:132, effect:{id:"dayAdd", per:40}, ph:true, },  // 営業日をまたぐごとに +40（永続）
     "金箔": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:1, count:0, tier:null, rar:"jou", weight:164, effect:{id:"adjBaseStepAdd", step:100, per:90}, ph:true, },  // 基礎点1。上下の基礎点合計100につき +90
     "生牡蠣": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:130, count:0, tier:null, rar:"jou", weight:58, effect:{id:"gambleHalve", per:0.06}, ph:true, },  // 基礎点130。高級以外の具材1枚につき6%でバーガー半減
-    "蟹カマ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:30, effect:{id:"lowToHigh"}, ph:true, },  // 最も低い基礎点が、最も高い基礎点と同じ値になる
+    "蟹カマ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"tokujou", weight:30, effect:{id:"lowToHigh"}, ph:true, },  // 最も低い基礎点が、最も高い基礎点と同じ値になる
     "飴細工": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:0, count:0, tier:null, rar:"jou", weight:84, effect:{id:"swapAdjBase"}, ph:true, },  // 基礎点0。上下2枚の基礎点を入れ替える
     "白トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", weight:44, effect:{id:"discardCount", per:30}, ph:true, },  // 廃棄を行うたび +30（永続）
-    "伊勢海老": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:180, count:0, tier:null, rar:"jou", weight:152, effect:{id:"otherCuiAdd", cui:"kokyu", per:-40}, ph:true, },  // 基礎点180。他の高級具材1枚につき −40
-    "デミグラスソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:76, effect:{id:"flatMult", mult:1.2}, ph:true, },  // ×1.2。無条件
+    "伊勢海老": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:180, count:0, tier:null, rar:"tokujou", weight:152, effect:{id:"otherCuiAdd", cui:"kokyu", per:-40}, ph:true, },  // 基礎点180。他の高級具材1枚につき −40
+    "デミグラスソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"nami", weight:76, effect:{id:"flatMult", mult:1.2}, ph:true, },  // ×1.2。無条件
     "コンソメ": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:108, effect:{id:"cuiRatioMult", cui:"kokyu", mult:1.3, other:0.9}, ph:true, },  // 高級1枚につき ×1.3、高級以外1枚につき ×0.9
-    "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:92, effect:{id:"perigueux", mult:2.0, bonus:1.5}, ph:true, },  // 接する高級1枚につき ×2.0。トリュフ/フォアグラなら更に ×1.5
-    "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"jou", weight:124, effect:{id:"drawFewerMult", draw:-2, mult:2.5}, ph:true, },  // 引く枚数 −2、×2.5
-    "ぎょうざ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:40, count:0, tier:null, rar:"jou", weight:102, effect:{id:"perCuiAdd", per:40}, ph:true, },  // 基礎点40。このバーガーの中華1枚につき +40
-    "もやし": { pile:"ingredient", type:"veg", cuisine:"chuka", base:5, count:0, tier:null, rar:"jou", weight:66, effect:{id:"selfDeckAdd", per:10}, ph:true, },  // 基礎点5。デッキのもやし1枚につき +10
+    "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"kiwami", weight:92, effect:{id:"perigueux", mult:2.0, bonus:1.5}, ph:true, },  // 接する高級1枚につき ×2.0。トリュフ/フォアグラなら更に ×1.5
+    "貴腐ワイン": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:3, count:0, tier:null, rar:"tokujou", weight:124, effect:{id:"drawFewerMult", draw:-2, mult:2.5}, ph:true, },  // 引く枚数 −2、×2.5
+    "ぎょうざ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:40, count:0, tier:null, rar:"tokujou", weight:102, effect:{id:"perCuiAdd", per:40}, ph:true, },  // 基礎点40。このバーガーの中華1枚につき +40
+    "もやし": { pile:"ingredient", type:"veg", cuisine:"chuka", base:5, count:0, tier:null, rar:"nami", weight:66, effect:{id:"selfDeckAdd", per:10}, ph:true, },  // 基礎点5。デッキのもやし1枚につき +10
     "エビチリ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:138, effect:{id:"deckSizeAdd", per:4}, ph:true, },  // デッキ枚数×4を加算
-    "チャーシュー": { pile:"ingredient", type:"meat", cuisine:"chuka", base:65, count:0, tier:null, rar:"jou", weight:146, effect:{id:null}, ph:true, },  // 基礎点65。効果なし
+    "チャーシュー": { pile:"ingredient", type:"meat", cuisine:"chuka", base:65, count:0, tier:null, rar:"nami", weight:146, effect:{id:null}, ph:true, },  // 基礎点65。効果なし
     "麻婆豆腐": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:112, effect:{id:"perTier", per:15}, ph:true, },  // 段数×15を加算
     "北京ダック": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:128, effect:{id:"drawAdd", per:12}, ph:true, },  // 引かれるたび +12（永続）
     "中華まん": { pile:"ingredient", type:"veg", cuisine:"chuka", base:30, count:0, tier:null, rar:"jou", weight:54, effect:{id:"nextDrawMore", draw:1}, ph:true, },  // 基礎点30。次のスピンの具材枠+1として引く
     "八宝菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:116, effect:{id:"treatAdjAsCui", targetCui:"chuka"}, ph:true, },  // 隣接1枚を中華として扱う
-    "搾菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:36, effect:{id:"buyAdd", per:10}, ph:true, },  // カードを購入するたび +10（永続）
+    "搾菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"nami", weight:36, effect:{id:"buyAdd", per:10}, ph:true, },  // カードを購入するたび +10（永続）
     "ピータン": { pile:"ingredient", type:"dairy", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:122, effect:{id:"gambleAdd", add:250, per:0.07}, ph:true, },  // 成功で +250、失敗で 0。成功率=具材の枚数×7%
-    "すぶた": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", weight:142, effect:{id:"bigBurgerAdd", per:25, need:10}, ph:true, },  // 10段以上のバーガーを作るたび +25（永続）
-    "ラーメン": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:86, effect:{id:"spinMult", per:0.15, pmMax:1.5}, ph:true, },  // スピンごとに ×0.15 ずつ育つ。引き直しでリセット
-    "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:106, effect:{id:"adjCuiMult", mult:1.5}, ph:true, },  // 接する中華1枚につき ×1.5
-    "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:120, effect:{id:"adjTwoCuiMult", cuiA:"kaisen", cuiB:"chuka", mult:1.8}, ph:true, },  // 接する海鮮または中華1枚につき ×1.8
-    "ソース焼きそば": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"jou", weight:64, effect:{id:"deckSizeMult", per:1.04, maxMul:5.0}, ph:true, },  // デッキ1枚につき ×1.04
-    "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:4, count:0, tier:null, rar:"jou", weight:26, effect:{id:"dayBaseMul", mult:2}, ph:true, },  // 基礎点4。営業日をまたぐごとに基礎点2倍
+    "すぶた": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"nami", weight:142, effect:{id:"bigBurgerAdd", per:25, need:10}, ph:true, },  // 10段以上のバーガーを作るたび +25（永続）
+    "ラーメン": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"tokujou", weight:86, effect:{id:"spinMult", per:0.15, pmMax:1.5}, ph:true, },  // スピンごとに ×0.15 ずつ育つ。引き直しでリセット
+    "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"tokujou", weight:106, effect:{id:"adjCuiMult", mult:1.5}, ph:true, },  // 接する中華1枚につき ×1.5
+    "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"kiwami", weight:120, effect:{id:"adjTwoCuiMult", cuiA:"kaisen", cuiB:"chuka", mult:1.8}, ph:true, },  // 接する海鮮または中華1枚につき ×1.8
+    "ソース焼きそば": { pile:"sauce", type:"sauce", cuisine:"chuka", base:3, count:0, tier:null, rar:"tokujou", weight:64, effect:{id:"deckSizeMult", per:1.04, maxMul:5.0}, ph:true, },  // デッキ1枚につき ×1.04
+    "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:4, count:0, tier:null, rar:"nami", weight:26, effect:{id:"dayBaseMul", mult:2}, ph:true, },  // 基礎点4。営業日をまたぐごとに基礎点2倍
     "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", weight:98, effect:{id:"growDrawn", per:1}, ph:true, },  // 基礎点20。引かれるたび育ち+1
     "昆布": { pile:"ingredient", type:"veg", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:176, effect:{id:"growUndrawn", per:1}, ph:true, },  // 引かれなかったスピンごとに育ち+1
     "白身魚": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:100, effect:{id:"growAdjKaisen", per:2}, ph:true, },  // 上下が海鮮の組ごとに育ち+2
-    "かに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:94, effect:{id:"sacrificeAdjGrow", per:3}, ph:true, },  // 自分を消して、隣接2枚に育ち+3（永続）
+    "かに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"nami", weight:94, effect:{id:"sacrificeAdjGrow", per:3}, ph:true, },  // 自分を消して、隣接2枚に育ち+3（永続）
     "あわび": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:134, effect:{id:"sacrificeBelowGrow", step:5}, ph:true, },  // 下の1枚を消して、その基礎点5につき育ち+1（永続）※Wave5で単位換算を修正
-    "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:104, effect:{id:"growAllSpin", per:3, halveChance:0.2}, ph:true, },  // 毎スピン育ち+3。ただし20%で育ちが半減
+    "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"kiwami", weight:104, effect:{id:"growAllSpin", per:3, halveChance:0.2}, ph:true, },  // 毎スピン育ち+3。ただし20%で育ちが半減
     "フグ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:130, count:0, tier:null, rar:"jou", weight:126, effect:{id:"gambleZero", chance:0.10}, ph:true, },  // 基礎点130。10%でこのバーガーが0点
     "かまぼこ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:150, count:0, tier:null, rar:"jou", weight:46, effect:{id:"dayAdd", per:-30}, ph:true, },  // 基礎点150。営業日をまたぐごとに −30
-    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:156, effect:{id:"drawMoreHeaviest", draw:1}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も基礎点が高いカード
+    "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"nami", weight:156, effect:{id:"drawMoreHeaviest", draw:1}, ph:true, },  // 引く枚数+1。増えた1枚はデッキで最も基礎点が高いカード
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:88, effect:{id:"adjKaisenGrowAdd", base:30, perG:6}, ph:true, },  // 隣接する海鮮1枚につき +30。育ち1段階につきこの値 +6
-    "さけ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:82, effect:{id:"growAccel"}, ph:true, },  // 育ちが1増えるたび、さらに+1（加速）
-    "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", weight:148, effect:{id:"grownCountAdd", per:45}, ph:true, },  // 育った具材（育ち1以上）1枚につき +45
-    "魚醤": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"jou", weight:95, effect:{id:"adjGrowMult", per:5, mult:1.2}, ph:true, },  // 接する具材の育ち5段階につき ×1.2
-    "醤油": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"jou", weight:90, effect:{id:"doubleGrowBonusAdj"}, ph:true, },  // 隣接する具材の育ちを2倍として計算
-    "出汁": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"jou", weight:110, effect:{id:"maxGrowToAdj"}, ph:true, },  // 最も育った具材の育ちを、隣接2枚にもコピーして計算
-    "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:55, count:0, tier:null, rar:"jou", weight:158, effect:{id:null}, ph:true, },  // 基礎点55。効果なし
+    "さけ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", weight:82, effect:{id:"growAccel"}, ph:true, },  // 育ちが1増えるたび、さらに+1（加速）
+    "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", weight:148, effect:{id:"grownCountAdd", per:45}, ph:true, },  // 育った具材（育ち1以上）1枚につき +45
+    "魚醤": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"tokujou", weight:95, effect:{id:"adjGrowMult", per:5, mult:1.2}, ph:true, },  // 接する具材の育ち5段階につき ×1.2
+    "醤油": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"kiwami", weight:90, effect:{id:"doubleGrowBonusAdj"}, ph:true, },  // 隣接する具材の育ちを2倍として計算
+    "出汁": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:3, count:0, tier:null, rar:"tokujou", weight:110, effect:{id:"maxGrowToAdj"}, ph:true, },  // 最も育った具材の育ちを、隣接2枚にもコピーして計算
+    "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:55, count:0, tier:null, rar:"nami", weight:158, effect:{id:null}, ph:true, },  // 基礎点55。効果なし
     "海老フライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:114, effect:{id:"perCuiAdd", per:25}, ph:true, },  // このバーガーの揚げ物1枚につき +25
-    "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:35, count:0, tier:null, rar:"jou", weight:130, effect:{id:null}, ph:true, },  // 基礎点35。このスピンの引き直し1回につき +45
+    "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:35, count:0, tier:null, rar:"nami", weight:130, effect:{id:null}, ph:true, },  // 基礎点35。このスピンの引き直し1回につき +45
     "メンチカツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:74, effect:{id:"completeAdd", per:10}, ph:true, },  // バーガーを完成させるたび +10（永続）
     "かぼちゃ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:107, effect:{id:"adjBothSauceAdd", per:80}, ph:true, },  // 上下がソースの組ごとに +80
     "かき揚げ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:22, effect:{id:"belowTierAdd", per:22}, ph:true, },  // 自分より下の段1つにつき +22
-    "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:68, effect:{id:null}, ph:true, },  // 引き直しが1回無料になる。使うと廃棄
+    "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"nami", weight:68, effect:{id:null}, ph:true, },  // 引き直しが1回無料になる。使うと廃棄
     "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:78, effect:{id:"treatAdjAsCui", targetCui:"agemono"}, ph:true, },  // 隣接1枚を揚げ物として扱う
-    "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:136, effect:{id:"runCuiAdd", cui:"agemono", per:50}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
+    "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"tokujou", weight:136, effect:{id:"runCuiAdd", cui:"agemono", per:50}, ph:true, },  // 揚げ物が連続して並ぶ長さ×50
     "天かす": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"jou", weight:18, effect:{id:"onDiscardBoost", per:20, targetCui:"agemono"}, ph:true, },  // 廃棄されると、デッキの揚げ物すべてに +20（永続）
-    "フライドポテト": { pile:"ingredient", type:"veg", cuisine:"agemono", base:25, count:0, tier:null, rar:"jou", weight:50, effect:{id:"belowPrevAdd", add:120}, ph:true, },  // 基礎点25。前スピンより得点が低いとき +120
-    "カレーソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:109, effect:{id:"useMult", per:0.3, max:5}, ph:true, },  // 使うたび ×0.3 ずつ増える。5回で酸化して廃棄
-    "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:105, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する揚げ物1枚につき ×1.6
+    "フライドポテト": { pile:"ingredient", type:"veg", cuisine:"agemono", base:25, count:0, tier:null, rar:"nami", weight:50, effect:{id:"belowPrevAdd", add:120}, ph:true, },  // 基礎点25。前スピンより得点が低いとき +120
+    "カレーソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"tokujou", weight:109, effect:{id:"useMult", per:0.3, max:5}, ph:true, },  // 使うたび ×0.3 ずつ増える。5回で酸化して廃棄
+    "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"kiwami", weight:105, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する揚げ物1枚につき ×1.6
     "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:123, effect:{id:"forceWin"}, ph:true, },  // 隣接する「賭け」の効果を必ず成功させる
-    "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"jou", weight:160, effect:{id:"soloSauceMult", mult:2.5, dec:0.4, min:1.0}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
+    "中濃ソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:3, count:0, tier:null, rar:"tokujou", weight:160, effect:{id:"soloSauceMult", mult:2.5, dec:0.4, min:1.0}, ph:true, },  // ×2.5。他のソース1枚につき ×0.4 減（最低 ×1）
     "白米": { pile:"ingredient", type:"veg", cuisine:"wa", base:30, count:0, tier:null, rar:"jou", weight:144, effect:{id:"adjCuiAdd", per:45}, ph:true, },  // 基礎点30。隣接する和1枚につき +45
     "豆腐": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:62, effect:{id:"tofu", per:40}, ph:true, },  // 隣接2枚の基礎点を各 +40
-    "油揚げ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:60, effect:{id:"drawAdjAdd", per:8}, ph:true, },  // 引かれるたび、隣接2枚に +8（永続）
-    "キムチ": { pile:"ingredient", type:"veg", cuisine:"wa", base:-30, count:0, tier:null, rar:"jou", weight:56, effect:{id:"dayAdjAdd", per:20}, ph:true, },  // 基礎点 −30。営業日ごとに隣接2枚へ +20 ずつ（永続）
-    "かつおぶし": { pile:"ingredient", type:"meat", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:103, effect:{id:"katsuobushiTwice"}, ph:true, },  // 自分を消して廃棄。隣接2枚の効果を今回2回発動
+    "油揚げ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"nami", weight:60, effect:{id:"drawAdjAdd", per:8}, ph:true, },  // 引かれるたび、隣接2枚に +8（永続）
+    "キムチ": { pile:"ingredient", type:"veg", cuisine:"wa", base:-30, count:0, tier:null, rar:"nami", weight:56, effect:{id:"dayAdjAdd", per:20}, ph:true, },  // 基礎点 −30。営業日ごとに隣接2枚へ +20 ずつ（永続）
+    "かつおぶし": { pile:"ingredient", type:"meat", cuisine:"wa", base:10, count:0, tier:null, rar:"kiwami", weight:103, effect:{id:"katsuobushiTwice"}, ph:true, },  // 自分を消して廃棄。隣接2枚の効果を今回2回発動
     "こんにゃく": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:40, effect:{id:"konjacMeat", per:60}, ph:true, },  // 引いた肉は段に乗らず消える。1枚につき和すべて +60（永続）
     "のり": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:34, effect:{id:"noriCount", add:1}, ph:true, },  // 上下の条件付き効果の成立数を+1として数えさせる
-    "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:174, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
-    "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:24, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
-    "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:42, effect:{id:"matsutakeTwice"}, ph:true, },  // 最初に引かれた具材の効果が2回発動
+    "もち": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"nami", weight:174, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
+    "麩": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"nami", weight:24, effect:{id:"adjSameCui"}, ph:true, },  // 同軸があれば必ずその隣に来る（Wave7で作り替え）
+    "まつたけ": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"tokujou", weight:42, effect:{id:"matsutakeTwice"}, ph:true, },  // 最初に引かれた具材の効果が2回発動
     "茶碗蒸し": { pile:"ingredient", type:"dairy", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:140, effect:{id:"runCuiAdd", cui:"wa", per:55}, ph:true, },  // 和が連続して並ぶ長さ×55
     "お好み焼き": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"jou", weight:154, effect:{id:"ascPairAdd", per:65}, ph:true, },  // 基礎点が下から昇順の組ごとに +65
-    "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:59, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する和1枚につき ×1.6
-    "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
-    "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
-    "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
-    "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"jou", weight:48, effect:{id:"antiCuiMult", cui:"wa", mult:2.8, dec:0.3, min:1.0}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
-    "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
-    "チーズ": { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:52, effect:{id:null}, },  // 初期デッキ。効果なし
-    "きゅうり": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:1, tier:null, rar:"jou", weight:38, effect:{id:null}, },  // 初期デッキ。効果なし
-    "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:1, tier:null, rar:"jou", weight:28, effect:{id:null}, },  // 初期デッキ。効果なし
-    "トマト": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:20, effect:{id:"drawExtra", extra:1}, },  // 3択の選択肢が1つ増える（基礎点0）
-    "オニオン": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"jou", weight:32, effect:{id:"drawReroll", rerolls:1}, },  // 3択を1回引き直せる（基礎点0）
+    "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:59, effect:{id:"adjCuiMult", mult:1.6}, ph:true, },  // 接する和1枚につき ×1.6
+    "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"kiwami", weight:150, effect:{id:"teriyaki", mult:2.2}, ph:true, },  // 接する肉1枚につき ×2.2
+    "味醂": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:127, effect:{id:"mirinAddMult", mult:1.6}, ph:true, },  // 隣接する具材の加算効果を1.6倍
+    "白味噌": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:70, effect:{id:"drawFewerCuiMult", draw:-1, mult:1.3}, ph:true, },  // 引く枚数 −1。このバーガーの和1枚につき ×1.3
+    "抹茶ソース": { pile:"sauce", type:"sauce", cuisine:"wa", base:3, count:0, tier:null, rar:"tokujou", weight:48, effect:{id:"antiCuiMult", cui:"wa", mult:2.8, dec:0.3, min:1.0}, ph:true, },  // ×2.8。和の具材1枚につき ×0.3 減（最低 ×1）
+    "パティ": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:80, effect:{id:null}, },  // 初期デッキ。効果なし
+    "チーズ": { pile:"ingredient", type:"dairy", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:52, effect:{id:null}, },  // 初期デッキ。効果なし
+    "きゅうり": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:1, tier:null, rar:"nami", weight:38, effect:{id:null}, },  // 初期デッキ。効果なし
+    "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:1, tier:null, rar:"nami", weight:28, effect:{id:null}, },  // 初期デッキ。効果なし
+    "トマト": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"nami", weight:20, effect:{id:"drawExtra", extra:1}, },  // 3択の選択肢が1つ増える（基礎点0）
+    "オニオン": { pile:"ingredient", type:"veg", cuisine:"none", base:0, count:0, tier:null, rar:"nami", weight:32, effect:{id:"drawReroll", rerolls:1}, },  // 3択を1回引き直せる（基礎点0）
     "ちゃんぽん麺": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:117, effect:{id:"axisKindsAdd", per:65}, ph:true, },  // このバーガーの軸の種類×65
     "パイナップル": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:133, effect:{id:"soloAxisAdd", per:85}, ph:true, },  // 盤面で1枚しかない軸の数×85
     "福神漬け": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:111, effect:{id:"adjDiffCuiAdd", per:55}, ph:true, },  // 上下が違う軸なら、その2枚に +55 ずつ
     "マッシュルーム": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:91, effect:{id:"dayAxisAdd", per:60}, ph:true, },  // 営業日ごとに軸が指定される。その軸の具材1枚につき +60
-    "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
-    "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:121, effect:{id:"becomeRarestCui"}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
+    "ロースハム": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"nami", weight:145, effect:{id:"nextDrawRareAxis"}, ph:true, },  // 次に引く1枚は、デッキで最も少ない軸になる
+    "アボカド": { pile:"ingredient", type:"veg", cuisine:"none", base:10, count:0, tier:null, rar:"nami", weight:121, effect:{id:"becomeRarestCui"}, ph:true, },  // 自分の軸が、盤面で最も少ない軸に変わる（複数ならランダム）
     "ウインナー": { pile:"ingredient", type:"meat", cuisine:"none", base:10, count:0, tier:null, rar:"jou", weight:115, effect:{id:"altCuiRunAdd", per:70}, ph:true, },  // 異軸が交互に並んでいる長さ×70
-    "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:97, effect:{id:"adjDiffCuiMult", mult:1.45}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
-    "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:51, effect:{id:"axisKindsMult", base:0.65, per:0.45}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
-    "継ぎ足しのタレ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:65, effect:{id:"spinAxisMult", per:0.04, pmMax:1.5}, ph:true, },  // 毎スピン、軸の種類×0.04 ずつ育つ（永続）
+    "万能だれ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"tokujou", weight:97, effect:{id:"adjDiffCuiMult", mult:1.45}, ph:true, },  // 接する2枚が違う軸の組ごとに ×1.45
+    "サルサソース": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"tokujou", weight:51, effect:{id:"axisKindsMult", base:0.65, per:0.45}, ph:true, },  // 基礎×0.65、軸1種につき ×0.45 増し
+    "継ぎ足しのタレ": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"tokujou", weight:65, effect:{id:"spinAxisMult", per:0.04, pmMax:1.5}, ph:true, },  // 毎スピン、軸の種類×0.04 ずつ育つ（永続）
     "五目あん": { pile:"sauce", type:"sauce", cuisine:"none", base:3, count:0, tier:null, rar:"jou", weight:93, effect:{id:"treatAdjDiffCui"}, ph:true, },  // 接する2枚を互いに違う軸として扱う
-    "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:5, count:2, tier:null, rar:"jou", weight:0, effect:{id:null} },  // つなぎのバンズ（枠を埋めるだけ・効果なし）。Wave5で新バンズシステムに置換
+    "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:5, count:2, tier:null, rar:"nami", weight:0, effect:{id:null} },  // つなぎのバンズ（枠を埋めるだけ・効果なし）。Wave5で新バンズシステムに置換
   },
   // アーティファクト（第3層・SHOKUZAI §10）。盤面の枠を使わない＝希釈しない。店で購入、所持上限まで持てる。数値は暫定・調整欄で変更可。
   //   id=効果の識別子（コード側と対応）／rar=レアリティ。効果の適用箇所：得点(applyArtifacts)・抽選・経営(家賃/店)。
@@ -1014,9 +1014,18 @@ const DEFAULTS = {
                      reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（購入で2倍ずつ）
                      artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
                      remove:   { onBuy: true,  mul: 2.0 } } },// デッキから取り除く（購入で2倍ずつ）
-    // レアリティ（SHOKUZAI §11・仮）。3択/店の抽選確率(weights)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
+    // レアリティ（Wave7 Step1・すべて仮値）。3択/店の出現率(rates)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
+    //   抽選は「軸 → レアリティ → カード」の3段。rates は軸の「主軸からの距離」ごとの表で、
+    //   main=主軸（距離0）／mid=中間（距離0.5）／far=遠い軸（デッキに0枚・距離1）。距離で3行を線形に補間する。
+    //   枚数ではなく確率で引くので、レアリティごとの枚数を後から動かしても体感が変わらない（Wave7 §3-2）。
     rarity: { on: true,
-              weights: { nami: 60, jou: 25, tokujou: 12, kiwami: 3 },
+              rates: { main: { nami: 0.45, jou: 0.37, tokujou: 0.15, kiwami: 0.03 },
+                       mid:  { nami: 0.35, jou: 0.35, tokujou: 0.22, kiwami: 0.08 },
+                       far:  { nami: 0.25, jou: 0.30, tokujou: 0.35, kiwami: 0.10 } },
+              kiwamiMax: 0.10,   // 極の上限。傾斜やアーティファクトで押し上げてもここで止める（Wave7 §3-3）
+              // アーティファクトの品揃えは軸を持たないので、上の rates（軸ごとの表）を使えない。
+              //   Wave6 までカード側と共用していた重みをここに分けて、従来どおりの比率を保つ。作り替えは Step5。
+              artifactWeights: { nami: 60, jou: 25, tokujou: 12, kiwami: 3 },
               prices:  { nami: 100, jou: 250, tokujou: 600, kiwami: 1500 },
               scaleOnBuy: false, scaleMul: 1.2 },
     // アーティファクト（第3層・SHOKUZAI §10）。所持上限・店に並ぶ数・各効果の数値は CONFIG.artifacts。
@@ -1316,10 +1325,11 @@ function drawPile(pileKey, cap, forced, forcedIds){
     const k = pool.findIndex(x => x.id === fid); if (k >= 0){ out.push(pool[k]); pool.splice(k,1); }
   }
   if (forced && out.length < cap){ const i = pool.findIndex(x => x.name === forced); if (i >= 0){ out.push(pool[i]); pool.splice(i,1); } }
+  // デッキから盤面に引くのは個体ごとに均等（Wave7 Step1）。レアリティは「入手のしやすさ」であって
+  //   「引きやすさ」ではない。ここに重みを乗せると、極を買った瞬間にそれが引けなくなる。
+  //   命中率を下げるのはデッキ枚数だけ、という関係を守る。
   while (out.length < cap && pool.length){
-    let tot = 0; for (const x of pool) tot += weightOf(x.name);   // レアリティ重み（現状は全 jou で一様）
-    let r = grand() * tot, pick = pool.length - 1;
-    for (let i=0;i<pool.length;i++){ r -= weightOf(pool[i].name); if (r <= 0){ pick = i; break; } }
+    const pick = Math.floor(grand() * pool.length);
     out.push(pool[pick]); pool.splice(pick,1);
   }
   return out;   // 個体（{id,name,g}）の配列
@@ -3117,35 +3127,106 @@ function deckAxisInfo(){
   return { main, share: totAx > 0 ? bestN / totAx : 0, totAx };
 }
 function deckMainCuisine(){ return deckAxisInfo().main; }
-const rarityRank = name => RARITY_ORDER.indexOf(rarityOf(name)) < 0 ? 0 : RARITY_ORDER.indexOf(rarityOf(name));
-// 3択の傾斜の実効強度（item14＋item15ピクルス）。0=完全ランダム / 1=自分の軸のみ。ramp で軸が固まるほど強まる。
+// 軸ごとのデッキ内枚数（無印も1つの区分として数える）。
+const cuisineCount = cu => catalogNames().reduce((s,n)=> s + (((CONFIG.items[n].cuisine||"none") === cu) ? CONFIG.items[n].count : 0), 0);
+// 3択の傾斜の実効強度（item14）。0=完全ランダム / 1=自分の軸のみ。ramp で軸が固まるほど強まる。
+//   ※ item15 の「ピクルス」による上乗せは、Wave1 でカードプールが96枚に入れ替わった際に
+//     ピクルス自体がプールから消えたため撤去した（CONFIG.items に存在しない＝ずっと不発だった）。
 function offerBiasStrength(){
   const ob = CONFIG.params.offerBias || {}; const info = deckAxisInfo();
   if (info.main === "none") return { main:"none", strength:0 };
   let s = Math.max(0, ob.strength || 0);
   if (ob.ramp) s *= info.share;                     // 序盤（share小）は弱く、固まるほど強く
-  const pk = CONFIG.items["ピクルス"]; if (pk && pk.count > 0 && pk.effect) s += (pk.effect.bias || 0) * pk.count;  // item15：ピクルス
   return { main: info.main, strength: Math.max(0, Math.min(1, s)) };
 }
-function weightOf(name){
-  const rr = CONFIG.params.rarity || {}; let w = (rr.on !== false && rr.weights) ? (rr.weights[rarityOf(name)] || 1) : 1;
-  const cu = CONFIG.items[name].cuisine || "none";
-  // 仕入れ帳（アーティファクト）：主要軸を重くする。
-  const led = artById("ledger"); if (led && cu === deckMainCuisine() && cu !== "none") w *= (led.weight || 1);
-  // item14：3択をデッキの軸に寄せる。主要軸以外の重みを (1-strength) で下げる（strength=1 で主要軸のみ）。
-  const ob = offerBiasStrength();
-  if (ob.main !== "none" && cu !== ob.main) w *= Math.max(0.0001, 1 - ob.strength);
-  // item15：レタスがデッキにあると高レアリティが出やすくなる。
-  const lt = CONFIG.items["レタス"]; if (lt && lt.count > 0 && lt.effect) w *= 1 + (lt.effect.bias || 0) * lt.count * rarityRank(name);
-  return Math.max(0.0001, w);
+
+// ── Wave7 Step1：3択・店の抽選を「軸 → レアリティ → カード」の3段にする ────────────
+//   狙い：レアリティの出る比率を、そのレアリティの枚数から切り離す。極が8枚でも23枚でも
+//   極が出る確率は表のとおりになる（Wave7 §3-2）。
+// 軸の「主軸からの距離」。主軸=0／デッキに0枚=1（最遠）／その間はデッキ内枚数で線形に補間する。
+function axisDistance(cu){
+  const info = deckAxisInfo();
+  if (info.main === "none") return 1;               // 軸カードが1枚も無い＝どの軸も最遠（＝どの軸も同じ表）
+  if (cu === info.main) return 0;
+  const n = cuisineCount(cu); if (n <= 0) return 1;
+  const mainN = cuisineCount(info.main); if (mainN <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - n / mainN));
+}
+// 距離からレアリティの出現率表を作る。main(0) → mid(0.5) → far(1) の3点を通る折れ線で補間する。
+//   ※ mid は main と far の中点ではないので（表がそうなっている）、中点を計算するのではなく
+//     3行そのものを通す形にしてある。
+function rarityRatesFor(cu){
+  const rr = CONFIG.params.rarity || {}, R = rr.rates || {};
+  const one = { nami:0.25, jou:0.25, tokujou:0.25, kiwami:0.25 };
+  const A = R.main || one, B = R.mid || one, C = R.far || one;
+  const d = Math.max(0, Math.min(1, axisDistance(cu)));
+  const lo = d <= 0.5 ? A : B, hi = d <= 0.5 ? B : C, t = d <= 0.5 ? d * 2 : (d - 0.5) * 2;
+  const out = {}; for (const k of RARITY_ORDER) out[k] = (lo[k]||0) + ((hi[k]||0) - (lo[k]||0)) * t;
+  // 極の上限。超えたぶんは他の3つへ比例配分して戻す（合計は変えない）。
+  const cap = (typeof rr.kiwamiMax === "number") ? rr.kiwamiMax : 1;
+  if (out.kiwami > cap){
+    const over = out.kiwami - cap; out.kiwami = cap;
+    let rest = 0; for (const k of RARITY_ORDER) if (k !== "kiwami") rest += out[k];
+    if (rest > 0) for (const k of RARITY_ORDER) if (k !== "kiwami") out[k] += over * (out[k] / rest);
+    else out.nami += over;
+  }
+  return out;
+}
+function drawRarity(cu){
+  const rates = rarityRatesFor(cu);
+  let tot = 0; for (const k of RARITY_ORDER) tot += Math.max(0, rates[k]);
+  if (tot <= 0) return "nami";
+  let r = grand() * tot;
+  for (const k of RARITY_ORDER){ r -= Math.max(0, rates[k]); if (r <= 0) return k; }
+  return "nami";
+}
+// 軸を引く重み。Step1 では「プール内の枚数 × 既存の傾斜（item14・仕入れ帳）」。
+//   Step2 でデッキ構成からの傾斜式（k・下限）に差し替える。
+function axisDrawWeights(pool){
+  const w = {};
+  for (const nm of pool){ const cu = CONFIG.items[nm].cuisine || "none"; w[cu] = (w[cu]||0) + 1; }
+  const ob = offerBiasStrength(), led = artById("ledger"), main = deckMainCuisine();
+  for (const cu of Object.keys(w)){
+    if (led && cu === main && cu !== "none") w[cu] *= (led.weight || 1);            // 仕入れ帳：主軸に寄せる（軸の段に効く）
+    if (ob.main !== "none" && cu !== ob.main) w[cu] *= Math.max(0.0001, 1 - ob.strength);
+    w[cu] = Math.max(0.0001, w[cu]);
+  }
+  return w;
+}
+// プールから1枚引く。軸 → レアリティ → そのレアリティ内で均等。
+//   候補が居ないレアリティを引いたら「極→特上→上→並」の順に落とし、落ちたことを記録する。
+function drawOffer(pool){
+  if (!pool.length) return null;
+  const rr = CONFIG.params.rarity || {};
+  if (rr.on === false) return pool[Math.floor(grand() * pool.length)];   // レアリティOFF＝プール全体から均等
+  const w = axisDrawWeights(pool), axes = Object.keys(w);
+  let tot = 0; for (const cu of axes) tot += w[cu];
+  let r = grand() * tot, cu = axes[axes.length - 1];
+  for (const k of axes){ r -= w[k]; if (r <= 0){ cu = k; break; } }
+  const byRar = {}; for (const k of RARITY_ORDER) byRar[k] = [];
+  for (const nm of pool) if ((CONFIG.items[nm].cuisine||"none") === cu) byRar[rarityOf(nm)].push(nm);
+  let rar = drawRarity(cu);
+  if (!byRar[rar].length){
+    const i0 = RARITY_ORDER.indexOf(rar); let got = null;
+    for (let i = i0 - 1; i >= 0 && !got; i--) if (byRar[RARITY_ORDER[i]].length) got = RARITY_ORDER[i];             // 極→特上→上→並
+    for (let i = i0 + 1; i < RARITY_ORDER.length && !got; i++) if (byRar[RARITY_ORDER[i]].length) got = RARITY_ORDER[i];  // それでも無ければ上へ
+    if (got){ noteRarityFallback(cu, rar, got); rar = got; }
+  }
+  const cand = byRar[rar];
+  if (!cand.length) return pool[Math.floor(grand() * pool.length)];      // 軸ごと空（起こらない想定）の保険
+  return cand[Math.floor(grand() * cand.length)];
+}
+let rarityFallbacks = [];                            // 直近の落下の記録（起動時セルフチェック・プレイログ用）
+function noteRarityFallback(cu, want, got){
+  const rec = { cuisine: cu, want, got };
+  rarityFallbacks.push(rec); if (rarityFallbacks.length > 200) rarityFallbacks.shift();
+  if (typeof plog !== "undefined" && plog.recordRarityFallback) plog.recordRarityFallback(rec);
 }
 function sampleWeighted(arr, n){
   const a = arr.slice(), out = [];
   for (let k = 0; k < n && a.length; k++){
-    let tot = 0; for (const x of a) tot += weightOf(x);
-    let r = grand() * tot, pick = a.length - 1;
-    for (let i = 0; i < a.length; i++){ r -= weightOf(a[i]); if (r <= 0){ pick = i; break; } }
-    out.push(a.splice(pick, 1)[0]);
+    const nm = drawOffer(a); if (nm == null) break;
+    out.push(nm); a.splice(a.indexOf(nm), 1);
   }
   return out;
 }
@@ -3257,9 +3338,11 @@ function artifactsShownN(){ const sh = CONFIG.params.shop || {}; const menu = ar
 function rerollArtifacts(){
   const owned = new Set(artifactsOwned);
   const pool = Object.keys(CONFIG.artifacts).filter(nm => !owned.has(nm));
-  // レアリティ重みで抽選（カードと同じ weights を流用）。
+  // レアリティ重みで抽選。アーティファクトは軸を持たないので、カード側の3段抽選（軸→レアリティ→カード）
+  //   ではなく専用の重み（rarity.artifactWeights）を使う。Wave6 まではカードと共用していた値。作り替えは Step5。
   const rr = CONFIG.params.rarity || {};
-  const wOf = nm => (rr.on !== false && rr.weights) ? (rr.weights[(CONFIG.artifacts[nm].rar)||"nami"] || 1) : 1;
+  const aw = rr.artifactWeights || {};
+  const wOf = nm => (rr.on !== false) ? (aw[(CONFIG.artifacts[nm].rar)||"nami"] || 1) : 1;
   const a = pool.slice(), out = [], want = artifactsShownN();
   for (let k = 0; k < want && a.length; k++){ let tot=0; for (const x of a) tot += wOf(x); let r=grand()*tot, pick=a.length-1;
     for (let i=0;i<a.length;i++){ r-=wOf(a[i]); if (r<=0){ pick=i; break; } } out.push(a.splice(pick,1)[0]); }
@@ -3969,11 +4052,18 @@ function renderSettings(){
   scaleRow("アーティファクト", "artifact");
   scaleRow("取り除き", "remove");
 
-  // ── 進行：レアリティ（3択/店の抽選確率と店の値段）── SHOKUZAI §11・仮
+  // ── 進行：レアリティ（3択/店の出現率と店の値段）── Wave7 Step1・すべて仮値
   const rr = CONFIG.params.rarity;
-  g = group("レアリティ：抽選確率（重み・大ほど出やすい）", "run");
+  const RATE_JA = { main:"主軸（距離0）", mid:"中間（距離0.5）", far:"遠い軸（デッキに0枚）" };
+  g = group("レアリティ：出現率（軸の距離ごと・合計1になるように入れる）", "run");
   gridRow(g, "レアリティを使う", boolInput(()=>rr.on!==false, v=>rr.on=v));
-  for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の重み", numInput(()=>rr.weights[k], v=>rr.weights[k]=Math.max(0,v), 1));
+  gridRow(g, "極の上限", numInput(()=>rr.kiwamiMax, v=>rr.kiwamiMax=Math.max(0,Math.min(1,v)), 0.01));
+  for (const row of ["main","mid","far"]){
+    for (const k of RARITY_ORDER)
+      gridRow(g, RATE_JA[row]+"："+RARITY_JA[k], numInput(()=>rr.rates[row][k], v=>rr.rates[row][k]=Math.max(0,Math.min(1,v)), 0.01));
+  }
+  g = group("レアリティ：アーティファクトの重み（軸を持たないので専用）", "run");
+  for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の重み", numInput(()=>rr.artifactWeights[k], v=>rr.artifactWeights[k]=Math.max(0,v), 1));
   g = group("レアリティ：店の基準価格", "run");
   for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の値段", numInput(()=>rr.prices[k], v=>rr.prices[k]=Math.max(0,Math.round(v)), 10));
   // カード価格の値上げは店の「カード」スケール（shop.scale.card）へ移動（要素別分離）。
@@ -4384,6 +4474,8 @@ const plog = (function(){
     recordOffered(names){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.offered = (names || []).slice(); s.picked = null; s.pickSkipped = false; saveCurrent(); } },
     recordPicked(name){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.picked = name || null; s.pickSkipped = !name; saveCurrent(); } },
     recordRemove(name, cause){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.removed.push({ name, cause }); saveCurrent(); } },
+    // Wave7 Step1：引いたレアリティに候補が居ず、隣のレアリティへ落ちたことの記録。
+    recordRarityFallback(rec){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.rarFallbacks = s.rarFallbacks || []).push(rec); saveCurrent(); } },
     endRun(){ if (!enabled || !cur){ cur = null; return; } finalize(); },
     getRuns: () => runs,
     currentBest: () => (cur && cur.summary.bestBurger) ? cur.summary.bestBurger : null,   // 進行中ランの最高得点バーガー（確定前に読む）
@@ -4465,6 +4557,11 @@ window.RUN = {
   addInstance: (name, g) => { const inst = addInstance(name, g); renderPiles(); renderAxisTally(); updateProgress(); updateRunStatus(); return inst ? { id: inst.id, name: inst.name, g: inst.g } : null; },
   clearDeck: () => { deck = []; instSeq = 0; syncCounts(); renderPiles(); renderAxisTally(); updateProgress(); },
   setGrowth: (id, g) => { const x = deck.find(d => d.id === id); if (x){ x.g = g|0; renderPiles(); } },
+  // レアリティ（Wave7 Step1）：軸の距離と出現率表、レアリティが隣に落ちた記録を読む（記録の確認用）。
+  rarityRates: (cu) => rarityRatesFor(cu),
+  axisDistance: (cu) => axisDistance(cu),
+  rarityFallbacks: () => rarityFallbacks.slice(),
+  clearRarityFallbacks: () => { rarityFallbacks = []; },
   dayAxis: () => dayAxis,                                                     // マッシュルームの本日の指定軸を読む
   setDayAxis: (c) => { if (DAY_AXES.includes(c)){ dayAxis = c; updateRunStatus(); } return dayAxis; },
 };
@@ -4494,6 +4591,25 @@ function selfCheck(){
   // ⑤ 軸が既知の6値以外
   const badC = names.filter(n => CUISINE_ORDER.indexOf(items[n].cuisine) < 0);
   if (badC.length) warn.push("未知の cuisine: " + badC.join(" / "));
+  // ⑥ レアリティ（Wave7 Step1）。未知の値・KENTO の枚数（極8・特上23・上39・並26）との食い違いを見る。
+  const badR = names.filter(n => RARITY_ORDER.indexOf(items[n].rar) < 0);
+  if (badR.length) warn.push("未知の rar: " + badR.join(" / "));
+  const rarN = {}; for (const k of RARITY_ORDER) rarN[k] = 0;
+  for (const n of names) if (RARITY_ORDER.indexOf(items[n].rar) >= 0) rarN[items[n].rar]++;
+  const RAR_EXPECT = { nami:26, jou:39, tokujou:23, kiwami:8 };   // KENTO「96枚のレアリティ割り振り案」§3
+  const rarBad = RARITY_ORDER.filter(k => rarN[k] !== RAR_EXPECT[k]);
+  if (rarBad.length) warn.push("レアリティの枚数が KENTO と違う: " + rarBad.map(k => RARITY_JA[k]+" "+rarN[k]+"（想定"+RAR_EXPECT[k]+"）").join(" / "));
+  // ⑦ 出現率の表。3行それぞれ合計1（±0.005）で、極が上限を超えていないこと。
+  const rr = CONFIG.params.rarity || {}, RT = rr.rates || {};
+  for (const row of ["main","mid","far"]){
+    const t = RARITY_ORDER.reduce((s,k)=> s + ((RT[row]||{})[k] || 0), 0);
+    if (Math.abs(t - 1) > 0.005) warn.push("出現率の合計が1でない（" + row + "）: " + t.toFixed(3));
+    if (((RT[row]||{}).kiwami || 0) > (rr.kiwamiMax || 1) + 1e-9) warn.push("極が上限を超えている（" + row + "）");
+  }
+  // ⑧ どの軸にも「並」が1枚以上あること（無い軸を引くと毎回フォールバックが起きる＝設計の穴）。
+  //    無印に極が無いのは設計どおりなので、ここでは並だけを見る。
+  const noNami = CUISINE_ORDER.filter(cu => !names.some(n => items[n].cuisine === cu && items[n].rar === "nami"));
+  if (noNami.length) warn.push("並のカードが無い軸: " + noNami.join(" "));
   if (warn.length) console.warn("[selfCheck] " + warn.length + "件\n" + warn.join("\n"));
   return warn;
 }
