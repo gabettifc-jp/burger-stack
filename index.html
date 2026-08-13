@@ -1121,10 +1121,13 @@ const DEFAULTS = {
     // バンズ（Wave7 Step4・すべて仮値）。デッキとは別領域。営業日ごとに1枚入手して1枚押し出す。
     //   slots=所持枠／onBoard=盤面に出る枚数／weights=バンズ専用のレアリティ抽選（軸には乗らない）。
     buns: { on: true, slots: 4, onBoard: 2, weights: { common: 60, rare: 34, kyoku: 6 } },
-    // 軸の傾斜（Wave7 Step2・すべて仮値）。デッキの軸構成から5軸の出現率を出す。
-    //   k     : 1.0=デッキ枚数に単純比例／0=完全均等。単純比例だと1枚取った瞬間に偏るので鈍らせる。
+    // 軸の傾斜（Wave7 Step2 → Wave8 Step0 で枚数ベースに・すべて仮値）。
+    //   m     : 「まだ決まっていないぶん」の重み。share の分母に足す（枚数_i /（合計枚数 + m））。
+    //           小さくすると速く寄る。Wave7 の式（分母＝合計枚数）だと1枚取った瞬間に share=1 になり
+    //           それ以上寄らなかった（実測：揚げ物1枚でも9枚でも主軸44%）ので、m を入れて直した。
+    //   k     : 1.0=share にそのまま比例／0=完全均等。share 側（m）で鈍らせるので既定は 1.0。
     //   floor : どの軸にも最低これだけは出す。他4軸に floor ずつ配るので、主軸は最大 1-4*floor。
-    axisBias: { k: 0.6, floor: 0.10 },
+    axisBias: { m: 8, k: 1.0, floor: 0.10 },
     // 3択の見せ方（item14 の残り）。distinctAxes=3枚を可能な限り別々の軸から出す。
     //   ※ 既定を false にした。true にすると1回の3択が必ず別々の軸で埋まるので、
     //     上の axisBias で決めた軸の出現率が3択の画面では成立しなくなる（Wave7 §4 と両立しない）。
@@ -3777,10 +3780,21 @@ function axisRates(){
   const k = Math.max(0, Math.min(1, ab.k != null ? ab.k : 0.6));
   const nAx = AXES.length;
   const floor = Math.max(0, Math.min(1 / nAx, ab.floor != null ? ab.floor : 0.1));
+  const m = Math.max(0, ab.m != null ? ab.m : 8);     // 「まだ決まっていないぶん」の重み（Wave8 Step0）
   const cnt = {}; let C = 0;
   for (const cu of AXES){ cnt[cu] = cuisineCount(cu); C += cnt[cu]; }
+  // Wave8 Step0：share の分母に m を足す。こうすると1枚目で頭打ちにならず、枚数に応じて寄っていく。
+  //   share の合計は C/(C+m) で1未満になる。余り（m/(C+m)）は「まだ取っていない軸」に均等に配る。
+  //   全部の軸が0枚のときは5軸すべてが「まだ取っていない軸」なので、各 1/5 になる（＝各20%）。
+  //   どの軸も1枚以上あるときは配る先が無いので、そのときだけ5軸に均等に配る。
+  const share = {}, denom = C + m;
+  for (const cu of AXES) share[cu] = denom > 0 ? cnt[cu] / denom : 1 / nAx;
+  const zeros = AXES.filter(cu => cnt[cu] === 0);
+  let left = 1; for (const cu of AXES) left -= share[cu];
+  const spread = zeros.length ? zeros : AXES;
+  for (const cu of spread) share[cu] += left / spread.length;   // これで share の合計は必ず1
   const q = {};
-  for (const cu of AXES) q[cu] = (1 - k) / nAx + k * (C > 0 ? cnt[cu] / C : 1 / nAx);
+  for (const cu of AXES) q[cu] = (1 - k) / nAx + k * share[cu];
   // アーティファクト（Wave7 Step5）：暖簾＝選んだ軸の重み×mul／老舗の暖簾＝大きく寄せて他軸は下限まで／
   //   常連客＝同じ軸を続けて取るほどその軸に寄る。比例のぶん（q）に掛けて正規化するので、
   //   下限と「主軸の上限」は壊れない。
@@ -4954,7 +4968,8 @@ function renderSettings(){
     const upd = () => { const r = axisRates();
       view.value = AXES.map(cu => CUISINE_JA[cu] + " " + (r[cu]*100).toFixed(1) + "%").join(" / ")
                  + "（主軸 " + (deckMainCuisine() === "none" ? "無し" : CUISINE_JA[deckMainCuisine()]) + "）"; };
-    gridRow(g, "k（1=枚数に比例／0=均等）", numInput(()=>ab.k, v=>{ab.k=Math.max(0,Math.min(1,v)); upd();}, 0.05));
+    gridRow(g, "m（まだ決まっていないぶんの重み）", numInput(()=>ab.m, v=>{ab.m=Math.max(0,v); upd();}, 1));
+    gridRow(g, "k（1=share に比例／0=均等）", numInput(()=>ab.k, v=>{ab.k=Math.max(0,Math.min(1,v)); upd();}, 0.05));
     gridRow(g, "どの軸にも出す下限", numInput(()=>ab.floor, v=>{ab.floor=Math.max(0,Math.min(1/AXES.length,v)); upd();}, 0.01));
     gridRow(g, "3枚を別々の軸から出す", boolInput(()=>ob.distinctAxes, v=>ob.distinctAxes=v));
     upd(); gridRow(g, "いまの出現率", view); }
