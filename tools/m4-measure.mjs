@@ -1,0 +1,325 @@
+/* 測定 M4：方策を直して測り直す（2026-08-14）。
+   index.html は1行も変更しない。実プレイ経路（Chromium の実UI操作）だけで走らせ、
+   1ランごとに JSON 1行を書き出す。集計は tools/m4-report.mjs。
+
+   M3 との違いは**方策だけ**。ゲーム側の値・記録の取り方は M3 と同じ。
+   M3 の基準は「デッキ最弱より代理打点が高ければ常に取る」で、これは実質「取れるだけ取る」だった
+   （10営業日でデッキ中央値71枚）。M4 は「引く枚数とデッキ枚数を揃える」を基本戦術に置き直す。
+
+   使い方：
+     node tools/m4-measure.mjs --policy=base --from=4001 --to=4060 --out=tools/out/m4-base.jsonl
+     --workers=N でページを並列に走らせる（既定4）。--days=10 で dayGoal。
+
+   方策（--policy）：
+     base    基準：枠（引く枚数）とデッキ枚数を揃える。空きがあるとき／削除で入れ替えるとき／
+             代理打点がデッキ平均の2倍以上のときだけ3択を取る。
+     norem   削除しない：削除を買わない。空きは具材枠を買ったときだけ生まれる。
+     nosauce ソース無視：ソースを取らない・買わない（初期デッキのケチャップは残る）。
+     noaxis  軸を無視：軸ボーナス（主軸なら ×1.3）を外し、代理打点だけで取捨する。
+     takeall 全部取る：M3 の基準と同じ。デッキ最弱より高ければ常に取る。下限の比較対象。
+     random  何も考えない：3択は無作為・店は買えるものを無作為に買う。
+*/
+import pkg from '/opt/node22/lib/node_modules/playwright/index.js';
+const { chromium } = pkg;
+import { writeFileSync, appendFileSync, mkdirSync, existsSync } from 'fs';
+
+const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.split('=').slice(1).join('=') : d; };
+const POLICY = arg('policy', 'base');
+const FROM = +arg('from', 4001), TO = +arg('to', 4060);
+const OUT = arg('out', `tools/out/m4-${POLICY}.jsonl`);
+const WORKERS = +arg('workers', 4);
+const DAYS = +arg('days', 10);
+const TARGET = 'file:///home/user/burger-stack/index.html';
+
+if (!existsSync('tools/out')) mkdirSync('tools/out', { recursive: true });
+writeFileSync(OUT, '');
+
+/* ── 代理打点（ボットが使う近似）。M3 と同じ換算。 ────────────────────────
+   具材＝帯の値（並60・上120・特上240・極480）
+   ソース＝40×(帯の倍率−1)（並×1.5→20・上×3→80・特上×6→200・極×10→360）
+     ＝「中段の自分以外の合計を40とみなしたときの打点」。M3 §3 と同じ式。
+   ボットは実際の打点を知らない。このずれ自体が「帯から飛び出しているカード」の証拠になる。 */
+const PROXY = `
+  const BAND = { nami:60, jou:120, tokujou:240, kiwami:480 };
+  const SAUCE_MULT = { nami:1.5, jou:3, tokujou:6, kiwami:10 };
+  function proxy(nm){
+    const it = CONFIG.items[nm]; if (!it) return 0;
+    if (it.pile === "sauce") return Math.round(40 * ((SAUCE_MULT[it.rar] || 1) - 1));
+    return BAND[it.rar] || 0;
+  }
+  // 軸ボーナス：デッキの主軸と同じ軸なら 1.3 倍に見積もる（noaxis では使わない）。M3 と同じ値。
+  function proxyWithAxis(nm, useAxis){
+    const v = proxy(nm); if (!useAxis) return v;
+    const main = RUN.mainCuisine();
+    const cu = (CONFIG.items[nm] || {}).cuisine || "none";
+    return (main !== "none" && cu === main) ? Math.round(v * 1.3) : v;
+  }
+  // 方策 random 用の乱数。ゲームの grand() は使わない（使うとゲーム側の抽選がずれる）。
+  window.__rngState = 0;
+  function botRand(){ let t = (window.__rngState += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+  function weakestInDeck(){
+    const d = RUN.deck(); let lo = null;
+    for (const x of d){ const v = proxy(x.name); if (lo === null || v < lo.v) lo = { v, name: x.name }; }
+    return lo || { v: 0, name: null };
+  }
+  function avgInDeck(){
+    const d = RUN.deck(); if (!d.length) return 0;
+    let s = 0; for (const x of d) s += proxy(x.name);
+    return s / d.length;
+  }
+  // 引く枚数＝具材枠＋ソース枠。デッキ枚数をここに合わせるのが M4 の基本戦術。
+  function capacity(){ return Math.round(CONFIG.params.tiers.ingredients) + Math.round(CONFIG.params.tiers.sauces); }
+  function deckN(){ return RUN.deck().length; }
+  function sauceN(){ return RUN.deck().filter(x => CONFIG.items[x.name].pile === "sauce").length; }
+  function sauceRoom(){ return Math.round(CONFIG.params.tiers.sauces) - sauceN(); }
+`;
+
+// ── 1スピンぶんのカード別打点を取り出す（plan から読むだけ・コードは変えない）──
+const PERCARD = `
+  function perCardHits(){
+    if (typeof plan === "undefined" || !plan) return [];
+    const st = plan.stack, ba = plan.sc.baseArr || [], hits = plan.sc.hits || [];
+    const out = [];
+    for (let i = 0; i < st.length; i++){
+      const it = CONFIG.items[st[i]]; if (!it || it.pile === "bun") continue;
+      let add = 0, mul = 1;
+      for (const h of hits){ if (h.src !== i || h.disabled) continue;
+        if (h.kind === "add") add += (h.add || 0);
+        else if (h.kind === "mult") mul *= (h.mult || 1); }
+      const dmg = Math.round((40 + (ba[i] || 0) + add) * mul - 40);
+      out.push([st[i], dmg]);
+    }
+    return out;
+  }
+`;
+
+async function runOne(page, seed, policy) {
+  const errs = [];
+  page.removeAllListeners('pageerror'); page.removeAllListeners('console');
+  page.on('pageerror', e => errs.push('PE ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') errs.push('CE ' + m.text()); });
+  await page.goto(TARGET);
+  await page.waitForFunction(() => typeof window.RUN !== 'undefined');
+  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc]) => {
+    window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
+      artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0 };
+    eval(proxySrc); eval(perCardSrc);
+    window.__proxy = proxy; window.__proxyAxis = proxyWithAxis; window.__weakest = weakestInDeck;
+    window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
+    window.__perCard = perCardHits; window.__botRand = botRand; window.__rngState = seed * 7919;
+    CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
+    RUN.setPendingSeed(seed); RUN.reset();
+    CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
+    CONFIG.params.run.dayGoal = days;
+  }, [seed, DAYS, policy, PROXY, PERCARD]);
+
+  const st = () => page.evaluate(() => ({
+    show: document.getElementById('offer').classList.contains('show'),
+    title: (document.querySelector('#offer .offer-title') || {}).textContent || '',
+    done: /完成/.test(document.getElementById('progress').textContent),
+    active: RUN.state().runActive, days: RUN.state().daysSurvived, money: RUN.state().money,
+    cls: document.getElementById('offer').className }));
+  const tap = () => page.evaluate(() => { const el = document.getElementById('tap');
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 })); window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); });
+
+  let guard = 0, ended = null, lastKey = '', rep = 0;
+  while (guard++ < 4000) {
+    const s = await st();
+    if (!s.active) { ended = /cleared/.test(s.cls) ? 'cleared' : 'broke'; break; }
+    const key = s.show + '|' + s.title + '|' + s.days;
+    if (key === lastKey) rep++; else { rep = 0; lastKey = key; }
+    if (rep > 40) { ended = 'stuck'; break; }
+    if (!s.show) {
+      for (let k = 0; k < 14; k++) { if ((await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
+      await page.evaluate(() => {   // 完成した時点のカード別打点と得点を控える
+        const day = RUN.state().daysSurvived + 1;
+        const d = RUN.deck();
+        window.__M4.spins.push({ d: day, t: plan ? plan.sc.total : 0, n: plan ? plan.stack.length : 0,
+          deck: d.length, ing: Math.round(CONFIG.params.tiers.ingredients), sau: Math.round(CONFIG.params.tiers.sauces),
+          ic: d.filter(x => CONFIG.items[x.name].pile === 'ingredient').length,
+          sc: d.filter(x => CONFIG.items[x.name].pile === 'sauce').length,
+          cards: window.__perCard() });
+      });
+      for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
+      continue;
+    }
+    const handled = await page.evaluate((policy) => {
+      const M = window.__M4, title = (document.querySelector('#offer .offer-title') || {}).textContent || '';
+      const day = RUN.state().daysSurvived + 1;
+      const useAxis = policy !== 'noaxis';
+      const useSauce = policy !== 'nosauce';
+      const useRemove = policy !== 'norem';
+      const rnd = arr => arr[Math.floor(window.__botRand() * arr.length)];
+      // 営業日が変わったら「今日の入れ替え枠」を戻す。credit＝削除で消す前提で先に取った枚数。
+      if (M.day !== day) { M.day = day; M.credit = 0; }
+
+      // ① バンズの押し出し：効果を持たないゴマバンズを優先して捨てる（方策で差をつけない）
+      if (/バンズを1枚入手/.test(title)) {
+        const sub = (document.querySelector('#offer .offer-subtitle') || {}).textContent || '';
+        const take = [...document.querySelectorAll('#offer .offer-buy')].find(x => /受け取る/.test(x.textContent));
+        if (!/押し出す/.test(sub) && take) { take.click(); return 'bun'; }
+        const rows = [...document.querySelectorAll('#offer .bunslots .remove-row:not(.off)')];
+        const goma = rows.find(r => (r.querySelector('.nm') || {}).textContent === 'ゴマバンズ');
+        if (goma) goma.click(); else if (rows[0]) rows[0].click();
+        else if (take) take.click();
+        return 'bun';
+      }
+      // ② 家賃
+      if (/家賃の支払い/.test(title)) {
+        const before = RUN.state().money;
+        const x = [...document.querySelectorAll('#offer .offer-buy')].find(y => /支払う|前借り|結果/.test(y.textContent));
+        if (x) x.click();
+        M.days.push({ d: day, moneyBefore: before, money: RUN.state().money,
+          bands: (() => { const c = { nami:0, jou:0, tokujou:0, kiwami:0 }; for (const y of RUN.deck()) c[CONFIG.items[y.name].rar]++; return c; })(),
+          deck: RUN.deck().length, cap: window.__cap(),
+          ing: Math.round(CONFIG.params.tiers.ingredients), sau: Math.round(CONFIG.params.tiers.sauces) });
+        return 'rent';
+      }
+      // ③ 店　買う順序：削除 → 具材枠 → アーティファクト → カード（今日の家賃ぶんは常に残す）
+      if (/店（/.test(title)) {
+        const money = () => RUN.state().money;
+        const keep = () => Math.round(300 * Math.pow(1.4, RUN.state().daysSurvived));   // 今日の家賃ぶんは残す
+        const btn = re => [...document.querySelectorAll('#offer .shopbtn')].find(y => re.test(y.textContent));
+        const price = el => +((el.querySelector('.price') || {}).textContent || '0').replace(/\D/g, '');
+        if (policy === 'random') {
+          for (let k = 0; k < 6; k++) {
+            const cs = [...document.querySelectorAll('#offer .shopcard')].filter(x => !x.classList.contains('cant'));
+            if (!cs.length) break; const c = rnd(cs);
+            const nm = (c.querySelector('.nm') || {}).textContent; const isArt = c.classList.contains('artcard');
+            c.click(); (isArt ? M.artBuys : M.buys).push({ d: day, nm });
+          }
+        } else {
+          // (a) 削除：デッキが引く枚数を上回っているぶんだけ、最弱を取り除く
+          if (useRemove) {
+            for (let k = 0; k < 3; k++) {
+              if (policy !== 'takeall' && window.__deckN() <= window.__cap()) break;
+              const rb = btn(/取り除く/); if (!rb || /cant/.test(rb.className)) break;
+              const cost = price(rb); if (money() - cost < keep()) break;
+              rb.click();
+              const rows = [...document.querySelectorAll('#offer .remove-row:not(.off)')];
+              if (!rows.length) { const back = [...document.querySelectorAll('#offer .offer-skip')].find(y => /戻る/.test(y.textContent)); if (back) back.click(); break; }
+              let lo = rows[0], lv = 1e9;
+              for (const r of rows) { const v = window.__proxy((r.querySelector('.nm') || {}).textContent); if (v < lv) { lv = v; lo = r; } }
+              const nm = (lo.querySelector('.nm') || {}).textContent;
+              lo.click(); M.removes[day] = (M.removes[day] || 0) + 1; M.buys.push({ d: day, nm, kind: 'remove' });
+            }
+          }
+          // (b) 具材枠：枠がデッキで埋まっているなら1つ増やす（明日ぶんの空きを作る）
+          for (let k = 0; k < 2; k++) {
+            const ib = btn(/具材枠/); if (!ib || /cant/.test(ib.className)) break;
+            const cost = price(ib); if (money() - cost < keep()) break;
+            if (policy === 'takeall') { if (RUN.deck().length <= Math.round(CONFIG.params.tiers.ingredients) + 1) break; }
+            else if (window.__deckN() < window.__cap()) break;   // まだ空きがあるなら増やさない
+            ib.click(); M.slots[day] = (M.slots[day] || 0) + 1; M.buys.push({ d: day, nm: '具材枠+1', kind: 'slot' });
+          }
+          // (c) アーティファクト：買えるものを高いレアリティから（M3 と同じ）
+          for (let k = 0; k < 3; k++) {
+            const as = [...document.querySelectorAll('#offer .shopcard.artcard')].filter(x => !x.classList.contains('cant'))
+              .filter(x => money() - price(x) >= keep());
+            if (!as.length) break;
+            const before = (RUN.state().artifacts || []).length;
+            const nm = (as[0].querySelector('.nm') || {}).textContent;
+            as[0].click();
+            const after = (RUN.state().artifacts || []).length;
+            if (after === before) M.artSwaps++;
+            M.artBuys.push({ d: day, nm });
+            if (M.fills === null && after >= 3) M.fills = day;
+          }
+          // (d) カード：空きがあるぶんだけ買う（takeall は M3 と同じで買えるだけ買う）
+          for (let k = 0; k < 8; k++) {
+            if (policy !== 'takeall' && window.__deckN() >= window.__cap()) break;
+            let cs = [...document.querySelectorAll('#offer .shopcard:not(.artcard)')].filter(x => !x.classList.contains('cant'));
+            if (!useSauce) cs = cs.filter(x => (CONFIG.items[(x.querySelector('.nm') || {}).textContent] || {}).pile !== 'sauce');
+            cs = cs.filter(x => money() - price(x) >= keep());
+            if (!cs.length) break;
+            const wantSauce = useSauce && window.__sauceRoom() > 0;
+            const weak = window.__weakest();
+            let pick = cs.map(x => ({ x, nm: (x.querySelector('.nm') || {}).textContent }))
+              .map(o => ({ ...o, v: window.__proxyAxis(o.nm, useAxis) + ((wantSauce && CONFIG.items[o.nm].pile === 'sauce') ? 10000 : 0) }))
+              .sort((a, b) => b.v - a.v)[0];
+            if (policy !== 'takeall' && pick.v < 10000 && pick.v <= weak.v) break;   // 最弱以下なら買わない
+            pick.x.click(); M.buys.push({ d: day, nm: pick.nm, kind: 'card' });
+          }
+        }
+        const out = [...document.querySelectorAll('#offer .offer-skip')].find(y => /店を出る/.test(y.textContent));
+        if (out) out.click();
+        return 'shop';
+      }
+      // ④ 押し出し・軸選択など
+      if (/押し出す|減らす|軸を選ぶ/.test(title)) {
+        const r = document.querySelector('#offer .remove-row:not(.off)') || document.querySelector('#offer .offer-card')
+          || [...document.querySelectorAll('#offer .offer-buy')][0];
+        if (r) r.click();
+        return 'other';
+      }
+      // ⑤ 3択
+      const cs = [...document.querySelectorAll('#offer .offer-card')];
+      if (!cs.length) { const s = document.querySelector('#offer .offer-skip'); if (s) s.click(); return 'offer-empty'; }
+      const names = cs.map(c => (c.querySelector('.nm') || {}).textContent);
+      if (policy === 'random') { const k = Math.floor(window.__botRand() * cs.length); cs[k].click();
+        M.takes[day] = (M.takes[day] || 0) + 1; return 'offer'; }
+      let cand = names.map((nm, k) => ({ nm, k, v: window.__proxyAxis(nm, useAxis) }));
+      if (!useSauce) cand = cand.filter(o => CONFIG.items[o.nm].pile !== 'sauce');
+      const weak = window.__weakest();
+      cand = cand.filter(o => o.v > weak.v);
+      const skip = () => { const s = document.querySelector('#offer .offer-skip'); if (s) s.click();
+        M.skips[day] = (M.skips[day] || 0) + 1; };
+      if (!cand.length) { skip(); return 'skip'; }
+      cand.sort((a, b) => b.v - a.v || a.k - b.k);   // 同点なら左端
+      // 「全部取る」＝ M3 の基準。枚数を見ない。
+      if (policy === 'takeall') { cs[cand[0].k].click(); M.takes[day] = (M.takes[day] || 0) + 1; return 'offer'; }
+      // ソース枠が空いていればソースを優先する（枚数の制約より優先）
+      if (useSauce && window.__sauceRoom() > 0) {
+        const sa = cand.find(o => CONFIG.items[o.nm].pile === 'sauce');
+        if (sa) { cs[sa.k].click(); M.takes[day] = (M.takes[day] || 0) + 1; return 'offer'; }
+      }
+      const room = window.__cap() - window.__deckN();
+      const best = cand[0];
+      let take = false;
+      if (room > 0) take = true;                                        // ① 枠に空きがある
+      else if (useRemove && M.credit < 1) { take = true; M.credit++; }   // ② 今日の削除1回ぶんを先に使う
+      else if (best.v >= 2 * window.__avg()) take = true;                // ③ 平均の2倍以上なら薄まる損を承知で取る
+      if (!take) { skip(); return 'skip'; }
+      cs[best.k].click(); M.takes[day] = (M.takes[day] || 0) + 1;
+      return 'offer';
+    }, policy);
+    await page.waitForTimeout(handled === 'shop' ? 40 : 25);
+  }
+
+  const out = await page.evaluate(() => {
+    const M = window.__M4;
+    return { spins: M.spins, days: M.days, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots,
+      artBuys: M.artBuys, artSwaps: M.artSwaps, fills: M.fills,
+      arts: (RUN.state().artifacts || []).slice(),
+      fb: (RUN.rarityFallbacks ? RUN.rarityFallbacks().length : 0),
+      warn: selfCheck().length, warnMsg: selfCheck(), deck: RUN.deck().length, cap: window.__cap(),
+      ing: Math.round(CONFIG.params.tiers.ingredients), sau: Math.round(CONFIG.params.tiers.sauces),
+      money: RUN.state().money, daysSurvived: RUN.state().daysSurvived };
+  });
+  return { seed, policy, ended, errs: errs.length, err0: errs[0] || null, ...out };
+}
+
+const seeds = []; for (let s = FROM; s <= TO; s++) seeds.push(s);
+const t0 = Date.now();
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell', args: ['--no-sandbox'] });
+let idx = 0, done = 0;
+async function worker() {
+  const page = await browser.newPage();
+  while (true) {
+    const my = idx++; if (my >= seeds.length) break;
+    try {
+      const r = await runOne(page, seeds[my], POLICY);
+      appendFileSync(OUT, JSON.stringify(r) + '\n');
+    } catch (e) {
+      appendFileSync(OUT, JSON.stringify({ seed: seeds[my], policy: POLICY, ended: 'error', error: String(e).slice(0, 200) }) + '\n');
+    }
+    done++;
+    if (done % 5 === 0) process.stderr.write(`  ${POLICY}: ${done}/${seeds.length}（${Math.round((Date.now()-t0)/1000)}秒）\n`);
+  }
+  await page.close();
+}
+await Promise.all(Array.from({ length: Math.min(WORKERS, seeds.length) }, worker));
+await browser.close();
+console.log(`${POLICY}: ${done}ラン / ${Math.round((Date.now() - t0) / 1000)}秒 → ${OUT}`);
