@@ -1412,7 +1412,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 12", base: "67d8f08", date: "2026-08-14" };
+const BUILD = { label: "Wave 13", base: "67d8f08", date: "2026-08-14" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1972,7 +1972,9 @@ function onDay(){
       const nm = pool.length ? drawOffer(pool) : null;
       if (nm){ addInstance(nm, 0); plog.recordBuy("forced", nm, 0); } } }
   if (hasArt("shopHalfOnce")) artShopDiscount = (artById("shopHalfOnce").ratio != null ? artById("shopHalfOnce").ratio : 0.5);
-  shopBuys.sauFree = 0;                              // ソース棚の無料ぶんは営業日ごとに戻す
+  // Wave13：ソース棚の無料ぶんは**ここで戻さない**。営業日ごとに戻すと、ソース枠の購入は生涯2回しか
+  //   無いので実質どちらも無料になり、総倍率が ×6 から ×216 まで素通しになっていた（効果文は「1回ぶん無料」）。
+  //   shopBuys はランごとに空になるので、これで n 回ぶん＝ラン全体で n 回だけ無料になる。
   renderPiles(); renderAxisTally();
 }
 function onBuyCard(inst){
@@ -5553,6 +5555,13 @@ $("gear").addEventListener("click", () => {          // 調整パネルを開い
    ブート時は前回の未確定ランを継続する（別ランに分けない）。明細形式は測定スクリプトと揃える（source で区別）。
    ========================================================================= */
 const plog = (function(){
+  /* Wave13：スピンごとの「盤面の並び」と「得点の内訳」を残す。
+     pb / growth / pm は配列だけでカード名が無く、後から「どのカードが何点持っていたか」が読めなかった。
+     stack を全スピンに広げ（bestBurger には前からある）、画面に出ている acc.hits をそのまま写す。
+     baseArr も足す：打点は (40 + 第1項 + 加算) × 乗算 − 40 で、第1項は飴細工・蟹カマ等の盤面操作が
+     入るためカード表から復元できない。これが無いとカードごとの打点が出せない。
+     detail=false でこの3つだけ落とす（測定スクリプト用・RUN.plogDetail で切り替える）。 */
+  let detail = true;
   const K_RUNS = "bstack.plog.runs.v1", K_EN = "bstack.plog.enabled.v1", K_CUR = "bstack.plog.current.v1";
   let enabled = true, runs = [], cur = null, cumScore = 0, warnMsg = "";
   try { const v = localStorage.getItem(K_EN); enabled = (v === null) ? true : (v === "1"); } catch(e){ enabled = true; }
@@ -5617,6 +5626,9 @@ const plog = (function(){
     saveRuns(); renderList(); }
   return {
     isEnabled: () => enabled,
+    // Wave13：スピンごとの盤面・内訳を残すか（既定 true＝残す）。測定スクリプトから false にして JSON を小さく保つ。
+    setDetail(v){ detail = !!v; return detail; },
+    isDetail: () => detail,
     setEnabled(v){ enabled = !!v; try { localStorage.setItem(K_EN, enabled ? "1" : "0"); } catch(e){} },
     bootStart(seed){                                  // ブート：前回の未確定ランがあれば継続、無ければ新規（別ランに分けない）。
       if (!enabled){ cur = null; return; }
@@ -5636,6 +5648,18 @@ const plog = (function(){
         offered: [], picked: null, pickSkipped: false,   // 3択（Wave6 Step3）。無料なので bought とは分けて持つ
 
         growth: (growth || []).slice(), pb: (pb || []).slice(), pm: (pm || []).slice(), gambles });   // Wave3：育ち／Wave4：pb・pm・賭けの結果（下から順）
+      if (detail){                                    // Wave13：手プレイのときだけ残す（測定では RUN.plogDetail(false) で落とす）
+        const t = cur.spins[cur.spins.length - 1];
+        t.stack = (stack || []).slice();               // 盤面の並び（下から順・pb/growth/pm と同じ並び）
+        t.baseArr = (sc && sc.baseArr) ? sc.baseArr.slice() : [];   // 得点時の第1項（盤面操作の後）
+        t.hits = (sc && sc.hits) ? sc.hits.map(h => {  // 画面に出ている内訳をそのまま写す
+          const o = { kind: h.kind, src: h.src, label: h.label, effect: h.effect };
+          if (h.add != null) o.add = h.add;
+          if (h.mult != null) o.mult = h.mult;
+          if (h.disabled) o.disabled = true;
+          return o;
+        }) : [];
+      }
       // 最高得点のバーガー1本だけを summary に保持（積み方＝下から順の配列＋育ち。全スピン分は持たない）。
       if (stack && stack.length && (!cur.summary.bestBurger || score > cur.summary.bestBurger.score)){
         cur.summary.bestBurger = { spin: spinNo, score, stack: stack.slice(), growth: (growth || []).slice() };
@@ -5761,6 +5785,9 @@ window.RUN = {
   shopStock: () => (shopStock ? shopStock.slice() : null),
   mainCuisine: () => deckMainCuisine(),
   axisDistance: (cu) => axisDistance(cu),
+  // Wave13：スピンごとの盤面（stack）・第1項（baseArr）・内訳（hits）を残すかどうか。既定 true。
+  //   測定ハーネスは初期化で RUN.plogDetail(false) を呼び、プレイログを小さく保つ。
+  plogDetail: (v) => (v == null ? plog.isDetail() : plog.setDetail(v)),
   rarityFallbacks: () => rarityFallbacks.slice(),
   clearRarityFallbacks: () => { rarityFallbacks = []; },
   dayAxis: () => dayAxis,                                                     // マッシュルームの本日の指定軸を読む
