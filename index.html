@@ -747,6 +747,7 @@
         <button id="clearCfg">保存した設定を消す</button>
         <button id="clearHist">履歴をクリア</button>
       </div>
+      <p id="cfgWarn" class="barnote" style="display:none"></p>
       <p class="barnote">※ 変更は次に作るバーガーから反映。<b>調整欄の値はこの端末に保存され、リロードしても残る。</b>「数値を初期化」は既定に戻してランもやり直す。「保存した設定を消す」は保存を捨てて既定に戻すだけで、遊んでいるランは続く。</p>
     </details>
   </section>
@@ -1296,11 +1297,21 @@ function cfgApply(dst, src){
   }
 }
 let cfgSaveTimer = null;
+let cfgWarnMsg = "";
+function renderCfgWarn(){ const el = document.getElementById("cfgWarn"); if (!el) return;
+  el.textContent = cfgWarnMsg; el.style.display = cfgWarnMsg ? "" : "none"; }
 function saveCfg(){
+  clearTimeout(cfgSaveTimer); cfgSaveTimer = null;
+  // 失敗を黙って飲まない。書けないまま遊ぶと「リロードしたら戻った」だけが見えて、原因が分からない。
   try {
     const d = cfgDiff(CONFIG, cfgRef());
     if (d) localStorage.setItem(K_CFG, JSON.stringify(d)); else localStorage.removeItem(K_CFG);
-  } catch(e){}
+    if (cfgWarnMsg){ cfgWarnMsg = ""; renderCfgWarn(); }
+  } catch(e){
+    cfgWarnMsg = "⚠ 設定を保存できませんでした（この端末の保存領域がいっぱいか、保存が禁じられています）。"
+               + "このままだとリロードで既定に戻ります。プレイログの「履歴をクリア」で空きが作れます。";
+    renderCfgWarn();
+  }
 }
 function scheduleSaveCfg(){ clearTimeout(cfgSaveTimer); cfgSaveTimer = setTimeout(saveCfg, 250); }
 // 保存されている差分を、いまの CONFIG を作り直したうえで載せる。ランの状態（枠・枚数）は持ち越す。
@@ -1318,6 +1329,8 @@ function clearSavedCfg(){ try { localStorage.removeItem(K_CFG); } catch(e){} }
   try { const t = localStorage.getItem(K_CFG); if (t) saved = JSON.parse(t); } catch(e){}
   if (saved) cfgApply(CONFIG, saved);
 }
+// 250ms の待ちを抱えたままページを閉じられると、最後の1回が消える。閉じる前に書き切る。
+window.addEventListener("pagehide", () => { if (cfgSaveTimer) saveCfg(); });
 
 /* =========================================================================
    効果音（Web Audio API・コード生成。音声ファイルは使わない＝素材権利を持ち込まない）
@@ -5354,7 +5367,8 @@ function renderSettings(){
   {
     const rebuild = document.createElement("button");
     rebuild.className = "shopbtn"; rebuild.textContent = "等比の式から作り直す（dayGoal の日数ぶん）";
-    rebuild.addEventListener("click", () => { rebuildRentByDay(); updateRunStatus(); renderSettings(); });
+    // ボタンは input/change を出さないので、入れ物の監視には引っかからない。ここで明示的に保存する。
+    rebuild.addEventListener("click", () => { rebuildRentByDay(); updateRunStatus(); saveCfg(); renderSettings(); });
     gridRow(g, "作り直し", rebuild);
     const arr = () => (CONFIG.params.run.rentByDay = Array.isArray(CONFIG.params.run.rentByDay) ? CONFIG.params.run.rentByDay : []);
     const n = Math.max(arr().length, Math.max(1, Math.round(CONFIG.params.run.dayGoal || 10)));
