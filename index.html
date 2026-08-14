@@ -1086,7 +1086,10 @@ const DEFAULTS = {
     // 第1層：完成ごとの3択（回収の直後に出す。いずれかの山に1枚足す）。無料。スキップは「見送る（何もしない）」。
     offer: { every: 1 },     // 3択：every=何個ごとに出すか（既定 毎回）。
     // ラン制（失敗あり・仮メカニクス）。バーガー1個=1スピン。rentEvery スピンごとに家賃。払えなければラン終了。
-    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 5 },   // rentBase=初期家賃(item2:500→300) / rentMul=等比の倍率(item2:1.5→1.4) / dayGoal=完走する営業日数（20→5・まず5営業日を面白くできるか見る・設定で変更可）
+    // Wave11：家賃は営業日ごとに置く（rentByDay）。初期値は rentBase 300 × rentMul 1.4^(営業日-1) を
+    //   丸めたもので、置き換え前とまったく同じ額になる。配列の外（11営業日目以降）は等比のまま。
+    run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 5,
+           rentByDay: [300, 420, 588, 823, 1152, 1613, 2259, 3162, 4427, 6198] },   // rentBase/rentMul は配列の外の日と、配列を作り直すときの雛形に残す
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
@@ -1404,7 +1407,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 10", base: "2dbcc86", date: "2026-08-14" };
+const BUILD = { label: "Wave 11", base: "3617327", date: "2026-08-14" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1588,10 +1591,37 @@ const bunOnBoard = () => {                           // 盤面に出るバンズ
 const bunDef     = nm => CONFIG.buns[nm] || null;
 const bunEff     = nm => (bunDef(nm) || {}).effect || { id:null };
 function makeBun(name){ return { id: ++bunSeq, name, g:0, uses:0 }; }
+/* ── Wave11：所持枠の上限（bunLimit）と、上限を割ったときの切り詰め ────────────
+   D1 §1 で3つの経路が分かれた。
+     ① 夜の仕込み（bunSkipPush）＝押し出しを飛ばして1枚増やす。**効果文どおりの動作**なので、
+        増えたぶん（bunSkipUsed）を上限に足して許容する。点検側を直す。
+     ② 調理台（ingSlotBun）で cap が下がる＝溢れたぶんを切り詰める（trimBunSlots）。
+     ③ resetRun() の順序＝前のランのアーティファクトで枠数が決まっていた（resetRun 側で直した）。 */
+let bunSkipUsed = 0;        // 夜の仕込みで押し出しを飛ばした回数＝所持枠を超えて許される枚数
+const bunLimit = () => bunCap() + bunSkipUsed;
+const BUN_RAR_RANK = { common:0, rare:1, kyoku:2 };
+// 上限を超えているぶんを捨てる。捨てる順は「弱いものから」：
+//   つなぎのゴマバンズ → レアリティの低い順 → 古い個体（id の小さい順）。捨てた枚数を返す。
+function trimBunSlots(){
+  const over = bunSlots.length - bunLimit();
+  if (over <= 0) return 0;
+  const order = bunSlots.slice().sort((a, b) => {
+    const ga = a.name === "ゴマバンズ" ? 0 : 1, gb = b.name === "ゴマバンズ" ? 0 : 1;
+    if (ga !== gb) return ga - gb;
+    const ra = BUN_RAR_RANK[(bunDef(a.name) || {}).rar] || 0, rb = BUN_RAR_RANK[(bunDef(b.name) || {}).rar] || 0;
+    if (ra !== rb) return ra - rb;
+    return a.id - b.id;
+  });
+  const gone = order.slice(0, over), ids = gone.map(b => b.id);
+  for (const b of gone) plog.recordBunSwap(null, b.name);
+  bunSlots = bunSlots.filter(x => ids.indexOf(x.id) < 0);
+  renderBunView();
+  return gone.length;
+}
 // ラン開始時の4枠は、つなぎのゴマバンズで埋める（KENTO §6-1：初期の4枠を埋めるために残す）。
 //   抽選で埋めない理由：デッキが全部無印の白紙から始まるのと同じで、ルールも取ったものだけが作る。
 function resetBuns(){
-  bunSlots = []; bunSeq = 0; bunPushed = 0; bunStreak = 0; bunPendingDraw = 0;
+  bunSlots = []; bunSeq = 0; bunPushed = 0; bunStreak = 0; bunPendingDraw = 0; bunSkipUsed = 0;
   for (let k = 0; k < bunCap(); k++) bunSlots.push(makeBun("ゴマバンズ"));
 }
 // バンズ専用のレアリティ抽選 → そのレアリティの中から1枚（軸・カードのレアリティには乗らない）。
@@ -1936,6 +1966,7 @@ function consumeArtifact(id){
   if (!nm) return false;
   artifactsOwned = artifactsOwned.filter(n => n !== nm);
   delete artAxis[nm];
+  trimBunSlots();                                    // Wave11：手放したことで所持枠が下がる場合に備える
   plog.recordArtifactUse(nm); updateRunStatus();
   return true;
 }
@@ -3770,6 +3801,9 @@ function takeBun(pushOutId){
   } else plog.recordBunSwap(nb.name, null);
   if (hasArt("bunSkipPush")) consumeArtifact("bunSkipPush");   // 夜の仕込み〈使い切り〉
   bunSlots.push(nb); pendingBun = null; bunChosen = null;
+  // Wave11：押し出しを飛ばして所持枠を超えたぶんは、点検で許容する（夜の仕込みの効果文どおり）。
+  //   空き枠に普通に入った回や、押し出して入れ替えた回はここを通らない。
+  if (bunSlots.length > bunLimit()) bunSkipUsed++;
   renderBunView(); Sound.coinChink(4, 0.5);
   // 朝の仕込み：1営業日に n 回入手する（押し出しも n 回）。
   const tw = artById("bunTwice");
@@ -4131,7 +4165,22 @@ function tuningOpen(){ const d = $("tuningDetails"); return d && d.open; }
 /* ===== ラン制（家賃・店・失敗）＝仮メカニクス。数値はすべて調整欄から変えられる。 ===== */
 function el(cls, text){ const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; return d; }
 function cuiTagHTML(it){ return it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : ""; }
-function rentDue(){ const r = CONFIG.params.run || {}; return Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived) * artRentMul); }   // artRentMul＝前借りの次回倍率
+// 家賃（Wave11）。rentByDay[営業日-1] があればその額、無ければ等比 rentBase×rentMul^(営業日-1)。
+//   artRentMul＝前借りの次回倍率。
+function rentDue(){
+  const r = CONFIG.params.run || {};
+  const a = r.rentByDay, v = (Array.isArray(a) && a[daysSurvived] != null && Number.isFinite(+a[daysSurvived]))
+    ? +a[daysSurvived]
+    : (r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived);
+  return Math.round(Math.max(0, v) * artRentMul);
+}
+// 等比の式から rentByDay を作り直す（調整欄の「等比から作り直す」ボタン用）。
+function rebuildRentByDay(){
+  const r = CONFIG.params.run || {};
+  const n = Math.max(1, Math.round(r.dayGoal || 10));
+  r.rentByDay = Array.from({ length: n }, (_, i) => Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, i)));
+  return r.rentByDay;
+}
 // 家賃までに作れる数＝rentEvery。深夜営業（アーティファクト）があれば +extra 個ぶん延びる。
 function effRentEvery(){ const rn = CONFIG.params.run || {}; const ns = artById("nightshift"); return Math.max(1, Math.round((rn.rentEvery || 5) + (ns ? (ns.extra || 0) : 0))); }
 // 購入キー → 価格スケールの要素（具材枠/ソース枠は段数スロットとして slot に統合）。
@@ -4330,6 +4379,7 @@ function showShop(){
       chip.addEventListener("click", () => {
         if (a.pick && artChipArmed !== name){ artChipArmed = name; showAxisPick(name); return; }
         artifactsOwned = artifactsOwned.filter(x => x !== name); delete artAxis[name]; artChipArmed = null;
+        trimBunSlots();                              // Wave11：バンズケースを手放すと所持枠が 5→4 に戻る
         plog.recordArtifactDrop(name); rerollArtifacts(); updateRunStatus(); showShop();
       });
       owned.appendChild(chip);
@@ -4394,6 +4444,7 @@ function buyArtifact(name, cost){
   setMoney(money - cost); bumpBuy("artifact");
   artifactsOwned.push(name); plog.recordBuy("artifact", name, cost);
   artifactStock = artifactStock.filter(x => x !== name);
+  trimBunSlots();                                    // Wave11：調理台のようにバンズの所持枠を下げる道具に備える
   updateRunStatus(); Sound.coinChink(6, 0.6);
   const a = CONFIG.artifacts[name] || {};
   if (a.pick){ showAxisPick(name); return; }          // 軸を選ぶ型（暖簾・一点張り 等）は買った直後に選ぶ
@@ -4634,10 +4685,13 @@ function resetRun(){
   seedRun(pendingSeed);                              // ラン開始時にシード確定（pendingSeed 指定があればそれ、無ければ自動）
   pendingSeed = null;
   plog.startRun(gameSeed);                           // プレイログ：新しいランの記録を開始（前ランが未確定なら確定してから）
+  // Wave11：アーティファクトを先に空にする。resetBuns() は bunCap() ぶん枠を埋めるので、
+  //   ここが後だと**前のランのアーティファクト**で新しいランの枠数が決まってしまう（D1 §1-2）。
+  artifactsOwned = [];
   restoreDefaultDeck(); resetBuns(); rollDayAxis();  // バンズの4枠も作り直す（Wave7 Step4）／マッシュルームの指定軸を1回引く
   pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
-  history = []; recentProducts = []; completedCount = 0; artifactsOwned = []; forcedCard = null;
+  history = []; recentProducts = []; completedCount = 0; forcedCard = null;
   pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0;   // バンズの入手待ち・最高得点（#22 連勝）
   artAxis = {}; artFirstAxis = null; artDayAxis = null; artOnceUsed = {}; artPendingFix = null;   // アーティファクトの状態（Wave7 Step5）
   artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; artChipArmed = null;
@@ -5028,6 +5082,31 @@ function renderSettings(){
   gridRow(g, "初期家賃(rentBase)", numInput(()=>CONFIG.params.run.rentBase, v=>{CONFIG.params.run.rentBase=Math.max(0,Math.round(v)); updateRunStatus();}, 50));
   gridRow(g, "家賃の倍率(rentMul・等比)", numInput(()=>CONFIG.params.run.rentMul, v=>{CONFIG.params.run.rentMul=Math.max(1,v); updateRunStatus();}, 0.05));
   gridRow(g, "完走する営業日数(dayGoal)", numInput(()=>CONFIG.params.run.dayGoal, v=>{CONFIG.params.run.dayGoal=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
+
+  // ── 進行：営業日ごとの家賃（Wave11）──
+  //   rentByDay に値があればその額を使う。空欄（削除）にすると、その日は等比 rentBase×rentMul^(日-1) に戻る。
+  g = group("ラン制：営業日ごとの家賃（rentByDay・空欄なら等比の式）", "run");
+  {
+    const rebuild = document.createElement("button");
+    rebuild.className = "shopbtn"; rebuild.textContent = "等比の式から作り直す（dayGoal の日数ぶん）";
+    rebuild.addEventListener("click", () => { rebuildRentByDay(); updateRunStatus(); renderSettings(); });
+    gridRow(g, "作り直し", rebuild);
+    const arr = () => (CONFIG.params.run.rentByDay = Array.isArray(CONFIG.params.run.rentByDay) ? CONFIG.params.run.rentByDay : []);
+    const n = Math.max(arr().length, Math.max(1, Math.round(CONFIG.params.run.dayGoal || 10)));
+    for (let i = 0; i < n; i++){
+      const inp = document.createElement("input");
+      inp.type = "number"; inp.step = "50"; inp.placeholder = "等比の式";
+      inp.value = arr()[i] != null ? arr()[i] : "";
+      inp.addEventListener("input", () => {
+        const a = arr();
+        while (a.length < i) a.push(null);
+        const v = parseFloat(inp.value);
+        a[i] = inp.value.trim() === "" || Number.isNaN(v) ? null : Math.max(0, Math.round(v));
+        updateRunStatus();
+      });
+      gridRow(g, (i + 1) + "営業日目の家賃", inp);
+    }
+  }
 
   // ── 進行：店 ──
   g = group("店（家賃後に開く・値段は購入回数で上げるか切替）", "run");
@@ -5474,6 +5553,7 @@ const plog = (function(){
   // ランの頭に残す設定の写し（Wave5 4-2）。あとで「どの設定で遊んだログか」を突き合わせるため。
   function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
     return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
+             rentByDay: Array.isArray(r.rentByDay) ? r.rentByDay.slice() : null,
              tiers: { ingredients: p.tiers.ingredients, sauces: p.tiers.sauces },
              growPer: GROW_PER, comboBonus: { threshold: (p.comboBonus||{}).threshold, perCombo: (p.comboBonus||{}).perCombo },
              scale: JSON.parse(JSON.stringify(sh.scale || {})),
@@ -5596,9 +5676,9 @@ const plog = (function(){
 // 計測・デバッグ用API（コンソール／測定ハーネスから触れる）。ゲームの内部状態を読み書きする。
 window.RUN = {
   state: () => ({ money, moneyShown, daysSurvived, runSpins, completedCount, runActive, artifacts: artifactsOwned.slice() }),
-  grantArtifact: (nm) => { if (CONFIG.artifacts[nm] && !artifactsOwned.includes(nm)) artifactsOwned.push(nm); updateRunStatus(); return artifactsOwned.slice(); },
-  setArtifacts: (arr) => { artifactsOwned = (arr||[]).filter(nm => CONFIG.artifacts[nm]); updateRunStatus(); return artifactsOwned.slice(); },
-  clearArtifacts: () => { artifactsOwned = []; updateRunStatus(); },
+  grantArtifact: (nm) => { if (CONFIG.artifacts[nm] && !artifactsOwned.includes(nm)) artifactsOwned.push(nm); trimBunSlots(); updateRunStatus(); return artifactsOwned.slice(); },
+  setArtifacts: (arr) => { artifactsOwned = (arr||[]).filter(nm => CONFIG.artifacts[nm]); trimBunSlots(); updateRunStatus(); return artifactsOwned.slice(); },
+  clearArtifacts: () => { artifactsOwned = []; trimBunSlots(); updateRunStatus(); },
   setMoney: (v) => { money = v; moneyShown = v; refreshMoney(false); },
   // 時間軸系（もち・たら＝基礎の育ち／ほたて＝倍率の育ち／白バンズ・さけ＝取得後の個数）の内部状態を計測から制御する。
   setCompleted: (v) => { completedCount = v; },
@@ -5622,7 +5702,8 @@ window.RUN = {
   buns: () => bunSlots.map(x => ({ id:x.id, name:x.name, g:x.g||0, uses:x.uses||0 })),
   setBuns: (names) => { bunSlots = (names||[]).filter(n => CONFIG.buns[n]).map(n => makeBun(n)); renderBunView(); return bunSlots.map(x=>x.name); },
   bunText: (nm) => bunText(nm),
-  bunStats: () => ({ pushed: bunPushed, streak: bunStreak, pendingDraw: bunPendingDraw, best: bunBestScore }),
+  bunStats: () => ({ pushed: bunPushed, streak: bunStreak, pendingDraw: bunPendingDraw, best: bunBestScore,
+                     cap: bunCap(), limit: bunLimit(), skipUsed: bunSkipUsed }),   // Wave11：許容量も読めるようにする
   // アーティファクト（Wave7 Step5）：確定枠と選んだ軸をテストから読む／組む口。
   setArtAxis: (nm, cu) => { if (CONFIG.artifacts[nm] && AXES.indexOf(cu) >= 0) artAxis[nm] = cu; return artAxis[nm]; },
   artAxes: () => Object.assign({}, artAxis),
@@ -5736,7 +5817,10 @@ function selfCheck(){
     if (based.length) warn.push("効果を持つバンズに基礎点がある: " + based.join(" / "));
     const bu = CONFIG.params.buns || {};
     if (Math.round(bu.onBoard || 0) > Math.round(bu.slots || 0)) warn.push("盤面に出るバンズが所持枠より多い");
-    if (bunSlots.length > bunCap()) warn.push("バンズの所持枠を超えている: " + bunSlots.length + " > " + bunCap());
+    // Wave11：夜の仕込みで押し出しを飛ばしたぶん（bunSkipUsed）は超過として数えない。
+    if (bunSlots.length > bunLimit())
+      warn.push("バンズの所持枠を超えている: " + bunSlots.length + " > " + bunCap()
+                + (bunSkipUsed ? "（夜の仕込みの許容 +" + bunSkipUsed + " を含めても超過）" : ""));
     const dead = Object.keys(BUN_TEXT).filter(id => !bn.some(nm => (bs[nm].effect || {}).id === id));
     if (dead.length) warn.push("使われていない BUN_TEXT: " + dead.join(" "));
     // つなぎ以外は30種そろっていること（KENTO §6：コモン12・レア15・極3）
