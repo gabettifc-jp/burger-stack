@@ -57,6 +57,25 @@ for (const p of POL) {
   const rs = M4[p];
   console.log(`| ${POL_JA[p]} | ${med(rs.map(r => sum(r.takes)))} | ${med(rs.map(r => sum(r.skips)))} | ${med(rs.map(r => sum(r.removes)))} | ${med(rs.map(r => sum(r.slots)))} | ${med(rs.map(r => (r.buys || []).filter(b => b.kind === 'card').length))} |`);
 }
+console.log('\n#### ソース枠が2枚・3枚になった営業日（方策別）\n');
+console.log('| 方策 | 2枚になったラン | 2枚になった営業日(中央/最小/最大) | 3枚になったラン | 3枚になった営業日(中央/最小/最大) | 10営業日後のソース枠(中央) |');
+console.log('| --- | --- | --- | --- | --- | --- |');
+for (const p of POL) {
+  const rs = M4[p], n = rs.length;
+  const at = k => rs.map(r => (r.sauSlots || []).find(s => s.to === k)).filter(Boolean).map(s => s.d);
+  const d2 = at(2), d3 = at(3);
+  const f = a => a.length ? `${med(a)} / ${Math.min(...a)} / ${Math.max(...a)}` : '—';
+  const sa = rs.filter(r => (r.days || []).some(d => d.d === 10)).map(r => r.sau);
+  console.log(`| ${POL_JA[p]} | ${d2.length}/${n} | ${f(d2)} | ${d3.length}/${n} | ${f(d3)} | ${med(sa) != null ? med(sa) : '—'} |`);
+}
+console.log('\n#### ソース枠の購入価格（方策別・実際に払った額の中央値）\n');
+console.log('| 方策 | 2枚目 | 3枚目 | 4枚目以降（アーティファクトで上限が上がった場合） |');
+console.log('| --- | --- | --- | --- |');
+for (const p of POL) {
+  const rs = M4[p];
+  const c = k => { const xs = rs.flatMap(r => (r.sauSlots || []).filter(s => (k === 4 ? s.to >= 4 : s.to === k)).map(s => s.cost)); return xs.length ? `${yen(med(xs))}（${xs.length}件）` : '—'; };
+  console.log(`| ${POL_JA[p]} | ${c(2)} | ${c(3)} | ${c(4)} |`);
+}
 console.log('\n#### 営業日ごとの見送りと削除（基準方策・中央値）\n');
 console.log('| 営業日 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |');
 console.log('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');

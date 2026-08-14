@@ -6,6 +6,10 @@
    M3 の基準は「デッキ最弱より代理打点が高ければ常に取る」で、これは実質「取れるだけ取る」だった
    （10営業日でデッキ中央値71枚）。M4 は「引く枚数とデッキ枚数を揃える」を基本戦術に置き直す。
 
+   改訂版（指示書 M4 改訂版 §2-3／§2-4）：**ソース枠を買う。**ソース枠が何枚開くかが総倍率を
+   ほぼ単独で決める（特上×6 なら 1枠×6／2枠×36／3枠×216）。改訂前は買わない方策だったので
+   「ソース1枚の世界」だけを測っていた。購入順序は 削除 → ソース枠 → 具材枠 → アーティファクト → カード。
+
    使い方：
      node tools/m4-measure.mjs --policy=base --from=4001 --to=4060 --out=tools/out/m4-base.jsonl
      --workers=N でページを並列に走らせる（既定4）。--days=10 で dayGoal。
@@ -104,7 +108,7 @@ async function runOne(page, seed, policy) {
   await page.waitForFunction(() => typeof window.RUN !== 'undefined');
   await page.evaluate(([seed, days, policy, proxySrc, perCardSrc]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
-      artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0 };
+      sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0 };
     eval(proxySrc); eval(perCardSrc);
     window.__proxy = proxy; window.__proxyAxis = proxyWithAxis; window.__weakest = weakestInDeck;
     window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
@@ -206,7 +210,21 @@ async function runOne(page, seed, policy) {
               lo.click(); M.removes[day] = (M.removes[day] || 0) + 1; M.buys.push({ d: day, nm, kind: 'remove' });
             }
           }
-          // (b) 具材枠：枠がデッキで埋まっているなら1つ増やす（明日ぶんの空きを作る）
+          // (b) ソース枠：上限に達していなければ、買えるようになった時点で買う（具材枠より優先）
+          //     ソース枠は総倍率を桁で動かす唯一のレバー（1枠×6／2枠×36／3枠×216）。
+          if (useSauce) {
+            for (let k = 0; k < 3; k++) {
+              const sb = btn(/ソース枠/); if (!sb || /cant/.test(sb.className)) break;
+              const cost = price(sb); if (money() - cost < keep()) break;
+              const before = Math.round(CONFIG.params.tiers.sauces);
+              sb.click();
+              const after = Math.round(CONFIG.params.tiers.sauces);
+              if (after === before) break;
+              M.sauSlots.push({ d: day, to: after, cost });
+              M.buys.push({ d: day, nm: 'ソース枠+1', kind: 'sslot' });
+            }
+          }
+          // (c) 具材枠：枠がデッキで埋まっているなら1つ増やす（明日ぶんの空きを作る）
           for (let k = 0; k < 2; k++) {
             const ib = btn(/具材枠/); if (!ib || /cant/.test(ib.className)) break;
             const cost = price(ib); if (money() - cost < keep()) break;
@@ -214,7 +232,7 @@ async function runOne(page, seed, policy) {
             else if (window.__deckN() < window.__cap()) break;   // まだ空きがあるなら増やさない
             ib.click(); M.slots[day] = (M.slots[day] || 0) + 1; M.buys.push({ d: day, nm: '具材枠+1', kind: 'slot' });
           }
-          // (c) アーティファクト：買えるものを高いレアリティから（M3 と同じ）
+          // (d) アーティファクト：買えるものを高いレアリティから（M3 と同じ）
           for (let k = 0; k < 3; k++) {
             const as = [...document.querySelectorAll('#offer .shopcard.artcard')].filter(x => !x.classList.contains('cant'))
               .filter(x => money() - price(x) >= keep());
@@ -227,7 +245,7 @@ async function runOne(page, seed, policy) {
             M.artBuys.push({ d: day, nm });
             if (M.fills === null && after >= 3) M.fills = day;
           }
-          // (d) カード：空きがあるぶんだけ買う（takeall は M3 と同じで買えるだけ買う）
+          // (e) カード：空きがあるぶんだけ買う（takeall は M3 と同じで買えるだけ買う）
           for (let k = 0; k < 8; k++) {
             if (policy !== 'takeall' && window.__deckN() >= window.__cap()) break;
             let cs = [...document.querySelectorAll('#offer .shopcard:not(.artcard)')].filter(x => !x.classList.contains('cant'));
@@ -290,7 +308,7 @@ async function runOne(page, seed, policy) {
 
   const out = await page.evaluate(() => {
     const M = window.__M4;
-    return { spins: M.spins, days: M.days, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots,
+    return { spins: M.spins, days: M.days, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots, sauSlots: M.sauSlots,
       artBuys: M.artBuys, artSwaps: M.artSwaps, fills: M.fills,
       arts: (RUN.state().artifacts || []).slice(),
       fb: (RUN.rarityFallbacks ? RUN.rarityFallbacks().length : 0),
