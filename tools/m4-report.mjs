@@ -173,8 +173,10 @@ for (const p of POL) {
   const rs = M4[p], n = rs.length;
   const fb = rs.reduce((a, r) => a + (r.fb || 0), 0);
   const ken = rs.filter(r => (r.artBuys || []).some(b => b.nm === '献立表')).length;
+  // 3枠が埋まったかは最終所持数で見る（M.fills は random 方策では記録していないため）。
+  const filled = rs.filter(r => (r.arts || []).length >= 3).length;
   const fills = rs.map(r => r.fills).filter(x => x != null);
-  console.log(`| ${POL_JA[p]} | ${fb} / ${(fb / n).toFixed(1)} | ${ken} | ${(100 * fills.length / n).toFixed(1)}% | ${med(fills) != null ? med(fills) : '—'} | ${rs.reduce((a, r) => a + (r.artSwaps || 0), 0)} | ${rs.reduce((a, r) => a + (r.warn || 0), 0)} | ${rs.reduce((a, r) => a + (r.errs || 0), 0)} |`);
+  console.log(`| ${POL_JA[p]} | ${fb} / ${(fb / n).toFixed(1)} | ${ken} | ${(100 * filled / n).toFixed(1)}% | ${p === 'random' ? '記録なし' : (med(fills) != null ? med(fills) : '—')} | ${rs.reduce((a, r) => a + (r.artSwaps || 0), 0)} | ${rs.reduce((a, r) => a + (r.warn || 0), 0)} | ${rs.reduce((a, r) => a + (r.errs || 0), 0)} |`);
 }
 console.log('\n#### 段数とデッキ枚数のどちらが律速か（全スピン%）\n');
 console.log('| 方策 | 具材：段数律速 | 具材：デッキ律速 | 一致 | ソース：段数律速 | ソース：デッキ律速 | 一致 |');
