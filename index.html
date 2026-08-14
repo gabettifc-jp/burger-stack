@@ -260,6 +260,8 @@
   .firedlist .chip{font-size:.66rem; padding:2px 7px; border-radius:999px; background:#2b313a; border:1px solid var(--line); color:var(--text)}
   .firedlist .chip.mult{background:#3a2f20; color:#ffd98c}
   .firedlist .chip.add{background:#24303a; color:#a9d5ff}
+  .firedlist .chip.lost{background:#3a2429; color:#ffb0a0; border-color:#5a3a40}   /* Wave12：消えたカード */
+  .offer-subtitle.lost{color:#ffb0a0}                                              /* 同・店の見出しの下に出す1行 */
   .firedlist .chip .g{margin-left:4px; opacity:.6; font-size:.9em}
   /* レアリティのチップ（並/上/特上/極）。3択・店・削除一覧で使う。 */
   .rar{display:inline-block; margin-left:4px; padding:0 5px; border-radius:999px; font-weight:800; font-size:.58rem; vertical-align:middle}
@@ -1132,8 +1134,11 @@ const DEFAULTS = {
               //   distMul：軸の距離による修正。加算ではなく倍率。加算だと「1営業日目の極は基準0%なのに
               //     遠い軸なら+7されて7%になる」という破綻が起きる。倍率なら 0%×3.3=0% のまま。
               //     主軸（距離0）と遠い軸（距離1）の2行を持ち、その間は距離で線形補間する。
-              distMul: { main: { nami: 1.3, jou: 1.0, tokujou: 0.6, kiwami: 0.5 },
-                         far:  { nami: 0.7, jou: 1.0, tokujou: 1.8, kiwami: 3.3 } },
+              //   Wave12：8つすべてを ×1.0 にした（軸の距離でレアリティを動かすのをやめる）。
+              //     Wave11 まで： main 並1.3 / 上1.0 / 特上0.6 / 極0.5、far 並0.7 / 上1.0 / 特上1.8 / 極3.3。
+              //     調整欄「レアリティ：軸の距離による倍率」から元の値に戻せる（8つとも編集できる）。
+              distMul: { main: { nami: 1.0, jou: 1.0, tokujou: 1.0, kiwami: 1.0 },
+                         far:  { nami: 1.0, jou: 1.0, tokujou: 1.0, kiwami: 1.0 } },
               noneDist: 0.5,     // 無印は軸ではないので「主軸からの距離」が定義できない。中間として扱う（Wave8 §3-3）
               kiwamiMax: 0.10,   // 極の上限。距離の倍率で押し上げてもここで止める（Wave8 §3-2 手順3）
               // アーティファクトの品揃えは軸を持たないので、上の rates（軸ごとの表）を使えない。
@@ -1407,7 +1412,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 11", base: "3617327", date: "2026-08-14" };
+const BUILD = { label: "Wave 12", base: "67d8f08", date: "2026-08-14" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1779,6 +1784,38 @@ function applyBaseRewrites(stack, arr, inst, cuiMap, noriMap){
 
 /* ── 廃棄（D3）：効果によってデッキから消えること。店の取り除き（有料）は廃棄ではない（フックを走らせない）。 ── */
 let discardLog = null;   // 非nullの間、廃棄はここに積む（collect が recordSpin に渡す）。null のときは即 plog へ。
+/* ── Wave12：消えたカードをプレイヤーに見せる ──────────────────────────────
+   cause は前から記録されていたが、画面には何も出ていなかった。デッキから札が減った理由が
+   分からないのが一番のストレスなので、原因つきの1行にして出す。
+   出す先は2か所：①完成の内訳欄（#firedList・スピン中に消えたぶん）②店の見出し（営業日をまたいで消えたぶん）。
+   店の「取り除く」だけは出さない（プレイヤー自身が今その場で選んだ操作で、棚の表示がすぐ更新されるため）。 */
+let discardNotices = [];
+const DISCARD_JA = {
+  awabi:       n => `${n} があわびに食べられた`,
+  foiegras:    n => `${n} がフォアグラに吸われた`,
+  daiebi:      n => `${n} が大海老フライに廃棄された`,
+  nanbanzu:    n => `${n} が南蛮酢の代償で廃棄された`,
+  caviar:      n => `${n} がキャビアに食べられた`,
+  katsuobushi: n => `${n} がタルタルソースに破棄された`,   // cause 名は旧カードの名残（今この経路を使うのはタルタルソースだけ）
+  artifact:    n => `${n} がアーティファクトで取り除かれた`,
+};
+function noteDiscard(name, cause){
+  if (cause === "shop") return;                      // 店の取り除きは自分でやった操作なので出さない
+  const f = DISCARD_JA[cause];
+  discardNotices.push(f ? f(name) : `${name} が消えた（${cause}）`);
+}
+// 溜まっている通知を host に流し込む。asChip=true なら完成の内訳欄と同じチップで並べる。
+function flushDiscardNotices(host, asChip){
+  if (!host || !discardNotices.length) return 0;
+  const n = discardNotices.length;
+  for (const t of discardNotices){
+    const e = document.createElement(asChip ? "span" : "div");
+    e.className = asChip ? "chip lost" : "offer-subtitle lost";
+    e.textContent = t; host.appendChild(e);
+  }
+  discardNotices = [];
+  return n;
+}
 function discardInstance(inst, cause, fireHooks){
   if (!inst) return false;
   // その山の最後の1枚は廃棄しない（Wave5 4-4）。店の取り除きが既に守っている条件を、効果の廃棄にも同じく適用する。
@@ -1787,6 +1824,7 @@ function discardInstance(inst, cause, fireHooks){
   if (!removeInstanceById(inst.id)) return false;
   if (discardLog) discardLog.push({ name: inst.name, cause });
   else plog.recordRemove(inst.name, cause);
+  noteDiscard(inst.name, cause);                     // Wave12：消えた理由を画面に出すために控える
   if (fireHooks !== false){ onDiscardSelf(inst); onAnyDiscard(inst); onRareLost(inst); }   // 店の取り除きだけ false（D3）
   return true;
 }
@@ -3702,6 +3740,7 @@ function collect(){
   const boardPm = (plan && plan.inst) ? plan.inst.map(x => r2(x.pm || 0)) : []; // 同：pm
   onSpinEnd(plan ? plan.boardIds : new Set());      // ⑥スピン終了：盤面に出なかった個体（昆布・チポトレ）
   discardLog = null;
+  flushDiscardNotices($("firedList"), true);        // Wave12：このスピンで消えたカードを内訳欄に並べる
   renderPiles(); renderAxisTally();                 // デッキ表示・軸内訳を更新（育ち／除外を反映）
   awaitingCollect = false;
   completedCount++; runSpins++;                     // バーガー1個 = 1スピン
@@ -4312,6 +4351,7 @@ function shopNoneN(){                                // 無印固定枠（裏メ
 }
 // Wave10：初期デッキのカードは店に並べない。絶対に買わないカードが店の枠を潰すのはストレスになる。
 //   3択には元から出ない（AXES に "none" が無いので無印は3択の対象外）。店だけの対応でよい。
+const uniq = arr => arr.filter((x, i) => arr.indexOf(x) === i);   // Wave12：同じ名前を1つに畳む
 const SHOP_EXCLUDE = ["パティ","チーズ","きゅうり","ケチャップ"];
 const shopPool = arr => arr.filter(n => SHOP_EXCLUDE.indexOf(n) < 0);
 function rerollStock(){
@@ -4327,10 +4367,15 @@ function rerollStock(){
   let stock = axis.concat(none);                                       // 無印枠は末尾にまとめる（固定枠だと分かるように）
   // 予約帳：前の営業日に買わなかったカードを先に並べる（重複は落とす）。
   if (shopKeepStock && shopKeepStock.length){
-    const keep = shopKeepStock.filter(nm => CONFIG.items[nm]);
+    const keep = uniq(shopKeepStock.filter(nm => CONFIG.items[nm]));
     stock = keep.concat(stock.filter(nm => keep.indexOf(nm) < 0)).slice(0, Math.max(nCards, keep.length));
     shopKeepStock = null;
   }
+  // Wave12：1回の品揃えの中で同じカードを2度並べない。
+  //   現状の経路（sampleWeighted も guaranteedPicks も非復元・無印枠と軸枠は素が別）では重複しないことを
+  //   10,560回の品揃えで確認済みだが、予約帳の持ち越しや将来の枠追加で崩れうるので、ここで保証しておく。
+  //   切り詰めより先に落とすので、棚の枚数は減らない。
+  stock = uniq(stock);
   shopStock = stock;
   if (artPendingFix && artPendingFix.kind === "shop") artPendingFix = null;   // 使い切りの効果はこの1回で終わり
   rerollArtifacts();
@@ -4340,6 +4385,7 @@ function showShop(){
   if (!shopStock) rerollStock();
   offerEl.innerHTML = "";
   offerEl.appendChild(el("offer-title", `店（所持金 ¥${money}）　残った所持金で買い物`));
+  flushDiscardNotices(offerEl, false);              // Wave12：営業日をまたぐときに消えたカード（大海老フライ・南蛮酢 等）
   const row = document.createElement("div"); row.className = "offer-cards";
   for (const name of shopStock){
     const it = CONFIG.items[name]; const cost = cardPriceOf(name); const aff = money >= cost;
@@ -4688,6 +4734,7 @@ function resetRun(){
   // Wave11：アーティファクトを先に空にする。resetBuns() は bunCap() ぶん枠を埋めるので、
   //   ここが後だと**前のランのアーティファクト**で新しいランの枠数が決まってしまう（D1 §1-2）。
   artifactsOwned = [];
+  discardNotices = [];                               // Wave12：前のランの「消えた」通知を持ち越さない
   restoreDefaultDeck(); resetBuns(); rollDayAxis();  // バンズの4枠も作り直す（Wave7 Step4）／マッシュルームの指定軸を1回引く
   pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
