@@ -114,6 +114,7 @@ async function runOne(page, seed, policy) {
     window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
     window.__perCard = perCardHits; window.__botRand = botRand; window.__rngState = seed * 7919;
     CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
+    if (RUN.plogDetail) RUN.plogDetail(false);   // Wave13：スピンごとの盤面・内訳はプレイログに残さない（測定では要らない・JSON が膨らむ）
     RUN.setPendingSeed(seed); RUN.reset();
     CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
     CONFIG.params.run.dayGoal = days;
