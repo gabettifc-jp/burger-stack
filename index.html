@@ -254,8 +254,7 @@
   body.shopping #firedList, body.shopping .modes, body.shopping #runStatus{display:none}
   .shop-head{display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
              padding:6px 10px 8px; border-bottom:1px solid var(--line); margin-bottom:4px}
-  .shop-head .sh-k{font-size:1.05rem; font-weight:900; letter-spacing:.06em}
-  .shop-head .sh-d{font-size:.66rem; color:var(--muted); margin-top:1px}
+  .shop-head .sh-k{font-size:1.05rem; font-weight:900; letter-spacing:.06em; text-align:left; margin:0}
   .shop-head .sh-r{text-align:right}
   .shop-head .sh-money{font-size:.8rem; color:var(--text); font-weight:700}
   .shop-head .sh-money b{font-size:1.15rem; color:#ffd98c; font-weight:900}
@@ -4572,7 +4571,9 @@ function showShop(){
   // Wave15：店の見出し。所持金を大きく、次の家賃を並べて出す（買うかどうかはこの2つで決まる）。
   {
     const head = document.createElement("div"); head.className = "shop-head";
-    head.innerHTML = `<div class="sh-l"><div class="sh-k">店</div><div class="sh-d">${daysSurvived + 1}営業日目</div></div>`
+    // 見出しの語は他の画面と同じ .offer-title で出す（どの画面かをこのクラスで判別する作りになっている。
+    //   測定ハーネスもここを読む）。見た目だけ店用に組み替え、画面の識別方法は変えない。
+    head.innerHTML = `<div class="sh-l"><div class="sh-k offer-title">店（${daysSurvived + 1}営業日目）</div></div>`
                    + `<div class="sh-r"><div class="sh-money">所持金 <b>¥${Math.round(money).toLocaleString()}</b></div>`
                    + `<div class="sh-rent">次の家賃 ¥${rentDue().toLocaleString()}</div></div>`;
     offerEl.appendChild(head);
