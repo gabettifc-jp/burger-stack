@@ -249,6 +249,25 @@
   .gb-label{font-size:.7rem; color:#e8c98a; font-weight:700; letter-spacing:.02em}
   .goalbanner.paid .gb-label{color:#9fe6bd}
   .gb-day{font-size:.66rem; color:var(--muted); margin-top:2px}
+  /* Wave15：店は「買うものを選ぶ画面」にする。売値・得点の内訳・操作モードは店では隠す。 */
+  body.shopping .scorehead, body.shopping .breakdown4, body.shopping #comboList,
+  body.shopping #firedList, body.shopping .modes, body.shopping #runStatus{display:none}
+  .shop-head{display:flex; align-items:flex-end; justify-content:space-between; gap:10px;
+             padding:6px 10px 8px; border-bottom:1px solid var(--line); margin-bottom:4px}
+  .shop-head .sh-k{font-size:1.05rem; font-weight:900; letter-spacing:.06em}
+  .shop-head .sh-d{font-size:.66rem; color:var(--muted); margin-top:1px}
+  .shop-head .sh-r{text-align:right}
+  .shop-head .sh-money{font-size:.8rem; color:var(--text); font-weight:700}
+  .shop-head .sh-money b{font-size:1.15rem; color:#ffd98c; font-weight:900}
+  .shop-head .sh-rent{font-size:.68rem; color:#ffb0a0; margin-top:2px; font-weight:700}
+  /* Wave15：デッキ一覧の行タップで開く効果文 */
+  .pile .row.tappable{cursor:pointer}
+  .pile .rowdet{display:none}
+  .pile .rowdet.open{display:block; margin:-2px 0 6px 4px; padding:5px 8px; border-left:2px solid var(--line); background:#20262e; border-radius:0 8px 8px 0}
+  .pile .rowdet .ef{font-size:.72rem; color:var(--text); line-height:1.35}
+  .pile .rowdet .nowv{font-size:.68rem; color:#ffd98c; margin-top:3px; font-weight:700}
+  .gb-money{font-size:.78rem; color:var(--text); margin-top:4px; font-weight:700}
+  .gb-money b{color:#ffd98c; font-weight:900}
   .gb-right{text-align:right}
   .gb-amount{font-size:1.9rem; font-weight:900; line-height:1; color:#ffd98c}
   .goalbanner.paid .gb-amount{color:#9fe6bd}
@@ -639,7 +658,9 @@
   <!-- 1. バーガー表示 -->
   <!-- 目標（次の家賃）を常に大きく表示（item3・Balatroのブラインド要求点のように目立たせる）。 -->
   <div id="goalBanner" class="goalbanner">
-    <div class="gb-left"><div class="gb-label">次の家賃（目標）</div><div class="gb-day" id="goalDay"></div></div>
+    <div class="gb-left"><div class="gb-label">次の家賃（目標）</div><div class="gb-day" id="goalDay"></div>
+      <!-- Wave15：所持金がどこにも出ていなかった。次のノルマと同じ場所に置く（判断はこの2つを見比べて決まる）。 -->
+      <div class="gb-money">所持金 <b id="gbMoney">¥0</b></div></div>
     <div class="gb-right"><div class="gb-amount">¥<span id="goalAmount">0</span></div><div class="gb-need" id="goalNeed"></div></div>
   </div>
 
@@ -3932,9 +3953,12 @@ function startOfferQueue(q){
   showNextOffer();
 }
 function showNextOffer(){
-  if (!offerQueue.length){ offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = ""; resetBurger(); return; }
+  if (!offerQueue.length){ offering = false; offerEl.classList.remove("show"); offerEl.innerHTML = "";
+    document.body.classList.remove("shopping"); resetBurger(); return; }
   offering = true;
   const kind = offerQueue[0];
+  // Wave15：店を開いている間は「買うものを選ぶ画面」にする。売値・得点の内訳・操作モードは店では要らない。
+  document.body.classList.toggle("shopping", kind === "shop");
   if (kind === "rent") showRent();
   else if (kind === "shop") showShop();
   else if (kind === "bun") showBunOffer();
@@ -4545,8 +4569,16 @@ function showShop(){
   const sh = CONFIG.params.shop || {};
   if (!shopStock) rerollStock();
   offerEl.innerHTML = "";
-  offerEl.appendChild(el("offer-title", `店（所持金 ¥${money}）　残った所持金で買い物`));
+  // Wave15：店の見出し。所持金を大きく、次の家賃を並べて出す（買うかどうかはこの2つで決まる）。
+  {
+    const head = document.createElement("div"); head.className = "shop-head";
+    head.innerHTML = `<div class="sh-l"><div class="sh-k">店</div><div class="sh-d">${daysSurvived + 1}営業日目</div></div>`
+                   + `<div class="sh-r"><div class="sh-money">所持金 <b>¥${Math.round(money).toLocaleString()}</b></div>`
+                   + `<div class="sh-rent">次の家賃 ¥${rentDue().toLocaleString()}</div></div>`;
+    offerEl.appendChild(head);
+  }
   flushDiscardNotices(offerEl, false);              // Wave12：営業日をまたぐときに消えたカード（大海老フライ・南蛮酢 等）
+  offerEl.appendChild(el("offer-subtitle", "カード"));
   const row = document.createElement("div"); row.className = "offer-cards";
   for (const name of shopStock){
     const it = CONFIG.items[name]; const cost = cardPriceOf(name); const aff = money >= cost;
@@ -4593,6 +4625,7 @@ function showShop(){
     }
     offerEl.appendChild(owned);
   }
+  offerEl.appendChild(el("offer-subtitle", "枠と手入れ"));
   const acts = document.createElement("div"); acts.className = "shop-acts";
   const mkbtn = (label, cost, fn, aff, note) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
     b.innerHTML = `${label}` + (note ? `<span class="reason">${note}</span>` : "") + (cost != null ? `<span class="price">¥${cost}</span>` : "");
@@ -4930,7 +4963,8 @@ function updateGoalBanner(){
   gb.style.display = "";
   const due = rentDue(), every = effRentEvery();
   const toRent = (every - (runSpins % every)) % every; const nspin = toRent === 0 ? every : toRent;
-  const gA = $("goalAmount"), gN = $("goalNeed"), gD = $("goalDay");
+  const gA = $("goalAmount"), gN = $("goalNeed"), gD = $("goalDay"), gM = $("gbMoney");
+  if (gM) gM.textContent = "¥" + Math.round(money).toLocaleString();   // Wave15：所持金（判定に使う論理値のほう）
   if (gA) gA.textContent = due;
   if (gD) gD.textContent = `${daysSurvived + 1}営業日目・あと${nspin}スピン`;
   const short = due - money;                          // 現在いくら足りないか（真の所持金で判定）
@@ -4989,7 +5023,8 @@ function coinArrive(cid, scoreAfter, delta, pitchSemi, thick, sound){
   if (sound) Sound.coinChink(pitchSemi, thick);      // 着弾ごとに音（到達音程の上で連鎖上昇）
 }
 // 所持金の表示更新。snap=true のときだけ着弾の跳ねを出す。金額が減った時は表示を即真値へ。
-function refreshMoney(bounce){ if (!cumTotalEl) return; cumTotalEl.textContent = moneyShown; if (bounce) numBounce(cumTotalEl); }
+function refreshMoney(bounce){ if (!cumTotalEl) return; cumTotalEl.textContent = moneyShown; if (bounce) numBounce(cumTotalEl);
+  updateGoalBanner(); }   // Wave15：ノルマの帯にも所持金を出しているので、コインが着くたびに一緒に更新する
 function setMoney(v){ money = Math.max(0, Math.round(v)); moneyShown = money; refreshMoney(false); updateGoalBanner(); }   // 家賃・買い物で即時に増減
 function launchCoin(fx, fy, tx, ty, dur, arc, onArrive){
   if (reduced || !coinLayerEl){ if (onArrive) onArrive(); return; }             // reduced：飛ばさず着弾処理だけ
@@ -5119,13 +5154,29 @@ function renderPiles(){
       const pms = instancesOf(n).map(x => x.pm || 0).filter(v => v > 0);              // 個体ごとの pm（Wave4）
       const pmTag = pms.length ? `<span class="pm-inline">${pms.map(v=>"×"+r2(1+v)).join("・")}</span>` : "";
       row.innerHTML = `<span class="nm">${n}</span>${cui}${tag}<span class="tag">基礎${it.base}</span>${growTag}${pbTag}${pmTag}`;
+      // Wave15：取ったカードの効果を後から読む場所が無かった。行をタップすると効果文と、いまの値を開く。
+      //   pb / pm は個体ごとに違うので、個体1つずつ「印字＋pb」「×(1+pm)」を並べる（上のバッジと同じ値）。
+      row.classList.add("tappable");
+      const det = document.createElement("div"); det.className = "rowdet";
+      row.addEventListener("click", (ev) => {
+        if (ev.target.closest(".stepper")) return;     // ＋／− は今までどおり
+        if (det.classList.toggle("open")){
+          const insts = instancesOf(n);
+          const now = insts.map((x, k) => {
+            const b1 = it.base + (x.pb || 0);
+            return `${insts.length > 1 ? (k + 1) + "枚目 " : ""}第1項 ${b1}` + ((x.pm || 0) > 0 ? ` ／ 倍率 ×${r2(1 + x.pm)}` : "");
+          });
+          det.innerHTML = `<div class="ef">${effectText(n) || "効果なし"}</div>`
+                        + (now.length ? `<div class="nowv">${now.join("　｜　")}</div>` : "");
+        } else det.innerHTML = "";
+      });
       const st = document.createElement("div"); st.className = "stepper";
       const minus = document.createElement("button"); minus.textContent = "−";
       const c = document.createElement("span"); c.className = "c"; c.textContent = it.count;
       const plus = document.createElement("button"); plus.textContent = "＋";
       minus.onclick = () => { removeOneByName(n); renderPiles(); };   // 個体を1つ減らす（同名なら最も育っていない個体）
       plus.onclick  = () => { addInstance(n, 0); renderPiles(); };     // 育ち0の個体を1つ足す
-      st.append(minus, c, plus); row.appendChild(st); box.appendChild(row);
+      st.append(minus, c, plus); row.appendChild(st); box.appendChild(row); box.appendChild(det);
     }
     host.appendChild(box);
   }
