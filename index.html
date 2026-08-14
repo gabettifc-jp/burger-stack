@@ -711,9 +711,10 @@
       <div id="settings"></div>
       <div class="btnrow">
         <button id="resetCfg">数値を初期化</button>
+        <button id="clearCfg">保存した設定を消す</button>
         <button id="clearHist">履歴をクリア</button>
       </div>
-      <p class="barnote">※ 変更は次に作るバーガーから反映。保存はしない（リロードで初期化）。</p>
+      <p class="barnote">※ 変更は次に作るバーガーから反映。<b>調整欄の値はこの端末に保存され、リロードしても残る。</b>「数値を初期化」は既定に戻してランもやり直す。「保存した設定を消す」は保存を捨てて既定に戻すだけで、遊んでいるランは続く。</p>
     </details>
   </section>
 
@@ -1210,12 +1211,13 @@ const catalogNames = () => {                     // 全カード名。ORDER の�
 };
 // CONFIG.buns の30種を、描画と評価が読めるように CONFIG.items にも登録する（bunOnly＝カードではない印）。
 //   ゴマバンズは items に元から居るので基礎点を0に揃えるだけ。
-function installBunItems(){
-  for (const nm of Object.keys(CONFIG.buns)){
-    const b = CONFIG.buns[nm];
-    if (CONFIG.items[nm]){ CONFIG.items[nm].base = b.base || 0; CONFIG.items[nm].count = 0; continue; }
-    CONFIG.items[nm] = { pile:"bun", type:"bun", cuisine:"none", base:b.base || 0, count:0,
-                         tier:null, rar:"nami", weight:0, effect:{ id:null }, ph:true, bunOnly:true };
+function installBunItems(target){
+  const C = target || CONFIG;                        // Wave14：比較用の素の CONFIG にも同じ登録をかけられるように
+  for (const nm of Object.keys(C.buns)){
+    const b = C.buns[nm];
+    if (C.items[nm]){ C.items[nm].base = b.base || 0; C.items[nm].count = 0; continue; }
+    C.items[nm] = { pile:"bun", type:"bun", cuisine:"none", base:b.base || 0, count:0,
+                    tier:null, rar:"nami", weight:0, effect:{ id:null }, ph:true, bunOnly:true };
   }
 }
 
@@ -1223,6 +1225,63 @@ let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
 installBunItems();        // バンズ30種を items に登録（描画・評価から読めるように）
 window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れるように公開（リセット時に貼り替え）
+
+/* ── Wave14：調整欄の設定を localStorage に残す ──────────────────────────────
+   保存するのは**既定（DEFAULTS＋バンズ登録）との差分だけ**。CONFIG を丸ごと保存すると、
+   あとでカードやアーティファクトを足したときに古い写しが新しい既定を隠してしまう。
+   ランの状態は保存しない。CONFIG の中で「遊んでいる間に動く」のは次の2つだけなので、差分から外す。
+     ・params.tiers（具材枠／ソース枠：店で買うと増える。ラン開始時に DEFAULTS へ戻る）
+     ・items[*].count（デッキの枚数：syncCounts が deck から書き戻している）
+   配列（rentByDay・progress・sauceSlotPrices 等）は中身を1つずつではなく丸ごと1つの値として扱う。 */
+const K_CFG = "bstack.cfg.v1";
+const CFG_SKIP = [["params","tiers"]];               // まるごと保存しない枝
+function cfgRef(){ const c = fresh(); installBunItems(c); return c; }   // 比較の基準（素の設定）
+function cfgDiff(cur, ref, path){
+  path = path || [];
+  if (Array.isArray(cur) || Array.isArray(ref)) return JSON.stringify(cur) === JSON.stringify(ref) ? undefined : cur;
+  if (cur === null || typeof cur !== "object" || ref === null || typeof ref !== "object")
+    return cur === ref ? undefined : cur;
+  const out = {};
+  for (const k of Object.keys(cur)){
+    const p = path.concat(k);
+    if (CFG_SKIP.some(sk => sk.length <= p.length && sk.every((x, i) => x === p[i]))) continue;
+    if (p.length === 3 && p[0] === "items" && p[2] === "count") continue;   // デッキ枚数はランの状態
+    const d = cfgDiff(cur[k], Object.prototype.hasOwnProperty.call(ref, k) ? ref[k] : undefined, p);
+    if (d !== undefined) out[k] = d;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function cfgApply(dst, src){
+  if (!src || typeof src !== "object") return;
+  for (const k of Object.keys(src)){
+    const v = src[k];
+    if (v !== null && typeof v === "object" && !Array.isArray(v) && dst[k] !== null && typeof dst[k] === "object" && !Array.isArray(dst[k])) cfgApply(dst[k], v);
+    else dst[k] = (v !== null && typeof v === "object") ? JSON.parse(JSON.stringify(v)) : v;
+  }
+}
+let cfgSaveTimer = null;
+function saveCfg(){
+  try {
+    const d = cfgDiff(CONFIG, cfgRef());
+    if (d) localStorage.setItem(K_CFG, JSON.stringify(d)); else localStorage.removeItem(K_CFG);
+  } catch(e){}
+}
+function scheduleSaveCfg(){ clearTimeout(cfgSaveTimer); cfgSaveTimer = setTimeout(saveCfg, 250); }
+// 保存されている差分を、いまの CONFIG を作り直したうえで載せる。ランの状態（枠・枚数）は持ち越す。
+function rebuildConfig(diff){
+  const tiers = { ingredients: CONFIG.params.tiers.ingredients, sauces: CONFIG.params.tiers.sauces };
+  const counts = {}; for (const nm of Object.keys(CONFIG.items)) counts[nm] = CONFIG.items[nm].count;
+  CONFIG = fresh(); installBunItems();
+  if (diff) cfgApply(CONFIG, diff);
+  CONFIG.params.tiers.ingredients = tiers.ingredients; CONFIG.params.tiers.sauces = tiers.sauces;
+  for (const nm of Object.keys(counts)) if (CONFIG.items[nm]) CONFIG.items[nm].count = counts[nm];
+  window.CONFIG = CONFIG;
+}
+function clearSavedCfg(){ try { localStorage.removeItem(K_CFG); } catch(e){} }
+{ let saved = null;                                  // 起動時：保存されていれば載せる
+  try { const t = localStorage.getItem(K_CFG); if (t) saved = JSON.parse(t); } catch(e){}
+  if (saved) cfgApply(CONFIG, saved);
+}
 
 /* =========================================================================
    効果音（Web Audio API・コード生成。音声ファイルは使わない＝素材権利を持ち込まない）
@@ -1412,7 +1471,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 13", base: "67d8f08", date: "2026-08-14" };
+const BUILD = { label: "Wave 14", base: "67d8f08", date: "2026-08-14" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -5113,6 +5172,11 @@ function textInput(get, set){
 }
 function renderSettings(){
   const host = $("settings"); host.innerHTML = "";
+  // Wave14：調整欄の入力が動いたら差分を保存する。入力欄は数百あるので、setter を1つずつ包まずに
+  //   入れ物で拾う（input/change はここまで上がってくる）。250ms まとめて1回書く。
+  if (!host.dataset.cfgWatch){ host.dataset.cfgWatch = "1";
+    host.addEventListener("input",  scheduleSaveCfg);
+    host.addEventListener("change", scheduleSaveCfg); }
   // 分類：それぞれ折りたためる（<details>）。既定はすべて閉じた状態。group() は第2引数の分類に入る。
   const cats = {};
   const CATS = [["run","進行（ラン・家賃・店・3択）"], ["board","盤面（段数・傾斜）"], ["cards","カードの数値（基礎点・各カードの効果）"],
@@ -5540,7 +5604,15 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
   if (mode === "ignore") wantDrop = revealed;  // 無視に切替えたら未処理の予約は破棄
   updateProgress();
 }));
-$("resetCfg").addEventListener("click", () => { CONFIG = fresh(); installBunItems(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
+// 数値を初期化：既定に戻し、保存も消して、ランもやり直す（Wave14 で「保存も消す」を足した。
+//   保存が残っていると、リロードでおかしな値が戻ってきて「初期化した」ことにならないため）。
+$("resetCfg").addEventListener("click", () => { clearSavedCfg(); CONFIG = fresh(); installBunItems(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
+// 保存した設定を消す：保存を捨てて既定に戻すだけ。**遊んでいるランは続ける**（枠と枚数は持ち越す）。
+//   おかしな値を入れてしまったときに、ランを捨てずに戻すための口。
+$("clearCfg").addEventListener("click", () => {
+  clearSavedCfg(); rebuildConfig(null); syncCounts();
+  renderSettings(); renderPiles(); renderAxisTally(); updateProgress(); updateRunStatus(); renderBunView();
+});
 $("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; resetBuns(); pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0; artAxis = {}; artFirstAxis = null; artDayAxis = null; artPendingFix = null; artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
@@ -5605,7 +5677,10 @@ const plog = (function(){
     cur.summary.spins = cur.spins.length; cur.summary.finalCum = cumScore;
     cur.summary.mainAxis = mainAxisOf(dk.byAxis);
     cur.summary.finalTiers = cur.spins.length ? cur.spins[cur.spins.length - 1].tiers : 0;
-    cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk; }
+    cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk;
+    // Wave14：settings は newRun() のとき1回だけ撮っていたので、ラン中に調整欄を触ると記録と実態がずれた。
+    //   ここで撮り直すと「そのランで最後に使われた設定」が残る（開始時の写しは残らない）。
+    cur.summary.settings = settingsSnap(); }
   // ランの頭に残す設定の写し（Wave5 4-2）。あとで「どの設定で遊んだログか」を突き合わせるため。
   function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
     return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
