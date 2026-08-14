@@ -261,6 +261,19 @@
   .firedlist .chip.mult{background:#3a2f20; color:#ffd98c}
   .firedlist .chip.add{background:#24303a; color:#a9d5ff}
   .firedlist .chip.lost{background:#3a2429; color:#ffb0a0; border-color:#5a3a40}   /* Wave12：消えたカード */
+  /* Wave15：内訳を2段（カード別／効果）にして、盤面と結びつける */
+  .firedlist{flex-direction:column; align-items:stretch}
+  .fl-row{display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin:2px 0}
+  .fl-lbl{font-size:.6rem; color:var(--muted); font-weight:800; letter-spacing:.04em; min-width:3.6em}
+  .firedlist .chip.card{background:#232a33; border-color:#3a4450; color:var(--text); cursor:pointer}
+  .firedlist .chip.card b{font-weight:800}
+  .firedlist .chip.card .cb{opacity:.8; margin-left:4px}
+  .firedlist .chip.card.bun{background:#2f2a22; border-color:#4a4133}
+  .firedlist .chip.card.quiet{opacity:.55}
+  .firedlist .chip.picked{outline:1px solid var(--accent)}
+  .firedlist .chip.dim{opacity:.28}
+  .tier.focus{filter:drop-shadow(0 0 6px var(--accent)) brightness(1.15)}
+  .tier.dim{opacity:.35}
   .offer-subtitle.lost{color:#ffb0a0}                                              /* 同・店の見出しの下に出す1行 */
   .firedlist .chip .g{margin-left:4px; opacity:.6; font-size:.9em}
   /* レアリティのチップ（並/上/特上/極）。3択・店・削除一覧で使う。 */
@@ -1030,6 +1043,9 @@ const DEFAULTS = {
       // 徐々に上がる（跨いだ瞬間だけ上げない）。curve=強度カーブ / stages=段階数（増やせる）。
       //   linear(直線) / exp(下は緩く上で急) / log(下で一気・上は緩やか) / smooth(S字：両端緩やか)。既定は log。
       scaling:   { curve:"log", stages:5 },
+      // Wave15：発動したカードの名前を右上に短く出す（「演出が何の演出か分からない」への対応）。
+      //   バーガーの上に数字を飛ばす方式は Wave6 で撤回しているので、そこには戻さず、名前だけを別枠に出す。
+      hitFeed:   { on:true, life:1.6, max:4 },
       particles: { on:true, count:22, scale:1.4, speed:150, life:1.0, gravity:360, spread:0.75, max:800 }, // 文字を減らした分、密度は破片で確保。maxは総数上限（〜2000）
       hitstop:   { on:true, base:0.03, scale:1.35 },   // 大コンボ/帯上昇で画面停止 base×scale^L 秒（上限0.45s）
       trail:     { on:true, base:0.35, scale:1.25 },   // 落下段の残像（尾）の濃さ
@@ -1471,7 +1487,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 14", base: "67d8f08", date: "2026-08-14" };
+const BUILD = { label: "Wave 15", base: "67d8f08", date: "2026-08-14" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -2771,8 +2787,10 @@ function applyBunLayer(stack, acc, baseArr, boardBuns){
     }
     if (n) acc.hits.push({ label:"見立てのバンズ：不発だった" + n + "枚を半分で発動扱い", effect:(gotAdd?"+"+gotAdd:"") + (gotMult!==1?" ×"+r2(gotMult):""), idx:bIdx.slice(), kind:"note", bun:true });
   }
-  // 各バンズの倍率・加算
-  const res = actors.map(b => ({ b, r: bunOneEffect(b, ctx, actors.find(x => x !== b) || null) }));
+  // 各バンズの倍率・加算。Wave15：盤面のどのバンズかを src（stack の添字）で持たせ、具材・ソースと同じ形にする。
+  //   全部乗せのバンズ（allFour）だけは盤面に出ていない枠も actors に入るので、そのぶんは src を付けない。
+  const res = actors.map((b, k) => ({ b, k, src: (!allFour && bIdx[k] != null) ? bIdx[k] : null,
+                                      r: bunOneEffect(b, ctx, actors.find(x => x !== b) || null) }));
   // #25 写しのバンズ：もう1枚の効果をもう一度適用する（倍率は2乗・加算は2倍）。
   for (const x of res){
     if (bunEff(x.b.name).id !== "bunOtherTwice") continue;
@@ -2791,7 +2809,7 @@ function applyBunLayer(stack, acc, baseArr, boardBuns){
     if (m !== 1 || x.r.add !== 0)
       acc.hits.push({ label:"バンズ " + x.r.label + (pow !== 1 ? "（0.6乗）" : ""),
                       effect:(m !== 1 ? "×" + r2(m) : "") + (x.r.add ? (m !== 1 ? " " : "") + "+" + x.r.add : ""),
-                      idx:bIdx.slice(), kind:"mult", mult:m, bun:true });
+                      idx:bIdx.slice(), kind:"mult", mult:m, add:(x.r.add || 0), bun:true, src:x.src });
   }
   acc.mult *= out.mult; acc.add += out.add;
   return out;
@@ -2956,6 +2974,9 @@ function makeTier(name, i){
   const pos = posOf(i, stack.length);
   const tier = document.createElement("div");
   tier.className = "tier";
+  tier.dataset.i = String(i);                        // Wave15：内訳と結びつけるための盤面の位置
+  // 完成して止まっている間だけ、盤面のカードをタップするとそのカードの内訳に絞れる。
+  tier.addEventListener("click", (ev) => { if (!awaitingCollect) return; ev.stopPropagation(); focusCard(i); });
   const food = document.createElement("div");
   food.className = "food";
   const it = CONFIG.items[name];
@@ -3170,29 +3191,94 @@ function buildPlan(){
 }
 
 const GRADE_JA = ["小","中","大"];
+/* ── Wave15：得点の内訳を盤面と結びつけて見せる ─────────────────────────────
+   手プレイで最も多かった不満が「何が起きたか分からない」だった。データ（acc.hits）は前からあるので、
+   見せ方だけを変える。内訳欄を2段にする。
+     上段「カード別」：盤面の1枚に1チップ。基礎点・加算の合計・乗算の積・打点を**必ず**出す。
+       ここが要点で、**倍率が ×1.00 でもチップが出る**。フォンドヴォーのようにデッキ枚数で倍率が決まる
+       カードは、これまで ×1 のとき hit が作られず画面に何も出なかった（「弱い気がする」の正体）。
+     下段「効果の明細」：これまでどおり発動した効果のチップ。
+   上段のチップ／盤面のカードをタップすると、そのカードだけに絞って盤面が光る（もう一度で戻る）。
+   バンズも同じ1チップにする。ただしバンズの倍率はバーガー全体に掛かるので「全体 ×M」と書き分ける。 */
+let focusIdx = null;                                 // いま絞り込んでいる盤面の位置（null＝絞っていない）
+// 1枚ぶんの内訳。src がその位置のヒットだけを集める（打点＝(40+第1項+加算)×乗算−40）。
+function cardBreakAt(i){
+  const sc = (plan && plan.sc) ? plan.sc : null; if (!sc) return null;
+  const base = (sc.baseArr || [])[i] || 0;
+  let add = 0, mul = 1, n = 0;
+  for (const h of (sc.hits || [])){
+    if (h.src !== i || h.disabled) continue;
+    if (h.kind === "add") { add += (h.add || 0); n++; }
+    else if (h.kind === "mult") { mul *= (h.mult || 1); n++; }
+  }
+  return { base, add, mul, n, dmg: Math.round((40 + base + add) * mul - 40) };
+}
+function focusCard(i){
+  focusIdx = (focusIdx === i) ? null : i;
+  for (let r = 0; r < (tierEls ? tierEls.length : 0); r++){
+    const el = tierEls[r]; if (!el) continue;
+    el.classList.toggle("focus", focusIdx != null && r === focusIdx);
+    el.classList.toggle("dim",   focusIdx != null && r !== focusIdx);
+  }
+  const host = $("firedList"); if (!host) return;
+  for (const c of host.querySelectorAll(".chip")){
+    const src = c.dataset.src == null ? null : +c.dataset.src;
+    c.classList.toggle("dim", focusIdx != null && src !== focusIdx);
+    c.classList.toggle("picked", focusIdx != null && src === focusIdx);
+  }
+}
 // 発動したカードと効果のチップを並べる（item13：完成して止まっている間に読ませる）。firedList=停止中の内訳欄。
 function showFiredCards(sc){
   const host = $("firedList") || firedRules; if (!host) return;
-  host.innerHTML = "";
+  host.innerHTML = ""; focusIdx = null;
+  const st = (plan && plan.stack) ? plan.stack : [];
+  // ── 上段：カード別（盤面の下から順・バンズも含める）──
+  if (st.length){
+    const row = document.createElement("div"); row.className = "fl-row";
+    const lb = document.createElement("span"); lb.className = "fl-lbl"; lb.textContent = "カード別";
+    row.appendChild(lb);
+    for (let i = 0; i < st.length; i++){
+      const it = CONFIG.items[st[i]] || {}, br = cardBreakAt(i); if (!br) continue;
+      const isBun = it.pile === "bun";
+      const c = document.createElement("span");
+      c.className = "chip card" + (isBun ? " bun" : "") + (br.n === 0 ? " quiet" : "");
+      c.dataset.src = String(i);
+      const parts = [`基礎${br.base}`];
+      if (br.add !== 0) parts.push((br.add > 0 ? "+" : "") + br.add);
+      if (isBun) { if (br.mul !== 1) parts.push("全体×" + r2(br.mul)); }
+      else { parts.push("×" + r2(br.mul)); parts.push("打点" + br.dmg); }
+      c.innerHTML = `<b>${st[i]}</b> <span class="cb">${parts.join("　")}</span>`;
+      c.addEventListener("click", () => focusCard(i));
+      row.appendChild(c);
+    }
+    host.appendChild(row);
+  }
+  // ── 下段：効果の明細（これまでのチップ）──
+  const row2 = document.createElement("div"); row2.className = "fl-row";
+  const lb2 = document.createElement("span"); lb2.className = "fl-lbl"; lb2.textContent = "効果";
+  row2.appendChild(lb2);
   if (sc.comboMult && sc.comboMult !== 1){
     const c = document.createElement("span"); c.className = "chip mult";
     c.textContent = `コンボ数ボーナス ×${sc.comboMult.toFixed(2)}（${sc.comboCount}件）`;
-    host.appendChild(c);
+    row2.appendChild(c);
   }
   if (sc.hits.length === 0){
     const c = document.createElement("span"); c.className = "chip"; c.textContent = "コンボなし（基礎点のみ）";
-    host.appendChild(c);
+    row2.appendChild(c);
   } else {
     sc.hits.forEach((h, i) => {
       const c = document.createElement("span");
-      c.className = "chip " + h.kind;
+      c.className = "chip " + h.kind + (h.bun ? " bun" : "");
+      if (h.src != null && h.src >= 0) c.dataset.src = String(h.src);
       const g = hitMeta[i] ? GRADE_JA[hitMeta[i].grade] : "";
       c.innerHTML = `${h.label}  ${h.effect}<span class="g">${g}</span>`;
-      host.appendChild(c);
+      if (h.src != null && h.src >= 0) c.addEventListener("click", () => focusCard(h.src));
+      row2.appendChild(c);
     });
   }
+  host.appendChild(row2);
 }
-function clearFiredCards(){ const host = $("firedList"); if (host) host.innerHTML = ""; }
+function clearFiredCards(){ const host = $("firedList"); if (host) host.innerHTML = ""; focusIdx = null; }
 function showBreakdown(sc){
   fBase.textContent  = sc.base;                       // 第1項（印字 base ＋ pb ＋ 盤面操作）
   if (fGrow) fGrow.textContent = sc.grow || 0;        // 第2項（育ち×15・醤油/出汁の修飾込み）
@@ -3519,6 +3605,20 @@ function presentHit(i){
     animTimers.push(setTimeout(() => el.classList.remove("hit","hitbig"), glowMs));
   }
   if (m.grade >= 2){ screenFlash(); cameraZoom(1); hitstop(1); }  // 大：画面反応＋カメラ寄り＋ヒットストップ
+  hitFeed(h, m.grade);                              // Wave15：いま何が発動したのかを名前で出す
+}
+/* Wave15：発動の名前を右上に短く出す。#comboFeed / .cfx は Wave6 で用意したまま使われていなかった枠。
+   数字はこれまでどおり飛ばさない（倍率は右上の累計に集約する方針を変えない）。出すのは「どのカードか」だけ。 */
+function hitFeed(h, grade){
+  const cf = (CONFIG.params.fx || {}).hitFeed || {}; if (cf.on === false || !comboFeedEl) return;
+  const nm = (h.src != null && h.src >= 0 && stack[h.src]) ? stack[h.src] : (h.label || "").split("：")[0];
+  if (!nm) return;
+  const e = document.createElement("div");
+  e.className = "cfx" + (h.kind === "add" ? " add" : "");
+  e.textContent = nm + "　" + (h.effect || "");
+  comboFeedEl.appendChild(e);
+  while (comboFeedEl.children.length > Math.max(1, Math.round(cf.max || 4))) comboFeedEl.removeChild(comboFeedEl.firstChild);
+  animTimers.push(setTimeout(() => { if (e.parentNode) e.remove(); }, Math.max(0.2, cf.life || 1.6) * 1000));
 }
 
 // 具材の隣に一瞬出す +N / ×N。バッジではなく、ただの値。位置は具材ごと、種類ごとの寿命で消える。
@@ -5467,6 +5567,11 @@ function renderSettings(){
   gridRow(g, "カーブ(linear/exp/log/S字)", selectInput(CURVES, ()=>Math.max(0,CURVES.indexOf(fx.scaling.curve)), v=>{ fx.scaling.curve=CURVES[v]; }));
   gridRow(g, "段階数(5〜。増やせる)", numInput(()=>fx.scaling.stages, v=>fx.scaling.stages=Math.max(1,Math.min(30,Math.round(v))), 1));
 
+  { const hf = CONFIG.params.fx.hitFeed || (CONFIG.params.fx.hitFeed = { on:true, life:1.6, max:4 });
+    g = group("演出：発動したカードの名前（右上に短く出す）", "fx");
+    gridRow(g, "出す", boolInput(()=>hf.on !== false, v=>hf.on=v));
+    gridRow(g, "消えるまでの秒", numInput(()=>hf.life, v=>hf.life=Math.max(0.2,v), 0.1));
+    gridRow(g, "同時に出す最大", numInput(()=>hf.max, v=>hf.max=Math.max(1,Math.round(v)), 1)); }
   g = group("演出：パーティクル（着地/コンボ/完成の破片）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.particles.on, v=>fx.particles.on=v));
   gridRow(g, "数(base)", fxNum(fx.particles,"count",1));
