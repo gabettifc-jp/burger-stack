@@ -286,7 +286,6 @@
   .firedlist .chip.card{background:#232a33; border-color:#3a4450; color:var(--text); cursor:pointer}
   .firedlist .chip.card b{font-weight:800}
   .firedlist .chip.card .cb{opacity:.8; margin-left:4px}
-  .firedlist .chip.card.bun{background:#2f2a22; border-color:#4a4133}
   .firedlist .chip.card.quiet{opacity:.55}
   .firedlist .chip.picked{outline:1px solid var(--accent)}
   .firedlist .chip.dim{opacity:.28}
@@ -625,7 +624,6 @@
   .dv-end{font-size:.66rem; font-weight:800; color:#8fd9a0; text-align:center; padding:3px; letter-spacing:.08em}
   .dv-row{display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:.72rem;
     padding:4px 6px; background:#1b1f27; border:1px solid #232833; border-radius:8px}
-  .dv-row.bun{background:#241f18; border-color:#3a3122}
   .dv-row .nm{font-weight:800; min-width:6.5em}
   .dv-row .tag{font-size:.62rem; padding:1px 6px; border-radius:999px; background:#2b313a; color:var(--muted)}
   .dv-row .w{font-size:.66rem; font-weight:800; color:#bfe3f5}
@@ -781,8 +779,6 @@
     </div>
     <div class="dv-note" id="dvNote"></div>
     <div class="dv-list" id="dvList"></div>
-    <div class="dv-note" id="bunHead"></div>
-    <div class="dv-list" id="bunList"></div>
   </div>
 </div>
 
@@ -927,8 +923,8 @@ const DEFAULTS = {
     "チポトレ": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"undrawn", pm0:0.5, per:0.15, pmMax:5.0}, ph:true },  // 盤面に出なかったスピンごとに ×0.15 ずつ育つ
     "バーベキューソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"adjSauceMultDown", per:0.5}, ph:true },  // 上下に接するソースの倍率を ×0.5 にする
     "スペシャルソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"axisKindsMult", base:1.0, per:2.0}, ph:true },  // 盤面の軸の種類1つにつき ×2.0 増し（基礎 ×1.0）
-    // ── バンズの入れ物（デッキには入らない。CONFIG.buns が本体）──
-    "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:20, count:0, tier:null, rar:"nami", effect:{id:null} },  // Wave10：効果を持たないバンズだけが基礎点を持つ（バンズにおける並の定義）。他29種は0のまま
+    // ── バンズの入れ物（デッキには入らない。Wave17：得点に関与しない絵だけの存在）──
+    "ゴマバンズ": { pile:"bun", type:"bun", cuisine:"none", base:0, count:0, tier:null, rar:"nami", effect:{id:null} },  // Wave17：得点計算に関与しない。盤面の上下に置く絵だけの入れ物（基礎点0・倍率なし・効果なし）
   },
   // アーティファクト（第3層・SHOKUZAI §10）。盤面の枠を使わない＝希釈しない。店で購入、所持上限まで持てる。数値は暫定・調整欄で変更可。
   //   id=効果の識別子（コード側と対応）／rar=レアリティ。効果の適用箇所：得点(applyArtifacts)・抽選・経営(家賃/店)。
@@ -957,7 +953,7 @@ const DEFAULTS = {
     "大型フライヤー":  { id:"ingNoRemove",  rar:"kiwami", ing:2 },
     // ── C. 枠（6）──
     "作業台":          { id:"ingSlot",      rar:"jou",    ing:1 },
-    "調理台":          { id:"ingSlotBun",   rar:"tokujou",ing:2, bunSlots:3 },
+    "調理台":          { id:"ingSlotBun",   rar:"tokujou",ing:2 },   // Wave17：バンズ枠を下げる副作用を撤去（具材枠+2 だけ）
     "ソース棚":        { id:"sauceFree",    rar:"jou",    n:1 },
     "寸胴鍋":          { id:"sauceOver",    rar:"kiwami", sauce:1, ing:-2 },
     "仕込み台":        { id:"ingPerDay",    rar:"tokujou",ing:1, deck:1 },
@@ -971,61 +967,12 @@ const DEFAULTS = {
     "予約帳":          { id:"shopKeep",     rar:"tokujou" },
     "値札の張り替え":  { id:"shopCheapest", rar:"jou",    once:true },
     "常連客":          { id:"streakWeight", rar:"tokujou",per:1.5 },
-    // ── E. バンズ（6）──
-    "バンズケース":    { id:"bunSlotUp",    rar:"jou",    slots:5 },
-    "二段バンズ":      { id:"bunBoardUp",   rar:"kiwami", onBoard:4, ing:-2 },
-    "のれん分け":      { id:"bunRarUp",     rar:"tokujou",mul:3 },
-    "選り好み":        { id:"bunChoice",    rar:"tokujou",n:2 },
-    "夜の仕込み":      { id:"bunSkipPush",  rar:"jou",    once:true },
-    "朝の仕込み":      { id:"bunTwice",     rar:"tokujou",n:2 },
     // ── F. 経済とラン構造（5）──
     "深夜営業":        { id:"nightshift",   rar:"kiwami", extra:2, offer:2 },
     "朝市":            { id:"shopHalfOnce", rar:"jou",    ratio:0.5, once:true },
     "常連の要求":      { id:"forcedDaily",  rar:"tokujou",ratio:0.5 },
     "前借り":          { id:"rentSkip",     rar:"tokujou",mul:2, once:true },
     "見習いの独立":    { id:"deckHalve",    rar:"kiwami", extra:2, once:true }
-  },
-  // ── バンズ（Wave7 Step4・KENTO「バンズの設計」§6 の30種＋つなぎのゴマバンズ）─────────
-  //   バンズはデッキとは別の領域（4枠）に持ち、そこから2枚が盤面に出る。軸を持たず、
-  //   デッキ枚数・命中率・軸の傾斜・カードのレアリティ抽選には一切乗らない。
-  //   基礎点は0（フィールドは残す＝後から上げられる）。倍率はバーガー全体に掛かる。
-  //   rar はバンズ専用の3段（common / rare / kyoku）。カードのレアリティとは別の抽選を使う。
-  //   数値はすべて仮。名前は KENTO に無かったので、ルールの向きから付けた（調整時に変えてよい）。
-  buns: {
-    "ゴマバンズ":         { rar:"common", base:20, mult:1.0, effect:{ id:null } },                                 // つなぎ。初期の4枠を埋める。Wave10：効果を持たないバンズだけが基礎点を持つ（バンズにおける並の定義・他29種は0のまま）
-    // ── コモン12種（KENTO #1〜#12）──
-    "ソースのバンズ":     { rar:"common", base:0, mult:1.0, effect:{ id:"bunPerSauce",        per:1.25 } },         // #1  ソース1枚ごとに ×1.25
-    "継ぎ目のバンズ":     { rar:"common", base:0, mult:1.0, effect:{ id:"bunPerDiffAdj",      per:1.15 } },         // #2  隣り合う2枚が違う軸の組ごとに ×1.15
-    "小盛りのバンズ":     { rar:"common", base:0, mult:1.2, effect:{ id:"bunPerTierUnder",    per:1.18, ref:10 } }, // #3  段が1減るごとに ×1.18（ref＝基準の段数）
-    "大盛りのバンズ":     { rar:"common", base:0, mult:1.0, effect:{ id:"bunPerTierAddAll",   per:80 } },           // #4  段1つごとに全具材 +80
-    "合わせ鏡のバンズ":   { rar:"common", base:0, mult:1.2, effect:{ id:"bunPerSymAxis",      per:1.2 } },          // #5  上下対称の位置に同じ軸があるたび ×1.2
-    "棚積みのバンズ":     { rar:"common", base:0, mult:1.2, effect:{ id:"bunPerAscAdj",       per:1.12 } },         // #6  下から上に基礎点が増えている組ごとに ×1.12
-    "寄せ集めのバンズ":   { rar:"common", base:0, mult:1.5, effect:{ id:"bunPerAxisKind",     per:1.4 } },          // #7  軸の種類が1つ増えるごとに ×1.4
-    "絞りのバンズ":       { rar:"common", base:0, mult:1.3, effect:{ id:"bunPerDeckUnder",    per:1.12, ref:12 } }, // #8  デッキ1枚減るごとに ×1.12（ref＝基準の枚数）
-    "蔵出しのバンズ":     { rar:"common", base:0, mult:1.4, effect:{ id:"bunPerUndrawn",      per:1.06 } },         // #9  引かれなかったカード1枚につき ×1.06
-    "二枚重ねのバンズ":   { rar:"common", base:0, mult:1.5, effect:{ id:"bunPerSameAdj",      per:1.2 } },          // #10 同じ軸が2枚並ぶ組ごとに ×1.2
-    "系統揃えのバンズ":   { rar:"common", base:0, mult:1.0, effect:{ id:"bunPerSameTypeAdj",  per:1.18 } },         // #11 同じ系統が2枚並ぶ組ごとに ×1.18
-    "無印嫌いのバンズ":   { rar:"common", base:0, mult:2.0, effect:{ id:"bunPerNone",         per:0.75 } },         // #12 盤面に無印がいるたび ×0.75
-    // ── レア15種（KENTO #13〜#27）──
-    "散らしのバンズ":     { rar:"rare",   base:0, mult:3.0, effect:{ id:"bunPerSameAdjDown",  per:0.92 } },         // #13 同じ軸が連続するたび −8%
-    "ソース抜きのバンズ": { rar:"rare",   base:0, mult:4.0, effect:{ id:"bunPerSauceDown",    per:0.5, min:0.1 } }, // #14 ソース1枚ごとに −0.5
-    "一点物のバンズ":     { rar:"rare",   base:0, mult:2.5, effect:{ id:"bunPerDupDown",      per:0.88 } },         // #15 同じカードの重複1組につき −12%
-    "型どりのバンズ":     { rar:"rare",   base:0, mult:2.0, effect:{ id:"bunPerSlotGap",      per:0.3, min:0.1 } }, // #16 引いた枚数が枠から1枚ずれるごとに −0.3
-    "先読みのバンズ":     { rar:"rare",   base:0, mult:1.3, effect:{ id:"bunAxisKindDraw",    per:1 } },            // #17 軸の種類数ぶん次スピンの引きが増える
-    "一色のバンズ":       { rar:"rare",   base:0, mult:1.2, effect:{ id:"bunPerTopAxis",      per:1.15 } },         // #18 盤面で最も多い軸の1枚ごとに ×1.15
-    "仕込みのバンズ":     { rar:"rare",   base:0, mult:2.0, effect:{ id:"bunGrow",            per:0.15 } },         // #19 毎スピン ×0.15 ずつ増える
-    "小口のバンズ":       { rar:"rare",   base:0, mult:2.0, effect:{ id:"bunDrawMinus",       per:1 } },            // #20 引く枚数が1減る
-    "使い切りのバンズ":   { rar:"rare",   base:0, mult:2.5, effect:{ id:"bunConsume",         per:0.3, uses:5 } },  // #21 使うたび ×0.3 増えるが5回で消える
-    "連勝のバンズ":       { rar:"rare",   base:0, mult:1.5, effect:{ id:"bunPerStreak",       per:1.3 } },          // #22 連続で得点を更新している回数ごとに ×1.3
-    "相棒のバンズ":       { rar:"rare",   base:0, mult:1.5, effect:{ id:"bunOtherMult",       per:2 } },            // #23 もう1枚のバンズの倍率を2倍にする
-    "揃いのバンズ":       { rar:"rare",   base:0, mult:1.3, effect:{ id:"bunPerSameBase",     per:1.2 } },          // #24 同じ基礎点の組ごとに ×1.2
-    "写しのバンズ":       { rar:"rare",   base:0, mult:1.0, effect:{ id:"bunOtherTwice" } },                        // #25 もう1枚のバンズの効果が2回適用される
-    "純度のバンズ":       { rar:"rare",   base:0, mult:2.2, effect:{ id:"bunPerPurity",       per:1.15, step:0.10 } },// #26 デッキの最多軸の占有率10%ごとに ×1.15
-    "入替のバンズ":       { rar:"rare",   base:0, mult:1.6, effect:{ id:"bunPerPushed",       per:1.1 } },          // #27 押し出したバンズの枚数ごとに ×1.1
-    // ── 極3種（KENTO #28〜#30）──
-    "加算のバンズ":       { rar:"kyoku",  base:0, mult:1.5, effect:{ id:"bunSauceMultToAdd",  per:100 } },          // #28 ソースの倍率を加算に変換（×2.0 → +100）
-    "見立てのバンズ":     { rar:"kyoku",  base:0, mult:1.0, effect:{ id:"bunForceAll",        half:0.5 } },          // #29 条件付き効果がすべて発動扱い（倍率は半分）
-    "総出のバンズ":       { rar:"kyoku",  base:0, mult:1.0, effect:{ id:"bunAllFour",         pow:0.6 } }           // #30 4枚すべてが働く（各倍率は0.6乗）
   },
   // ルール（系統A/B）。Wave1：旧75枚に紐づく効果（ケチャップ×1.4・とろけチーズ×2 等）は
   //   差し替えで対象カードが消えた／効果なしに変わったため撤去。効果は Wave2 以降で新設する（この波は基礎点のみ）。
@@ -1206,9 +1153,6 @@ const DEFAULTS = {
               scaleOnBuy: false, scaleMul: 1.2 },
     // アーティファクト（第3層・SHOKUZAI §10）。所持上限・店に並ぶ数・各効果の数値は CONFIG.artifacts。
     artifacts: { on: true, maxOwned: 3 },   // Wave7 Step5：3枠（仮）。入れ替えは自由・回数制限なし・払い戻しなし
-    // バンズ（Wave7 Step4・すべて仮値）。デッキとは別領域。営業日ごとに1枚入手して1枚押し出す。
-    //   slots=所持枠／onBoard=盤面に出る枚数／weights=バンズ専用のレアリティ抽選（軸には乗らない）。
-    buns: { on: true, slots: 4, onBoard: 2, weights: { common: 60, rare: 34, kyoku: 6 } },
     // 軸の傾斜（Wave7 Step2 → Wave8 Step0 で枚数ベースに・すべて仮値）。
     //   m     : 「まだ決まっていないぶん」の重み。share の分母に足す（枚数_i /（合計枚数 + m））。
     //           小さくすると速く寄る。Wave7 の式（分母＝合計枚数）だと1枚取った瞬間に share=1 になり
@@ -1257,30 +1201,13 @@ const CUI_DIFF = "_diff";   // 五目あん：どの軸とも一致しない専�
 // レアリティ（SHOKUZAI §11）。抽選確率と店の値段に使う。
 const RARITY_JA = { nami:"並", jou:"上", tokujou:"特上", kiwami:"極" };
 const RARITY_ORDER = ["nami","jou","tokujou","kiwami"];
-// バンズ専用のレアリティ（カードの並／上／特上／極とは別の3段・別の抽選）。
-const BUN_RAR_JA = { common:"コモン", rare:"レア", kyoku:"極" };
-const BUN_RAR_ORDER = ["common","rare","kyoku"];
 const catalogNames = () => {                     // 全カード名。ORDER の順を優先し、残り（新軸カード）を後ろに。
-  //   バンズ（Wave7 Step4 で CONFIG.items に登録する描画用の入れ物）はカードではないので外す。
-  //   ※ ゴマバンズは96枚の一員として items に元から居るので残す（count は常に0＝デッキには入らない）。
+  //   ※ ゴマバンズは items に元から居るので残る（count は常に0＝デッキには入らない）。
   const rest = Object.keys(CONFIG.items).filter(n => !ORDER.includes(n) && !CONFIG.items[n].bunOnly);
   return ORDER.filter(n => CONFIG.items[n]).concat(rest);   // ORDER に実在しない名前が混ざっても弾く（安全策）
 };
-// CONFIG.buns の30種を、描画と評価が読めるように CONFIG.items にも登録する（bunOnly＝カードではない印）。
-//   ゴマバンズは items に元から居るので基礎点を0に揃えるだけ。
-function installBunItems(target){
-  const C = target || CONFIG;                        // Wave14：比較用の素の CONFIG にも同じ登録をかけられるように
-  for (const nm of Object.keys(C.buns)){
-    const b = C.buns[nm];
-    if (C.items[nm]){ C.items[nm].base = b.base || 0; C.items[nm].count = 0; continue; }
-    C.items[nm] = { pile:"bun", type:"bun", cuisine:"none", base:b.base || 0, count:0,
-                    tier:null, rar:"nami", weight:0, effect:{ id:null }, ph:true, bunOnly:true };
-  }
-}
-
 let CONFIG = fresh();
 function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
-installBunItems();        // バンズ30種を items に登録（描画・評価から読めるように）
 window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れるように公開（リセット時に貼り替え）
 
 /* ── Wave14：調整欄の設定を localStorage に残す ──────────────────────────────
@@ -1292,7 +1219,7 @@ window.CONFIG = CONFIG;   // 計測ツール／コンソール調整から触れ
    配列（rentByDay・progress・sauceSlotPrices 等）は中身を1つずつではなく丸ごと1つの値として扱う。 */
 const K_CFG = "bstack.cfg.v1";
 const CFG_SKIP = [["params","tiers"]];               // まるごと保存しない枝
-function cfgRef(){ const c = fresh(); installBunItems(c); return c; }   // 比較の基準（素の設定）
+function cfgRef(){ return fresh(); }                 // 比較の基準（素の設定）
 function cfgDiff(cur, ref, path){
   path = path || [];
   if (Array.isArray(cur) || Array.isArray(ref)) return JSON.stringify(cur) === JSON.stringify(ref) ? undefined : cur;
@@ -1338,7 +1265,7 @@ function scheduleSaveCfg(){ clearTimeout(cfgSaveTimer); cfgSaveTimer = setTimeou
 function rebuildConfig(diff){
   const tiers = { ingredients: CONFIG.params.tiers.ingredients, sauces: CONFIG.params.tiers.sauces };
   const counts = {}; for (const nm of Object.keys(CONFIG.items)) counts[nm] = CONFIG.items[nm].count;
-  CONFIG = fresh(); installBunItems();
+  CONFIG = fresh();
   if (diff) cfgApply(CONFIG, diff);
   CONFIG.params.tiers.ingredients = tiers.ingredients; CONFIG.params.tiers.sauces = tiers.sauces;
   for (const nm of Object.keys(counts)) if (CONFIG.items[nm]) CONFIG.items[nm].count = counts[nm];
@@ -1540,7 +1467,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 16", base: "ee42890", date: "2026-08-15" };
+const BUILD = { label: "Wave 17", base: "c393b71", date: "2026-08-15" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1568,7 +1495,7 @@ let pendingDraw = 0;       // 次のスピンの具材枠に足す枚数（負�
 let pendingForced = [];    // 次のスピンで確定で引く指定（{kind:"topBase"}＝ツナ／{kind:"rarestAxis"}＝ロースハム）
 function effIngSlots(){                              // 具材枠（Wave7 Step5：C群・E群のアーティファクトが増減させる）
   let n = Math.round(CONFIG.params.tiers.ingredients) + pendingDraw;
-  for (const id of ["ingSlot","ingSlotBun","sauceOver","bunBoardUp","ingNoRemove"]){
+  for (const id of ["ingSlot","ingSlotBun","sauceOver","ingNoRemove"]){
     const a = artById(id); if (a && typeof a.ing === "number") n += a.ing;
   }
   const ya = artById("ingHalfDeck");                 // 屋台：具材枠が常にデッキ枚数の半分（増減する）
@@ -1625,14 +1552,14 @@ function drawPile(pileKey, cap, forced, forcedIds){
 // 中段の並びを決める（Wave7 Step0・抽選）。重さによる整列は撤回した（KENTO「並びの重さ制を撤回」）。
 //   プレイヤーが決められるのはデッキの中身だけ。構築で確率を作り、盤面で振る。
 //   抽選は buildPlan()（計算層）の中でここが呼ばれた1回だけ。段が落ちるたびに振らない（演出が結果を作らない＝再現性を守る）。
-//   バンズも上下どちらに来るかを抽選する。top が null（バンズ1枚）のときは上バンズ無しで組む。
+//   Wave17：バンズは上下とも同じゴマバンズなので、どちらが上かの抽選はしない（結果が変わらない）。
 function shuffled(arr){                              // Fisher-Yates（grand() のみ・Math.random は使わない）
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(grand() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
   return a;
 }
 function arrangeStack(bottom, mids, top){   // bottom/top/mids は「個体」（{id,name,g}）。返り値も個体の配列。
-  const wrap = m => (top != null ? [bottom, ...m, top] : [bottom, ...m]);
+  const wrap = m => [bottom, ...m, top];
   if (mids.length === 0) return wrap(mids);
   let ord = shuffled(mids);                          // ①まず中段を丸ごとシャッフル
   // ②もち・麩：盤面に自分と同じ軸のカードがあるとき、必ずその隣に来る（複数あればランダムに1枚）。無ければ通常の抽選のまま。
@@ -1655,7 +1582,6 @@ function arrangeStack(bottom, mids, top){   // bottom/top/mids は「個体」�
 //   成長（うに等）を引きの前に安全に走らせるために使う（Wave4 3-6：空引きの回に二重発火させない）。
 function canBuild(){
   const t = CONFIG.params.tiers || { ingredients:0, sauces:0 };
-  if (bunSlots.length < 1) return false;                                      // バンズの所持枠が空＝組めない（Wave7 Step4：バンズはデッキではなく所持枠）
   const ing = Math.min(effIngSlots(), pileCopies("ingredient"));               // 実効の具材枠（pendingDraw 込み）
   const sau = Math.min(Math.max(0, Math.round(t.sauces)),      pileCopies("sauce"));
   return (ing + sau) >= 1;                                                    // 中身を1枚も引けない＝組めない
@@ -1668,15 +1594,13 @@ function buildBurger(){
   pendingDraw = 0; pendingForced = [];                          // 使ったら戻す
   const nSauce0 = Math.max(0, Math.round(t.sauces));            // ソースの段数スロット（上限）
   const f = forcedCard;                                         // item12：この1個に確定で入れるカード（山に応じて割り当て）
-  // バンズはデッキではなく所持枠（4枚）から抽選する（Wave7 Step4）。上下も抽選（Step0）。
-  const buns  = drawBunsForSpin();
-  //   #20 小口のバンズ／#17 先読みのバンズ：引く枚数の補正。バンズを引いたあとに枠を確定させる。
-  const dd = bunDrawDelta(buns);
-  const nIng2   = Math.max(0, nIng + dd);
+  // Wave17：バンズは抽選しない。上下に同じゴマバンズを1枚ずつ置くだけ（得点には関与しない）。
+  const buns  = [makeBun(), makeBun()];
+  const nIng2   = Math.max(0, nIng);
   const nSauce  = nSauce0;
   let   ings  = drawPile("ingredient", nIng2, f, fIds);        // 引けた具材（個体・≤ nIng2・デッキの具材数まで）
   const sauces= drawPile("sauce", nSauce, f);                   // 引けたソース（個体・≤ nSauce・デッキのソース数まで）
-  if (buns.length === 0 || (ings.length + sauces.length) === 0) return null;   // バンズ0枚／中身を1枚も引けない＝組めない
+  if ((ings.length + sauces.length) === 0) return null;                        // 中身を1枚も引けない＝組めない
   forcedCard = null;                                            // 消費（次のバーガーからは通常抽選）
   // こんにゃく（和）：引いた具材のうち系統が肉のものを盤面に乗せない（デッキには残す＝廃棄しない・Q7）。乗らなかった枚数を返し、pb の付与は buildPlan で行う。
   let konjac = 0;
@@ -1685,11 +1609,10 @@ function buildBurger(){
     for (const x of ings){ if (CONFIG.items[x.name].type === "meat"){ konjac++; continue; } kept.push(x); }
     ings = kept;
   }
-  if (buns.length === 0 || (ings.length + sauces.length) === 0) return null;   // こんにゃくで中身が空になった＝組めない
+  if ((ings.length + sauces.length) === 0) return null;                        // こんにゃくで中身が空になった＝組めない
   const drawn = [...buns, ...ings, ...sauces];                  // 引いた順（整列前）。成長の適用と「最初に引かれた具材」（まつたけ）の判定に使う
   const mids = [...ings, ...sauces];                            // 具材とソースを中段に（引いた順のまま渡す＝重さ同値のタイブレーク用。空段は無い＝詰めて組む）
-  const top  = buns.length >= 2 ? buns[1] : null;              // バンズ1枚なら上バンズ無し（下バンズだけで組む＝得点0にはしない）
-  const arranged = arrangeStack(buns[0], mids, top);           // index0=最下段（下バンズ）。並びは抽選（arrangeStack・Wave7 Step0）
+  const arranged = arrangeStack(buns[0], mids, buns[1]);       // index0=最下段（下バンズ）。中段の並びは抽選（arrangeStack・Wave7 Step0）
   // 成長（ほたて等）は buildPlan 側で適用する（空引きの回に発火させないため・Wave4 3-6）。
   return { inst: arranged, drawn, konjac, stack: arranged.map(x => x.name) };  // inst＝盤面の個体（育ち保持）／stack＝名前（描画・レイアウト用）
 }
@@ -1700,110 +1623,16 @@ function buildBurger(){
    発動処理は applyCardEffects()。原則：軸の見返りは複数カードに分散させ、
    「無いと軸が崩壊する」ものを乗算の項に置かない。
    ========================================================================= */
-/* ── バンズの層（Wave7 Step4）─────────────────────────────────────────────
-   デッキとは別の4枠。営業日ごとに必ず1枚入手し、1枚を押し出す（捨てる札はプレイヤーが選ぶ）。
-   盤面に出るのは4枚から抽選した2枚で、上下も抽選（buildBurger＝計算層で確定）。
-   基礎点は0。倍率はバーガー全体に掛かる（第4節の「層」）。
-   個体ごとの状態：g＝毎スピンの伸び（#19 仕込み）／uses＝使った回数（#21 使い切り）。 */
-let bunSlots = [];          // [{ id, name, g, uses }] 最大 buns.slots 枚
-let bunSeq = 0;             // バンズ個体の連番
-let bunPushed = 0;          // このランで押し出した枚数（#27 入替のバンズ）
-let bunStreak = 0;          // 連続で得点を更新している回数（#22 連勝のバンズ）
-let bunPendingDraw = 0;     // #17 先読みのバンズ：次スピンだけ引きが増える
-const bunCap     = () => {                           // バンズの所持枠（バンズケース＝5／調理台＝3）
-  let n = Math.round((CONFIG.params.buns || {}).slots || 4);
-  const up = artById("bunSlotUp"); if (up) n = (up.slots || n);
-  const dn = artById("ingSlotBun"); if (dn) n = (dn.bunSlots || n);
-  return Math.max(1, n);
-};
-const bunOnBoard = () => {                           // 盤面に出るバンズ（二段バンズ＝4）
-  let n = Math.round((CONFIG.params.buns || {}).onBoard || 2);
-  const a = artById("bunBoardUp"); if (a) n = (a.onBoard || n);
-  return Math.max(1, n);
-};
-const bunDef     = nm => CONFIG.buns[nm] || null;
-const bunEff     = nm => (bunDef(nm) || {}).effect || { id:null };
-function makeBun(name){ return { id: ++bunSeq, name, g:0, uses:0 }; }
-/* ── Wave11：所持枠の上限（bunLimit）と、上限を割ったときの切り詰め ────────────
-   D1 §1 で3つの経路が分かれた。
-     ① 夜の仕込み（bunSkipPush）＝押し出しを飛ばして1枚増やす。**効果文どおりの動作**なので、
-        増えたぶん（bunSkipUsed）を上限に足して許容する。点検側を直す。
-     ② 調理台（ingSlotBun）で cap が下がる＝溢れたぶんを切り詰める（trimBunSlots）。
-     ③ resetRun() の順序＝前のランのアーティファクトで枠数が決まっていた（resetRun 側で直した）。 */
-let bunSkipUsed = 0;        // 夜の仕込みで押し出しを飛ばした回数＝所持枠を超えて許される枚数
-const bunLimit = () => bunCap() + bunSkipUsed;
-const BUN_RAR_RANK = { common:0, rare:1, kyoku:2 };
-// 上限を超えているぶんを捨てる。捨てる順は「弱いものから」：
-//   つなぎのゴマバンズ → レアリティの低い順 → 古い個体（id の小さい順）。捨てた枚数を返す。
-function trimBunSlots(){
-  const over = bunSlots.length - bunLimit();
-  if (over <= 0) return 0;
-  const order = bunSlots.slice().sort((a, b) => {
-    const ga = a.name === "ゴマバンズ" ? 0 : 1, gb = b.name === "ゴマバンズ" ? 0 : 1;
-    if (ga !== gb) return ga - gb;
-    const ra = BUN_RAR_RANK[(bunDef(a.name) || {}).rar] || 0, rb = BUN_RAR_RANK[(bunDef(b.name) || {}).rar] || 0;
-    if (ra !== rb) return ra - rb;
-    return a.id - b.id;
-  });
-  const gone = order.slice(0, over), ids = gone.map(b => b.id);
-  for (const b of gone) plog.recordBunSwap(null, b.name);
-  bunSlots = bunSlots.filter(x => ids.indexOf(x.id) < 0);
-  renderBunView();
-  return gone.length;
-}
-// ラン開始時の4枠は、つなぎのゴマバンズで埋める（KENTO §6-1：初期の4枠を埋めるために残す）。
-//   抽選で埋めない理由：デッキが全部無印の白紙から始まるのと同じで、ルールも取ったものだけが作る。
-function resetBuns(){
-  bunSlots = []; bunSeq = 0; bunPushed = 0; bunStreak = 0; bunPendingDraw = 0; bunSkipUsed = 0;
-  for (let k = 0; k < bunCap(); k++) bunSlots.push(makeBun("ゴマバンズ"));
-}
-// バンズ専用のレアリティ抽選 → そのレアリティの中から1枚（軸・カードのレアリティには乗らない）。
-function drawBunName(){
-  const w0 = (CONFIG.params.buns || {}).weights || {};
-  const w = Object.assign({}, w0);
-  const nw = artById("bunRarUp");                    // のれん分け：レアリティの高いものが選ばれやすくなる
-  if (nw){ w.rare = (w.rare || 0) * (nw.mul || 1); w.kyoku = (w.kyoku || 0) * (nw.mul || 1); }
-  const byRar = {}; for (const r of BUN_RAR_ORDER) byRar[r] = [];
-  for (const nm of Object.keys(CONFIG.buns)){ if (nm === "ゴマバンズ") continue; const r = CONFIG.buns[nm].rar; if (byRar[r]) byRar[r].push(nm); }
-  let tot = 0; for (const r of BUN_RAR_ORDER) if (byRar[r].length) tot += Math.max(0, w[r] || 0);
-  let x = grand() * tot, pick = null;
-  for (const r of BUN_RAR_ORDER){ if (!byRar[r].length) continue; x -= Math.max(0, w[r] || 0); if (x <= 0){ pick = r; break; } }
-  if (!pick) pick = BUN_RAR_ORDER.filter(r => byRar[r].length).pop() || "common";
-  const cand = byRar[pick];
-  return cand[Math.floor(grand() * cand.length)];
-}
-// 盤面に出す2枚を4枠から引く（非復元）。上下は shuffled で入れ替わる。
-function drawBunsForSpin(){
-  const pool = bunSlots.slice(), out = [];
-  const n = Math.min(bunOnBoard(), pool.length);
-  for (let k = 0; k < n; k++) out.push(pool.splice(Math.floor(grand() * pool.length), 1)[0]);
-  return shuffled(out);
-}
-// #20 小口のバンズ／#17 先読みのバンズ：そのスピンの引き枚数への補正（盤面に出た2枚だけを見る）。
-function bunDrawDelta(boardBuns){
-  let d = bunPendingDraw; bunPendingDraw = 0;
-  for (const b of boardBuns){ const e = bunEff(b.name); if (e.id === "bunDrawMinus") d -= (e.per || 1); }
-  return d;
-}
-let bunBestScore = 0;      // #22：このランの最高得点（更新が続いている回数を数えるため）
-// スピンが終わったあとのバンズの状態更新。#19 伸び／#21 使い切り／#17 次スピンの引き／#22 連勝。
-function bunAfterSpin(boardBuns, total, stack){
-  if (!boardBuns || !boardBuns.length) return;
-  if (total > bunBestScore){ bunStreak++; bunBestScore = total; } else bunStreak = 0;
-  const gone = [];
-  for (const b of boardBuns){
-    const e = bunEff(b.name);
-    if (e.id === "bunGrow") b.g = (b.g || 0) + 1;
-    if (e.id === "bunConsume"){ b.uses = (b.uses || 0) + 1; if (b.uses >= (e.uses || 5)) gone.push(b.id); }
-    if (e.id === "bunAxisKindDraw"){
-      const s = new Set();
-      for (let i = 0; i < stack.length; i++){ const it = CONFIG.items[stack[i]] || {}; if (it.pile !== "bun") s.add(it.cuisine || "none"); }
-      bunPendingDraw += s.size * (e.per || 1);
-    }
-  }
-  // 使い切りは枠から消える。空いた枠は次の入手でそのまま埋まる（押し出しは要らない）。
-  if (gone.length) bunSlots = bunSlots.filter(x => gone.indexOf(x.id) < 0);
-}
+/* ── Wave17：バンズ機構の廃止 ────────────────────────────────────────────
+   バンズは得点計算に一切関与しない。盤面の上下に置く2枚の「絵」だけが残る。
+   撤去したもの：30種のプール／所持枠4／営業日ごとの入手と押し出し／バンズ専用のレアリティ抽選／
+   バンズの倍率・加算・効果（bunOneEffect・applyBunLayer）／関連アーティファクト6種。
+   廃止の理由は KENTO「バンズ機構の廃止」を見ること。将来は「パンの種類＝そのランのルール」に
+   置き換えるが、その置き換えは Wave17 では実装しない（この波は撤去だけ）。 */
+const BUN_NAME = "ゴマバンズ";
+let bunSeq = 0;
+function makeBun(){ return { id: ++bunSeq, name: BUN_NAME, g:0 }; }   // 盤面用の個体（育ちも効果も持たない）
+
 let artifactsOwned = [];                             // 所持アーティファクト名の配列（第3層・盤面を希釈しない）。
 // 旧「時間軸系」の名前単位の器（temporalBonus / temporalMult / acquiredAt）は Wave5 で撤去した。
 // 永続の伸びは個体の pb / pm / g（第13節）に一本化してある。
@@ -2134,7 +1963,6 @@ function consumeArtifact(id){
   if (!nm) return false;
   artifactsOwned = artifactsOwned.filter(n => n !== nm);
   delete artAxis[nm];
-  trimBunSlots();                                    // Wave11：手放したことで所持枠が下がる場合に備える
   plog.recordArtifactUse(nm); updateRunStatus();
   return true;
 }
@@ -2352,7 +2180,7 @@ const ARTIFACT_TEXT = {
   ingNoRemove:   a => `具材枠+${a.ing}。削除が使えなくなる`,
   // C. 枠
   ingSlot:       a => `具材枠+${a.ing}`,
-  ingSlotBun:    a => `具材枠+${a.ing}。バンズの所持枠が${a.bunSlots}になる`,
+  ingSlotBun:    a => `具材枠+${a.ing}`,
   sauceFree:     a => `ソース枠+${a.n}（上限は変わらない。1回ぶん無料になるだけ）`,
   sauceOver:     a => `ソース枠+${a.sauce}（上限を超える）。具材枠${a.ing}`,
   ingPerDay:     a => `営業日ごとに具材枠+${a.ing}。ただし同時にデッキも${a.deck}枚増える（抽選）`,
@@ -2366,13 +2194,6 @@ const ARTIFACT_TEXT = {
   shopKeep:      a => `店で買わなかったカードが、次の営業日も並ぶ`,
   shopCheapest:  a => `〈使い切り〉その営業日、店のカードが全部いちばん安い値段になる`,
   streakWeight:  a => `同じ軸のカードを続けて取るほど、次の3択がその軸に寄る（連続1回ごとに重み×${a.per}）`,
-  // E. バンズ
-  bunSlotUp:     a => `バンズの所持枠が${a.slots}になる`,
-  bunBoardUp:    a => `盤面に出るバンズが${a.onBoard}枚になる。具材枠${a.ing}`,
-  bunRarUp:      a => `バンズの抽選でレアリティの高いものが選ばれやすくなる（重み×${a.mul}）`,
-  bunChoice:     a => `バンズの入手が${a.n}択になる`,
-  bunSkipPush:   a => `〈使い切り〉押し出しを1回飛ばす`,
-  bunTwice:      a => `バンズの入手が1営業日${a.n}回になる（押し出しも${a.n}回）`,
   // F. 経済とラン構造
   nightshift:    a => `家賃までに作れる数が${a.extra}増える。3択が${a.offer}択になる`,
   shopHalfOnce:  a => `〈使い切り〉次の1回、店が${Math.round((a.ratio||0)*100)}%の値段になる`,
@@ -2381,51 +2202,8 @@ const ARTIFACT_TEXT = {
   deckHalve:     a => `〈使い切り〉デッキを半分にする（残す札は自分で選ぶ）。以後、3択の選択肢が${a.extra}つ増える`,
 };
 // 〈使い切り〉は使うと所持枠から消える（3枠しかないので、枠が空くこと自体が価値になる）。
-const ARTIFACT_ONCE = ["fixShopOnce","fixAllOnce","shopCheapest","bunSkipPush","shopHalfOnce","rentSkip","deckHalve"];
+const ARTIFACT_ONCE = ["fixShopOnce","fixAllOnce","shopCheapest","shopHalfOnce","rentSkip","deckHalve"];
 function artifactText(name){ const a = CONFIG.artifacts[name]; if (!a || !ARTIFACT_TEXT[a.id]) return ""; return ARTIFACT_TEXT[a.id](a); }
-// バンズの効果文（Wave7 Step4）。効果文の無いバンズは入れない（SHIYOU 第5節）。
-//   すべて「バーガー全体」に掛かる。表示は現在の数値から作る（調整欄で変えたら文も変わる）。
-const BUN_TEXT = {
-  bunPerSauce:       e => `ソース1枚ごとに全体×${e.per}`,
-  bunPerDiffAdj:     e => `隣り合う2枚が違う軸である組ごとに全体×${e.per}`,
-  bunPerTierUnder:   e => `${e.ref}段より1段少ないごとに全体×${e.per}`,
-  bunPerTierAddAll:  e => `段1つごとに、盤面の具材すべてに+${e.per}`,
-  bunPerSymAxis:     e => `上下対称の位置に同じ軸があるたび全体×${e.per}`,
-  bunPerAscAdj:      e => `隣り合う組のうち下から上に基礎点が増えている組ごとに全体×${e.per}`,
-  bunPerAxisKind:    e => `盤面の軸の種類1つごとに全体×${e.per}`,
-  bunPerDeckUnder:   e => `デッキが${e.ref}枚より1枚少ないごとに全体×${e.per}`,
-  bunPerUndrawn:     e => `引かれなかったカード1枚につき全体×${e.per}`,
-  bunPerSameAdj:     e => `同じ軸が2枚並ぶ組ごとに全体×${e.per}`,
-  bunPerSameTypeAdj: e => `同じ系統が2枚並ぶ組ごとに全体×${e.per}`,
-  bunPerNone:        e => `盤面に無印がいるたび全体×${e.per}`,
-  bunPerSameAdjDown: e => `同じ軸が連続するたび全体×${e.per}`,
-  bunPerSauceDown:   e => `ソース1枚ごとに全体の倍率−${e.per}（下限×${e.min}）`,
-  bunPerDupDown:     e => `同じカードの重複1組につき全体×${e.per}`,
-  bunPerSlotGap:     e => `引いた枚数が枠から1枚ずれるごとに全体の倍率−${e.per}（下限×${e.min}）`,
-  bunAxisKindDraw:   e => `盤面の軸の種類の数だけ、次スピンの引く枚数が増える`,
-  bunPerTopAxis:     e => `盤面で最も多い軸の1枚ごとに全体×${e.per}`,
-  bunGrow:           e => `毎スピン、全体の倍率が+${e.per}ずつ増える`,
-  bunDrawMinus:      e => `引く枚数が${e.per}減る`,
-  bunConsume:        e => `使うたび全体の倍率が+${e.per}増えるが、${e.uses}回で消える`,
-  bunPerStreak:      e => `連続で得点を更新している回数ごとに全体×${e.per}`,
-  bunOtherMult:      e => `もう1枚のバンズの倍率を${e.per}倍にする`,
-  bunPerSameBase:    e => `同じ基礎点の組ごとに全体×${e.per}`,
-  bunOtherTwice:     e => `もう1枚のバンズの効果が2回適用される`,
-  bunPerPurity:      e => `デッキの最多軸の占有率${Math.round((e.step||0.1)*100)}%ごとに全体×${e.per}`,
-  bunPerPushed:      e => `このランで押し出したバンズ1枚ごとに全体×${e.per}`,
-  bunSauceMultToAdd: e => `ソースが出した倍率を加算に変換する（×2.0 → +${e.per}）`,
-  bunForceAll:       e => `この盤面で不発だったカードの効果が、${Math.round((e.half!=null?e.half:0.5)*100)}%の効き方で発動扱いになる`,
-  bunAllFour:        e => `所持している4枚のバンズすべてが働く（ただし各倍率は${e.pow}乗）`,
-};
-function bunText(name){
-  const d = CONFIG.buns[name]; if (!d) return "";
-  const m = d.mult != null ? d.mult : 1;
-  const head = `全体×${r2(m)}`;
-  const e = d.effect || {};
-  if (!e.id) return head + "。つなぎ（ほかの効果なし）";
-  const t = BUN_TEXT[e.id]; if (!t) return head;
-  return head + "。" + t(e);
-}
 /* ── 効果解決を2段に分ける（Wave4・メタの土台）──
    resolveCard(i, ctx) … 位置 i のカードの効果を解決し hit の配列を返す（acc を触らない）。
    applyHits(hits, acc) … 返った hit を acc.add / acc.mult / acc.hits に反映する。hit は src（発動元の位置）を持つ。
@@ -2732,141 +2510,6 @@ function applyCardEffects(stack, acc){
   acc.sacrificeRandom = side.sacrificeRandom;
 }
 // 得点 =（第1項 基礎点 ＋ 第2項 育ち ＋ 第3項 加算）×（乗算の積）。3項に分ける（Wave4・D1）。
-/* ── バンズの層の判定（Wave7 Step4）──────────────────────────────────────────
-   すべて「そのバーガー全体」に効く。個々のカードの得点には触らない。
-   並びを要求するルールは、並びが抽選になった（Step0）ので成立が確率になる。判定はそのまま書く。 */
-function bunCtx(stack, baseArr){
-  const cui = i => { const it = CONFIG.items[stack[i]] || {}; return it.cuisine || "none"; };
-  const mid = [];                                     // バンズを除いた中段の位置
-  for (let i = 0; i < stack.length; i++) if ((CONFIG.items[stack[i]] || {}).pile !== "bun") mid.push(i);
-  const t = CONFIG.params.tiers || {};
-  const slots = Math.max(0, Math.round(t.ingredients || 0)) + Math.max(0, Math.round(t.sauces || 0));
-  const info = deckAxisInfo();
-  return { stack, baseArr, cui, mid, slots,
-    nSauce:  mid.filter(i => (CONFIG.items[stack[i]] || {}).pile === "sauce").length,
-    nIng:    mid.filter(i => (CONFIG.items[stack[i]] || {}).pile === "ingredient").length,
-    nTier:   mid.length,                              // 段数はバンズを含めない（バンズは基礎点0の層）
-    deckN:   deck.length,
-    purity:  info.share };
-}
-// 1枚のバンズが出す倍率と加算。返り値 { mult, add, label }。
-function bunOneEffect(b, ctx, other){
-  const d = bunDef(b.name); if (!d) return { mult:1, add:0, label:null };
-  const e = d.effect || {}, per = e.per;
-  let mult = d.mult != null ? d.mult : 1, add = 0, note = "";
-  const S = ctx.stack, cui = ctx.cui, mid = ctx.mid;
-  const adjPairs = () => { const out = []; for (let k = 0; k + 1 < mid.length; k++) out.push([mid[k], mid[k+1]]); return out; };
-  const cnt = (arr, f) => arr.reduce((s, x) => s + (f(x) ? 1 : 0), 0);
-  switch (e.id){
-    case null: case undefined: break;
-    case "bunPerSauce":       { const n = ctx.nSauce;        mult *= Math.pow(per, n); note = "ソース"+n+"枚"; break; }
-    case "bunPerDiffAdj":     { const n = cnt(adjPairs(), p => cui(p[0]) !== cui(p[1]));  mult *= Math.pow(per, n); note = "異軸の組"+n; break; }
-    case "bunPerTierUnder":   { const n = Math.max(0, (e.ref || 10) - ctx.nTier);         mult *= Math.pow(per, n); note = "基準"+(e.ref||10)+"段より"+n+"段少ない"; break; }
-    case "bunPerTierAddAll":  { add = ctx.nIng * (per || 0) * ctx.nTier;                  note = "具材"+ctx.nIng+"枚×"+ctx.nTier+"段"; break; }
-    case "bunPerSymAxis":     { let n = 0; for (let k = 0; k < Math.floor(mid.length/2); k++) if (cui(mid[k]) === cui(mid[mid.length-1-k]) && cui(mid[k]) !== "none") n++;
-                                mult *= Math.pow(per, n); note = "対称の組"+n; break; }
-    case "bunPerAscAdj":      { const n = cnt(adjPairs(), p => (ctx.baseArr[p[1]] || 0) > (ctx.baseArr[p[0]] || 0)); mult *= Math.pow(per, n); note = "増える組"+n; break; }
-    case "bunPerAxisKind":    { const s = new Set(mid.map(cui)); const n = s.size;        mult *= Math.pow(per, n); note = "軸"+n+"種"; break; }
-    case "bunPerDeckUnder":   { const n = Math.max(0, (e.ref || 12) - ctx.deckN);         mult *= Math.pow(per, n); note = "基準"+(e.ref||12)+"枚より"+n+"枚少ない"; break; }
-    case "bunPerUndrawn":     { const n = Math.max(0, ctx.deckN - ctx.nTier);             mult *= Math.pow(per, n); note = "引かれなかった"+n+"枚"; break; }
-    case "bunPerSameAdj":     { const n = cnt(adjPairs(), p => cui(p[0]) === cui(p[1]));  mult *= Math.pow(per, n); note = "同軸の組"+n; break; }
-    case "bunPerSameTypeAdj": { const n = cnt(adjPairs(), p => (CONFIG.items[S[p[0]]]||{}).type === (CONFIG.items[S[p[1]]]||{}).type); mult *= Math.pow(per, n); note = "同系統の組"+n; break; }
-    case "bunPerNone":        { const n = cnt(mid, i => cui(i) === "none");               mult *= Math.pow(per, n); note = "無印"+n+"枚"; break; }
-    case "bunPerSameAdjDown": { const n = cnt(adjPairs(), p => cui(p[0]) === cui(p[1]));  mult *= Math.pow(per, n); note = "同軸の連続"+n; break; }
-    case "bunPerSauceDown":   { mult = Math.max(e.min || 0, mult - (per || 0) * ctx.nSauce); note = "ソース"+ctx.nSauce+"枚"; break; }
-    case "bunPerDupDown":     { const c = {}; for (const i of mid) c[S[i]] = (c[S[i]]||0) + 1;
-                                let n = 0; for (const k in c) n += Math.max(0, c[k] - 1);  mult *= Math.pow(per, n); note = "重複"+n+"組"; break; }
-    case "bunPerSlotGap":     { const n = Math.abs(ctx.nTier - ctx.slots); mult = Math.max(e.min || 0, mult - (per || 0) * n); note = "枠とのずれ"+n; break; }
-    case "bunAxisKindDraw":   { const s = new Set(mid.map(cui)); note = "次スピンの引き+"+s.size; break; }   // 引きの加算は applyBunAfter で
-    case "bunPerTopAxis":     { const c = {}; for (const i of mid) c[cui(i)] = (c[cui(i)]||0) + 1;
-                                let n = 0; for (const k in c) if (c[k] > n) n = c[k];      mult *= Math.pow(per, n); note = "最多軸"+n+"枚"; break; }
-    case "bunGrow":           { mult += (per || 0) * (b.g || 0);                          note = "伸び"+(b.g||0); break; }
-    case "bunDrawMinus":      { note = "引く枚数−"+(per || 1); break; }                     // 引きの減算は buildBurger で
-    case "bunConsume":        { mult += (per || 0) * (b.uses || 0);                       note = "使用"+(b.uses||0)+"/"+(e.uses||5); break; }
-    case "bunPerStreak":      { mult *= Math.pow(per, bunStreak);                         note = "連勝"+bunStreak; break; }
-    case "bunOtherMult":      { note = other ? "相棒＝"+other.name : "相棒なし"; break; }     // もう1枚への干渉は applyBunLayer で
-    case "bunPerSameBase":    { const c = {}; for (const i of mid) c[ctx.baseArr[i]||0] = (c[ctx.baseArr[i]||0]||0) + 1;
-                                let n = 0; for (const k in c) n += Math.max(0, c[k] - 1);  mult *= Math.pow(per, n); note = "同じ基礎点"+n+"組"; break; }
-    case "bunOtherTwice":     { note = other ? "相棒＝"+other.name : "相棒なし"; break; }
-    case "bunPerPurity":      { const n = Math.floor(ctx.purity / (e.step || 0.1));        mult *= Math.pow(per, n); note = "純度"+Math.round(ctx.purity*100)+"%"; break; }
-    case "bunPerPushed":      { mult *= Math.pow(per, bunPushed);                          note = "押し出し"+bunPushed+"枚"; break; }
-    case "bunSauceMultToAdd": { note = "ソースの倍率→加算"; break; }                          // 変換は applyBunLayer で
-    case "bunForceAll":       { note = "条件つきをすべて発動扱い（半分）"; break; }
-    case "bunAllFour":        { note = "4枚すべてが働く（0.6乗）"; break; }
-    default: break;
-  }
-  return { mult, add, label: b.name + (note ? "：" + note : "") };
-}
-// 盤面のバンズを合成して、バーガー全体の倍率と加算を出す。hits に読める形で積む。
-//   #23 相棒／#25 写し／#30 総出／#28 加算／#29 見立て は、ここで他のバンズや hits に干渉する。
-function applyBunLayer(stack, acc, baseArr, boardBuns){
-  const out = { mult:1, add:0 };
-  if ((CONFIG.params.buns || {}).on === false || !boardBuns || !boardBuns.length) return out;
-  const ctx = bunCtx(stack, baseArr);
-  // 内訳表示は h.idx を展開するので、バンズの行にも位置を持たせる（盤面のバンズの段）。
-  const bIdx = []; for (let i = 0; i < stack.length; i++) if ((CONFIG.items[stack[i]] || {}).pile === "bun") bIdx.push(i);
-  const ids = boardBuns.map(b => bunEff(b.name).id);
-  const allFour = ids.indexOf("bunAllFour") >= 0;
-  const pow = allFour ? ((bunEff(boardBuns[ids.indexOf("bunAllFour")].name).pow) || 0.6) : 1;
-  // #30：4枚すべてが働く。盤面の2枚のかわりに所持枠の全部を対象にする（各倍率は pow 乗）。
-  const actors = allFour ? bunSlots.slice() : boardBuns.slice();
-  // #28 加算のバンズ：ソースが出した倍率を加算に変換する（×2.0 → +100）。
-  const conv = boardBuns.find(b => bunEff(b.name).id === "bunSauceMultToAdd");
-  if (conv){
-    const per = bunEff(conv.name).per || 100; let moved = 0, movedAdd = 0;
-    for (const h of acc.hits){
-      if (h.disabled || h.kind !== "mult" || !(h.mult > 0)) continue;
-      const si = (h.src != null) ? h.src : (h.idx && h.idx.length ? h.idx[0] : null);
-      if (si == null || (CONFIG.items[stack[si]] || {}).pile !== "sauce") continue;
-      const a = Math.round((h.mult - 1) * per);
-      acc.mult /= h.mult; acc.add += a; moved++; movedAdd += a;
-      h.kind = "note"; h.effect = "×" + r2(h.mult) + " → +" + a; h.converted = true;
-    }
-    if (moved) acc.hits.push({ label:"加算のバンズ：ソースの倍率を加算に変換（" + moved + "件）", effect:"+" + movedAdd, idx:bIdx.slice(), kind:"note", bun:true });
-  }
-  // #29 見立てのバンズ：この盤面で条件が成立せず何も出さなかったカードを「1回ぶん発動した」扱いにする。
-  //   ただし効き方は半分（per は半分を加算／mult は 1+(mult-1)/2）。
-  const fa = boardBuns.find(b => bunEff(b.name).id === "bunForceAll");
-  if (fa){
-    const half = bunEff(fa.name).half != null ? bunEff(fa.name).half : 0.5;
-    const fired = new Set(acc.hits.filter(h => !h.disabled && h.kind !== "note").map(h => h.src).filter(v => v != null));
-    let n = 0, gotAdd = 0, gotMult = 1;
-    for (const i of ctx.mid){
-      if (fired.has(i)) continue;
-      const ce = (CONFIG.items[stack[i]] || {}).effect || {};
-      if (!ce.id) continue;
-      if (typeof ce.per === "number" && ce.per !== 0){ const a = Math.round(ce.per * half); acc.add += a; gotAdd += a; n++; }
-      else if (typeof ce.mult === "number" && ce.mult > 0){ const m = 1 + (ce.mult - 1) * half; acc.mult *= m; gotMult *= m; n++; }
-    }
-    if (n) acc.hits.push({ label:"見立てのバンズ：不発だった" + n + "枚を半分で発動扱い", effect:(gotAdd?"+"+gotAdd:"") + (gotMult!==1?" ×"+r2(gotMult):""), idx:bIdx.slice(), kind:"note", bun:true });
-  }
-  // 各バンズの倍率・加算。Wave15：盤面のどのバンズかを src（stack の添字）で持たせ、具材・ソースと同じ形にする。
-  //   全部乗せのバンズ（allFour）だけは盤面に出ていない枠も actors に入るので、そのぶんは src を付けない。
-  const res = actors.map((b, k) => ({ b, k, src: (!allFour && bIdx[k] != null) ? bIdx[k] : null,
-                                      r: bunOneEffect(b, ctx, actors.find(x => x !== b) || null) }));
-  // #25 写しのバンズ：もう1枚の効果をもう一度適用する（倍率は2乗・加算は2倍）。
-  for (const x of res){
-    if (bunEff(x.b.name).id !== "bunOtherTwice") continue;
-    const o = res.find(y => y.b !== x.b); if (!o) continue;
-    o.r = { mult: o.r.mult * o.r.mult, add: o.r.add * 2, label: o.r.label + "（写しで2回）" };
-  }
-  // #23 相棒のバンズ：もう1枚の倍率を2倍にする。
-  for (const x of res){
-    const e = bunEff(x.b.name); if (e.id !== "bunOtherMult") continue;
-    const o = res.find(y => y.b !== x.b); if (!o) continue;
-    o.r = { mult: o.r.mult * (e.per || 2), add: o.r.add, label: o.r.label + "（相棒で×" + (e.per || 2) + "）" };
-  }
-  for (const x of res){
-    let m = x.r.mult; if (pow !== 1) m = Math.pow(Math.max(0, m), pow);
-    out.mult *= m; out.add += x.r.add;
-    if (m !== 1 || x.r.add !== 0)
-      acc.hits.push({ label:"バンズ " + x.r.label + (pow !== 1 ? "（0.6乗）" : ""),
-                      effect:(m !== 1 ? "×" + r2(m) : "") + (x.r.add ? (m !== 1 ? " " : "") + "+" + x.r.add : ""),
-                      idx:bIdx.slice(), kind:"mult", mult:m, add:(x.r.add || 0), bun:true, src:x.src });
-  }
-  acc.mult *= out.mult; acc.add += out.add;
-  return out;
-}
 function evaluate(stack, growthArr, inst, firstIngId){
   const G = growthArr || stack.map(() => 0);         // 位置ごとの生の育ち（無ければ全0＝Wave2以前と同じ）
   const cuiMap = buildCuiMap(stack);                 // ①軸の読み替え（第1項の書き換えでも使うので先に確定させる）
@@ -2918,14 +2561,6 @@ function evaluate(stack, growthArr, inst, firstIngId){
   const acc = { add, mult, hits, rawG: G, inst: inst || null, baseArr, growArr, cuiMap, noriMap, firstIngId: (firstIngId != null ? firstIngId : null) };
   applyCardEffects(stack, acc);
   add = acc.add; mult = acc.mult;                    // hits は同じ配列参照に push 済み（第1項・第2項は効果で変えない）
-
-  // バンズの層（Wave7 Step4）。バーガー全体に掛かる。カード効果のあとに合成する
-  //   （#28 はソースが出した倍率を、#29 は不発だったカードを見るので、カード効果より後でなければ判定できない）。
-  {
-    const bb = (inst || []).filter(x => x && (CONFIG.items[x.name] || {}).pile === "bun");
-    applyBunLayer(stack, acc, baseArr, bb);
-    add = acc.add; mult = acc.mult;
-  }
 
   // C：コンボ数ボーナス（2件以上で件数に応じ全体倍率。既定 perCombo:0 で無効）
   const cb = CONFIG.params.comboBonus || { threshold:2, perCombo:0 };
@@ -3235,7 +2870,7 @@ function buildPlan(){
       }
     }
   }
-  /* boardIds は「デッキの個体のうち、この盤面に出たもの」。バンズは所持枠（bunSlots）の別個体で、id が別連番（bunSeq）なので
+  /* boardIds は「デッキの個体のうち、この盤面に出たもの」。バンズは盤面用の別個体で、id が別連番（bunSeq）なので
      そのまま混ぜるとデッキ側の id と衝突する。衝突すると盤面に出ていない個体が「出た」と誤判定され、
      昆布（引かれなかったスピンごとに育つ）が黙って育たない回ができる。Wave9 で豆板醤を足したときに露見したので、ここでバンズを外す。 */
   return { stack: st, inst, rawG, boardIds: new Set(inst.filter(x => (CONFIG.items[x.name]||{}).pile !== "bun").map(x => x.id)),
@@ -3321,7 +2956,7 @@ function showFiredCards(sc){
   } else {
     sc.hits.forEach((h, i) => {
       const c = document.createElement("span");
-      c.className = "chip " + h.kind + (h.bun ? " bun" : "");
+      c.className = "chip " + h.kind;
       if (h.src != null && h.src >= 0) c.dataset.src = String(h.src);
       const g = hitMeta[i] ? GRADE_JA[hitMeta[i].grade] : "";
       c.innerHTML = `${h.label}  ${h.effect}<span class="g">${g}</span>`;
@@ -3959,19 +3594,14 @@ function collect(){
   awaitingCollect = false;
   completedCount++; runSpins++;                     // バーガー1個 = 1スピン
   updateRunStatus();
-  // バンズの状態更新（Wave7 Step4）。プレイログに残す盤面のバンズもここで確定させる。
-  const boardBuns = (plan && plan.inst) ? plan.inst.filter(x => (CONFIG.items[x.name] || {}).pile === "bun") : [];
   plog.recordSpin(runSpins, total, spinTiers, removedThisSpin, stack, boardGrowth, boardPb, boardPm, sc);   // プレイログ：このスピンの明細（育ち／pb／pm／賭けの結果）
-  plog.recordBuns(boardBuns.map(x => ({ name:x.name, g:x.g || 0, uses:x.uses || 0 })), bunSlots.map(x => x.name));
-  bunAfterSpin(boardBuns, total, stack);
-  renderBunView();
   // 完成の区切りで出す画面を順に積む：3択（無料・毎回）→ 家賃（rentEvery ごと）→ 店。
-  //   Wave7 Step4：営業日の最後のスピンだけ、3択のかわりにバンズの入手を出す（選択の回数は変わらない）。
+  //   Wave17：バンズの入手を廃止したので、営業日の最後のスピンも3択が出る（3択が毎スピン）。
   const q = [];
   const every = Math.max(1, Math.round((CONFIG.params.offer && CONFIG.params.offer.every) || 1));
   const rn = CONFIG.params.run;
   const dayEnd = !!(rn && rn.on !== false && runSpins % effRentEvery() === 0);
-  if (completedCount % every === 0) q.push(dayEnd && (CONFIG.params.buns || {}).on !== false ? "bun" : "card");
+  if (completedCount % every === 0) q.push("card");
   if (dayEnd){ q.push("rent"); q.push("shop"); }
   if (q.length){ startOfferQueue(q); }              // 選択・家賃・店を出す（次バーガーはまだ始めない）
   else { beginNext(); }                             // 何もない回は即・次のバーガー
@@ -3993,96 +3623,10 @@ function showNextOffer(){
   document.body.classList.toggle("shopping", kind === "shop");
   if (kind === "rent") showRent();
   else if (kind === "shop") showShop();
-  else if (kind === "bun") showBunOffer();
   else showOffer();
 }
 function advanceOffer(){ offerQueue.shift(); showNextOffer(); }   // 現在の選択を消化して次へ（無ければ待機）
 
-/* バンズの入手（Wave7 Step4）。営業日の最後のスピンの報酬。スキップできない。
-   4枠が埋まっているときは、押し出す1枚をプレイヤーが選ぶ。空きがあればそのまま入る。 */
-let pendingBun = null;        // 入手待ちのバンズ（選り好みのときは複数＝2択）
-let bunChosen = null;         // 選り好みで選んだ番号
-let bunRoundsLeft = 0;        // 朝の仕込み：1営業日に2回入手するときの残り回数
-function showBunOffer(){
-  if ((CONFIG.params.buns || {}).on === false){ advanceOffer(); return; }
-  // 夜の仕込み〈使い切り〉：押し出しを1回飛ばす（入手はするが枠から捨てない）。
-  const skipPush = hasArt("bunSkipPush");
-  const ch = artById("bunChoice");                   // 選り好み：入手が n 択になる
-  const nCand = Math.max(1, ch ? (ch.n || 2) : 1);
-  if (!pendingBun) pendingBun = Array.from({ length:nCand }, () => makeBun(drawBunName()));
-  offerEl.innerHTML = "";
-  offerEl.appendChild(el("offer-title", nCand > 1 ? `バンズを1枚入手（${nCand}択・見送れません）` : "バンズを1枚入手（見送れません）"));
-  const row = document.createElement("div"); row.className = "offer-cards";
-  pendingBun.forEach((nb, i) => {
-    const d = bunDef(nb.name) || {};
-    const card = document.createElement("div"); card.className = "offer-card bunnew" + (bunChosen === i ? " picked" : "");
-    card.innerHTML = `<div class="pl">バンズ<span class="rar rar-${d.rar}">${BUN_RAR_JA[d.rar]||d.rar}</span></div>`
-                   + `<div class="nm">${nb.name}</div><div class="ef">${bunText(nb.name)}</div>`;
-    if (nCand > 1) card.addEventListener("click", () => { bunChosen = i; showBunOffer(); });
-    row.appendChild(card);
-  });
-  offerEl.appendChild(row);
-  if (nCand > 1 && bunChosen == null){
-    offerEl.appendChild(el("offer-subtitle", "受け取る1枚をタップで選ぶ"));
-    offerEl.classList.add("show"); updateProgress(); return;
-  }
-  const free = bunSlots.length < bunCap() || skipPush;
-  offerEl.appendChild(el("offer-subtitle", skipPush
-    ? `夜の仕込み：この1回は押し出しを飛ばします（${bunSlots.length}/${bunCap()}）`
-    : free ? `所持枠に空きがあります（${bunSlots.length}/${bunCap()}）。そのまま入ります`
-           : `所持枠は ${bunSlots.length}/${bunCap()}。押し出す1枚をタップで選ぶ`));
-  const list = document.createElement("div"); list.className = "remove-list bunslots";
-  for (const b of bunSlots){
-    const bd = bunDef(b.name) || {};
-    const r = document.createElement("div"); r.className = "remove-row";
-    r.innerHTML = `<span class="nm">${b.name}</span><span class="tag">${BUN_RAR_JA[bd.rar]||bd.rar}</span>`
-                + `<span class="bs">${bunText(b.name)}</span>`
-                + ((b.g||0) > 0 ? `<span class="grow-inline">伸び ${b.g}</span>` : "")
-                + ((b.uses||0) > 0 ? `<span class="pb-inline">使用 ${b.uses}</span>` : "");
-    if (!free) r.addEventListener("click", () => takeBun(b.id));
-    list.appendChild(r);
-  }
-  offerEl.appendChild(list);
-  if (free){ const go = el("offer-buy", "受け取る"); go.addEventListener("click", () => takeBun(null)); offerEl.appendChild(go); }
-  offerEl.classList.add("show"); updateProgress();
-}
-function takeBun(pushOutId){
-  if (!pendingBun || !pendingBun.length) { advanceOffer(); return; }
-  const nb = pendingBun[bunChosen != null ? bunChosen : 0];
-  if (pushOutId != null){
-    const i = bunSlots.findIndex(x => x.id === pushOutId);
-    if (i < 0) return;
-    plog.recordBunSwap(nb.name, bunSlots[i].name);
-    bunSlots.splice(i, 1); bunPushed++;
-  } else plog.recordBunSwap(nb.name, null);
-  if (hasArt("bunSkipPush")) consumeArtifact("bunSkipPush");   // 夜の仕込み〈使い切り〉
-  bunSlots.push(nb); pendingBun = null; bunChosen = null;
-  // Wave11：押し出しを飛ばして所持枠を超えたぶんは、点検で許容する（夜の仕込みの効果文どおり）。
-  //   空き枠に普通に入った回や、押し出して入れ替えた回はここを通らない。
-  if (bunSlots.length > bunLimit()) bunSkipUsed++;
-  renderBunView(); Sound.coinChink(4, 0.5);
-  // 朝の仕込み：1営業日に n 回入手する（押し出しも n 回）。
-  const tw = artById("bunTwice");
-  if (bunRoundsLeft <= 0 && tw) bunRoundsLeft = Math.max(0, (tw.n || 2) - 1);
-  if (bunRoundsLeft > 0){ bunRoundsLeft--; showBunOffer(); return; }
-  advanceOffer();
-}
-// 所持している4枚の効果が常に読める表示（デッキ一覧と同じ形）。
-function renderBunView(){
-  const host = $("bunList"); if (!host) return;
-  host.innerHTML = "";
-  const head = $("bunHead"); if (head) head.textContent = `バンズ ${bunSlots.length}/${bunCap()}（盤面に出るのは${bunOnBoard()}枚・押し出しは営業日ごと）`;
-  for (const b of bunSlots){
-    const d = bunDef(b.name) || {};
-    const r = document.createElement("div"); r.className = "dv-row bun";
-    r.innerHTML = `<span class="nm">${b.name}</span><span class="tag">${BUN_RAR_JA[d.rar]||d.rar}</span>`
-                + `<span class="bs">全体×<b>${r2(d.mult != null ? d.mult : 1)}</b></span>`
-                + ((b.g||0) > 0 ? `<span class="up">伸び${b.g}</span>` : "")
-                + ((b.uses||0) > 0 ? `<span class="up">使用${b.uses}</span>` : "")
-                + `<span class="mark">${bunText(b.name)}</span>`;
-    host.appendChild(r);
-  }
-}
 // 第1層：完成ごとの3択。いずれかの山に1枚足す／スキップ（小報酬）。タップで即決・確認画面なし。
 function sample(arr, n){
   const a = arr.slice(), out = [];
@@ -4682,7 +4226,6 @@ function showShop(){
       chip.addEventListener("click", () => {
         if (a.pick && artChipArmed !== name){ artChipArmed = name; showAxisPick(name); return; }
         artifactsOwned = artifactsOwned.filter(x => x !== name); delete artAxis[name]; artChipArmed = null;
-        trimBunSlots();                              // Wave11：バンズケースを手放すと所持枠が 5→4 に戻る
         plog.recordArtifactDrop(name); rerollArtifacts(); updateRunStatus(); showShop();
       });
       owned.appendChild(chip);
@@ -4748,7 +4291,6 @@ function buyArtifact(name, cost){
   setMoney(money - cost); bumpBuy("artifact");
   artifactsOwned.push(name); plog.recordBuy("artifact", name, cost);
   artifactStock = artifactStock.filter(x => x !== name);
-  trimBunSlots();                                    // Wave11：調理台のようにバンズの所持枠を下げる道具に備える
   updateRunStatus(); Sound.coinChink(6, 0.6);
   const a = CONFIG.artifacts[name] || {};
   if (a.pick){ showAxisPick(name); return; }          // 軸を選ぶ型（暖簾・一点張り 等）は買った直後に選ぶ
@@ -4989,15 +4531,12 @@ function resetRun(){
   seedRun(pendingSeed);                              // ラン開始時にシード確定（pendingSeed 指定があればそれ、無ければ自動）
   pendingSeed = null;
   plog.startRun(gameSeed);                           // プレイログ：新しいランの記録を開始（前ランが未確定なら確定してから）
-  // Wave11：アーティファクトを先に空にする。resetBuns() は bunCap() ぶん枠を埋めるので、
-  //   ここが後だと**前のランのアーティファクト**で新しいランの枠数が決まってしまう（D1 §1-2）。
   artifactsOwned = [];
   discardNotices = [];                               // Wave12：前のランの「消えた」通知を持ち越さない
-  restoreDefaultDeck(); resetBuns(); rollDayAxis();  // バンズの4枠も作り直す（Wave7 Step4）／マッシュルームの指定軸を1回引く
+  restoreDefaultDeck(); rollDayAxis();               // マッシュルームの指定軸を1回引く
   pendingDraw = 0; pendingForced = [];               // 引き枚数の持ち越しもリセット
   money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; forcedCard = null;
-  pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0;   // バンズの入手待ち・最高得点（#22 連勝）
   artAxis = {}; artFirstAxis = null; artDayAxis = null; artOnceUsed = {}; artPendingFix = null;   // アーティファクトの状態（Wave7 Step5）
   artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; artChipArmed = null;
   refreshMoney(false); clearPiledCoins();
@@ -5198,7 +4737,7 @@ function renderBars(){
 /* ===== 5. 山の編集 ===== */
 function renderPiles(){
   const host = $("piles"); host.innerHTML = "";
-  const piles = [["ingredient","具材山"],["sauce","ソース山"],["bun","バンズ山"]];
+  const piles = [["ingredient","具材山"],["sauce","ソース山"]];   // Wave17：バンズ山は無くなった（デッキに入らないので枚数も出ない）
   for (const [key, title] of piles){
     // 基本カード（ORDER）は常に表示。新軸カードは山に入っている（count>0）ときだけ表示（普段は畳む）。
     const names = catalogNames().filter(n => CONFIG.items[n].pile === key && (ORDER.includes(n) || CONFIG.items[n].count > 0));
@@ -5255,16 +4794,16 @@ function updateTierCap(){
   const t = CONFIG.params.tiers || { ingredients:3, sauces:1 };
   const nIng = effIngSlots(), nSau = Math.max(0, Math.round(t.sauces));   // 具材は実効値（pendingDraw 込み・D5）
   const pd = pendingDraw;
-  const ingC = pileCopies("ingredient"), sauC = pileCopies("sauce"), bunC = bunSlots.length;   // バンズは所持枠（Wave7 Step4）
-  const ingB = Math.min(nIng, ingC), sauB = Math.min(nSau, sauC), bunB = Math.min(bunOnBoard(), bunC);   // 実際に組める段
-  const total = ingB + sauB + bunB;
+  const ingC = pileCopies("ingredient"), sauC = pileCopies("sauce");
+  const ingB = Math.min(nIng, ingC), sauB = Math.min(nSau, sauC);   // 実際に組める段
+  const total = ingB + sauB + 2;                                    // Wave17：上下のバンズは常に2段（絵だけ・得点なし）
   const part = (label, build, cap, copies) => {                                                // デッキ不足で制限中は赤く出す
     const limited = copies < cap;
     return `${label} <b>${build}</b><span class="${limited ? "cap-lim" : ""}">（枠${cap}・デッキ${copies}${limited ? "→不足" : ""}）</span>`;
   };
   const pdTag = pd !== 0 ? `<span class="cap-lim">（次スピン ${pd>0?"+":""}${pd}枚）</span>` : "";
   e.innerHTML = `🍔 組める段 <b>${total}</b>段${pdTag}　` +
-    part("具材", ingB, nIng, ingC) + " ／ " + part("ソース", sauB, nSau, sauC) + " ／ " + part("バンズ", bunB, bunOnBoard(), bunC);
+    part("具材", ingB, nIng, ingC) + " ／ " + part("ソース", sauB, nSau, sauC) + " ／ バンズ <b>2</b>";
 }
 
 // 軸ごとの内訳（デッキに何枚あるか）。常に画面から偏りが分かるよう、上部に固定表示する。
@@ -5280,7 +4819,7 @@ function renderAxisTally(){
     const on = c[k] > 0;
     return `<span class="ax ax-${k}${on?"":" z"}">${CUISINE_JA[k]} ${c[k]}</span>`;
   }).join("") + `<span class="al">計${tot}</span>` + `<span class="open">▸ 一覧を見る</span>`;
-  if (deckViewOpen()){ renderDeckView(); renderBunView(); }   // 開いている間は中身も追随させる
+  if (deckViewOpen()) renderDeckView();                      // 開いている間は中身も追随させる
 }
 
 /* ===== 読むだけのデッキ一覧（Wave6 3-1） =====
@@ -5299,7 +4838,7 @@ let dvSort = 0;
 const deckViewOpen = () => { const el = document.getElementById("deckView"); return !!el && el.classList.contains("show"); };
 function dvEff(inst){ const it = CONFIG.items[inst.name] || {};   // 点数順に使う実効値
   return (it.base || 0) + (inst.pb || 0) + (inst.g || 0) * GROW_PER; }
-function dvRow(inst, isBun){
+function dvRow(inst){
   const it = CONFIG.items[inst.name] || {};
   const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="tag">${CUISINE_JA[it.cuisine]}</span>` : `<span class="tag">無印</span>`;
   const pb = inst.pb || 0;
@@ -5309,7 +4848,7 @@ function dvRow(inst, isBun){
   const pm = (inst.pm || 0) > 0 ? `<span class="up">×${r2(1 + inst.pm)}</span>` : "";
   // もち・麩は「そのとき何が引かれたか」で相手が変わるので、静的な一覧には並びを描けない。印だけ付けて効果文で読ませる。
   const mark = ((it.effect || {}).id === "adjSameCui") ? `<span class="mark">↕同軸の隣に来る</span>` : "";
-  const row = document.createElement("div"); row.className = "dv-row" + (isBun ? " bun" : "");
+  const row = document.createElement("div"); row.className = "dv-row";
   row.innerHTML = `<span class="nm">${inst.name}</span><span class="tag">${PILE_JA[it.pile]}</span>${cuiTag}${rarChipHTML(rarityOf(inst.name))}${bs}${g}${pm}${mark}`;
   row.title = effectText(inst.name) || "";
   return row;
@@ -5321,31 +4860,20 @@ function renderDeckView(){
   const sortBtn = document.getElementById("dvSort"); if (sortBtn) sortBtn.textContent = "並び：" + DV_SORT_JA[mode];
   const note = document.getElementById("dvNote"); if (note) note.textContent = "引かれたときの上下関係。" + DV_NOTE[mode];
   const cnt = document.getElementById("dvCount"); if (cnt) cnt.textContent = `（${deck.length}枚）`;
-  const isBun = x => CONFIG.items[x.name].pile === "bun";
   const byW  = (a, b) => a.name.localeCompare(b.name) || (a.id - b.id);   // 重さは撤去したので名前順（Wave7 Step0）
-  const add = (arr, bun) => { for (const x of arr) host.appendChild(dvRow(x, bun)); };
-  const label = t => { const d = document.createElement("div"); d.className = "dv-end"; d.textContent = t; host.appendChild(d); };
-  if (mode === "weight"){
-    // バンズは重さ0で整列の対象外なので、両端に固定して出す（下から順に使われるので前半が下バンズ側）。
-    const buns = deck.filter(isBun).slice().sort((a,b)=>a.id-b.id);
-    const half = Math.ceil(buns.length / 2);
-    const bottomBuns = buns.slice(0, half), topBuns = buns.slice(half);
-    label("▲ 上バンズ側");
-    add(topBuns, true);
-    add(deck.filter(x => !isBun(x)).slice().sort(byW), false);
-    add(bottomBuns, true);
-    label("▼ 下バンズ側");
-  } else if (mode === "score"){
-    add(deck.slice().sort((a,b)=> dvEff(b) - dvEff(a) || byW(a,b)), false);
+  const add = arr => { for (const x of arr) host.appendChild(dvRow(x)); };
+  if (mode === "score"){
+    add(deck.slice().sort((a,b)=> dvEff(b) - dvEff(a) || byW(a,b)));
   } else if (mode === "cuisine"){
     const ord = {}; CUISINE_ORDER.forEach((k,i)=>ord[k]=i);
-    add(deck.slice().sort((a,b)=> (ord[CONFIG.items[a.name].cuisine] - ord[CONFIG.items[b.name].cuisine]) || byW(a,b)), false);
+    add(deck.slice().sort((a,b)=> (ord[CONFIG.items[a.name].cuisine] - ord[CONFIG.items[b.name].cuisine]) || byW(a,b)));
   } else {
-    const po = { ingredient:0, sauce:1, bun:2 };
-    add(deck.slice().sort((a,b)=> (po[CONFIG.items[a.name].pile] - po[CONFIG.items[b.name].pile]) || byW(a,b)), false);
+    // Wave17：バンズはデッキに入らないので、両端に固定して出す並びは無くなった。
+    const po = { ingredient:0, sauce:1 };
+    add(deck.slice().sort((a,b)=> (po[CONFIG.items[a.name].pile] - po[CONFIG.items[b.name].pile]) || byW(a,b)));
   }
 }
-function openDeckView(){ const el = document.getElementById("deckView"); if (!el) return; renderDeckView(); renderBunView(); el.classList.add("show"); }
+function openDeckView(){ const el = document.getElementById("deckView"); if (!el) return; renderDeckView(); el.classList.add("show"); }
 function closeDeckView(){ const el = document.getElementById("deckView"); if (el) el.classList.remove("show"); }
 
 /* ===== 6. 数値調整 ===== */
@@ -5545,21 +5073,6 @@ function renderSettings(){
   for (const k of RARITY_ORDER) gridRow(g, RARITY_JA[k]+"の値段", numInput(()=>rr.prices[k], v=>rr.prices[k]=Math.max(0,Math.round(v)), 10));
   // カード価格の値上げは店の「カード」スケール（shop.scale.card）へ移動（要素別分離）。
 
-  // ── 進行：バンズ（Wave7 Step4・すべて仮値）──
-  { const bu = CONFIG.params.buns;
-    g = group("バンズ（デッキとは別の枠・倍率はバーガー全体）", "run");
-    gridRow(g, "バンズを使う", boolInput(()=>bu.on!==false, v=>bu.on=v));
-    gridRow(g, "所持枠", numInput(()=>bu.slots, v=>{bu.slots=Math.max(1,Math.round(v));}, 1));
-    gridRow(g, "盤面に出る枚数", numInput(()=>bu.onBoard, v=>{bu.onBoard=Math.max(1,Math.round(v));}, 1));
-    for (const k of BUN_RAR_ORDER) gridRow(g, BUN_RAR_JA[k]+"の重み", numInput(()=>bu.weights[k], v=>bu.weights[k]=Math.max(0,v), 1));
-    g = group("バンズ30種の数値（倍率と係数・すべて仮値）", "run");
-    for (const nm of Object.keys(CONFIG.buns)){
-      const d = CONFIG.buns[nm], e = d.effect || {};
-      gridRow(g, nm+"：全体×", numInput(()=>d.mult, v=>d.mult=Math.max(0,v), 0.1));
-      for (const key of ["per","ref","min","step","uses","pow","half"])
-        if (typeof e[key] === "number") gridRow(g, nm+"："+key, numInput(()=>e[key], v=>e[key]=v, 0.05));
-    } }
-
   // ── 進行：アーティファクト（第3層・所持上限と各効果の数値）── SHOKUZAI §10・仮
   const ar = CONFIG.params.artifacts;
   g = group("アーティファクト（第3層・盤面を希釈しない）", "run");
@@ -5567,7 +5080,7 @@ function renderSettings(){
   gridRow(g, "所持できる上限", numInput(()=>ar.maxOwned, v=>{ar.maxOwned=Math.max(1,Math.round(v)); updateRunStatus();}, 1));
   g = group("アーティファクト45種の数値（すべて仮値）", "run");
   for (const nm of Object.keys(CONFIG.artifacts)){ const a = CONFIG.artifacts[nm];
-    for (const key of ["mul","need","n","per","times","step","ing","bunSlots","sauce","deck","slots","onBoard","shopCards","extra","offer","ratio"])
+    for (const key of ["mul","need","n","per","times","step","ing","sauce","deck","shopCards","extra","offer","ratio"])
       if (typeof a[key] === "number") gridRow(g, nm+"："+key, numInput(()=>a[key], v=>a[key]=v, 0.5));
     continue;
   }
@@ -5872,14 +5385,14 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventL
 }));
 // 数値を初期化：既定に戻し、保存も消して、ランもやり直す（Wave14 で「保存も消す」を足した。
 //   保存が残っていると、リロードでおかしな値が戻ってきて「初期化した」ことにならないため）。
-$("resetCfg").addEventListener("click", () => { clearSavedCfg(); CONFIG = fresh(); installBunItems(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
+$("resetCfg").addEventListener("click", () => { clearSavedCfg(); CONFIG = fresh(); window.CONFIG = CONFIG; completedCount = 0; resetRun(); renderSettings(); });
 // 保存した設定を消す：保存を捨てて既定に戻すだけ。**遊んでいるランは続ける**（枠と枚数は持ち越す）。
 //   おかしな値を入れてしまったときに、ランを捨てずに戻すための口。
 $("clearCfg").addEventListener("click", () => {
   clearSavedCfg(); rebuildConfig(null); syncCounts();
-  renderSettings(); renderPiles(); renderAxisTally(); updateProgress(); updateRunStatus(); renderBunView();
+  renderSettings(); renderPiles(); renderAxisTally(); updateProgress(); updateRunStatus();
 });
-$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; resetBuns(); pendingBun = null; bunChosen = null; bunRoundsLeft = 0; bunBestScore = 0; artAxis = {}; artFirstAxis = null; artDayAxis = null; artPendingFix = null; artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
+$("clearHist").addEventListener("click", () => { history = []; recentProducts = []; money = 0; moneyShown = 0; refreshMoney(false); completedCount = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null; artifactsOwned = []; collectFillActive = false; artAxis = {}; artFirstAxis = null; artDayAxis = null; artPendingFix = null; artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; plog.startRun(gameSeed); clearPiledCoins(); renderPiles(); updateStats(); renderBars(); updateRunStatus(); });
 $("gear").addEventListener("click", () => {          // 調整パネルを開いてスクロール
   $("tuningDetails").open = true;
   $("tuning").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -6018,8 +5531,6 @@ const plog = (function(){
     // Wave7 Step1：引いたレアリティに候補が居ず、隣のレアリティへ落ちたことの記録。
     recordRarityFallback(rec){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.rarFallbacks = s.rarFallbacks || []).push(rec); saveCurrent(); } },
     // Wave7 Step4：そのスピンの盤面に出たバンズと、所持している4枠。
-    recordBuns(board, slots){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ s.buns = { board:(board||[]).slice(), slots:(slots||[]).slice() }; saveCurrent(); } },
-    recordBunSwap(gained, pushed){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.bunSwaps = s.bunSwaps || []).push({ gained, pushed }); saveCurrent(); } },
     // Wave7 Step5：アーティファクトの使い切り・手放し・選んだ軸。
     recordArtifactUse(nm){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.artUsed = s.artUsed || []).push(nm); saveCurrent(); } },
     recordArtifactDrop(nm){ if (!enabled || !cur) return; const s = lastSpin(); if (s){ (s.artDropped = s.artDropped || []).push(nm); saveCurrent(); } },
@@ -6089,9 +5600,9 @@ const plog = (function(){
 // 計測・デバッグ用API（コンソール／測定ハーネスから触れる）。ゲームの内部状態を読み書きする。
 window.RUN = {
   state: () => ({ money, moneyShown, daysSurvived, runSpins, completedCount, runActive, artifacts: artifactsOwned.slice() }),
-  grantArtifact: (nm) => { if (CONFIG.artifacts[nm] && !artifactsOwned.includes(nm)) artifactsOwned.push(nm); trimBunSlots(); updateRunStatus(); return artifactsOwned.slice(); },
-  setArtifacts: (arr) => { artifactsOwned = (arr||[]).filter(nm => CONFIG.artifacts[nm]); trimBunSlots(); updateRunStatus(); return artifactsOwned.slice(); },
-  clearArtifacts: () => { artifactsOwned = []; trimBunSlots(); updateRunStatus(); },
+  grantArtifact: (nm) => { if (CONFIG.artifacts[nm] && !artifactsOwned.includes(nm)) artifactsOwned.push(nm); updateRunStatus(); return artifactsOwned.slice(); },
+  setArtifacts: (arr) => { artifactsOwned = (arr||[]).filter(nm => CONFIG.artifacts[nm]); updateRunStatus(); return artifactsOwned.slice(); },
+  clearArtifacts: () => { artifactsOwned = []; updateRunStatus(); },
   setMoney: (v) => { money = v; moneyShown = v; refreshMoney(false); },
   // 時間軸系（もち・たら＝基礎の育ち／ほたて＝倍率の育ち／白バンズ・さけ＝取得後の個数）の内部状態を計測から制御する。
   setCompleted: (v) => { completedCount = v; },
@@ -6111,12 +5622,6 @@ window.RUN = {
   rarityBase: () => rarityBaseFor(runProgress()),                             // 進行の基準（Wave8 Step1）
   progress: () => runProgress(),
   axisRates: () => axisRates(),                                               // 5軸の出現率（Wave7 Step2）
-  // バンズ（Wave7 Step4）：4枠の読み出しと、テストから枠を組む口。
-  buns: () => bunSlots.map(x => ({ id:x.id, name:x.name, g:x.g||0, uses:x.uses||0 })),
-  setBuns: (names) => { bunSlots = (names||[]).filter(n => CONFIG.buns[n]).map(n => makeBun(n)); renderBunView(); return bunSlots.map(x=>x.name); },
-  bunText: (nm) => bunText(nm),
-  bunStats: () => ({ pushed: bunPushed, streak: bunStreak, pendingDraw: bunPendingDraw, best: bunBestScore,
-                     cap: bunCap(), limit: bunLimit(), skipUsed: bunSkipUsed }),   // Wave11：許容量も読めるようにする
   // アーティファクト（Wave7 Step5）：確定枠と選んだ軸をテストから読む／組む口。
   setArtAxis: (nm, cu) => { if (CONFIG.artifacts[nm] && AXES.indexOf(cu) >= 0) artAxis[nm] = cu; return artAxis[nm]; },
   artAxes: () => Object.assign({}, artAxis),
@@ -6219,36 +5724,10 @@ function selfCheck(){
     const missing = ["reroll","ing","sau","remove"].filter(k => typeof dl[k] !== "number");
     if (missing.length) warn.push("店の1営業日の回数が未設定: " + missing.join(" "));
   }
-  // ⑪ バンズ（Wave7 Step4）。効果文の欠落・レアリティの値・所持枠との整合を点検する。
-  {
-    const bs = CONFIG.buns || {}, bn = Object.keys(bs);
-    const noText = bn.filter(nm => !bunText(nm));
-    if (noText.length) warn.push("効果文が無いバンズ: " + noText.join(" / "));
-    const noRule = bn.filter(nm => { const e = (bs[nm].effect || {}); return e.id && !BUN_TEXT[e.id]; });
-    if (noRule.length) warn.push("BUN_TEXT が無いバンズの効果: " + noRule.join(" / "));
-    const badR = bn.filter(nm => BUN_RAR_ORDER.indexOf(bs[nm].rar) < 0);
-    if (badR.length) warn.push("未知のバンズのレアリティ: " + badR.join(" / "));
-    // Wave10：効果を持たないバンズだけが基礎点を持つ（バンズにおける並の定義）。効果を持つバンズは0のまま。
-    const based = bn.filter(nm => (bs[nm].base || 0) !== 0 && (bs[nm].effect || {}).id);
-    if (based.length) warn.push("効果を持つバンズに基礎点がある: " + based.join(" / "));
-    const bu = CONFIG.params.buns || {};
-    if (Math.round(bu.onBoard || 0) > Math.round(bu.slots || 0)) warn.push("盤面に出るバンズが所持枠より多い");
-    // Wave11：夜の仕込みで押し出しを飛ばしたぶん（bunSkipUsed）は超過として数えない。
-    if (bunSlots.length > bunLimit())
-      warn.push("バンズの所持枠を超えている: " + bunSlots.length + " > " + bunCap()
-                + (bunSkipUsed ? "（夜の仕込みの許容 +" + bunSkipUsed + " を含めても超過）" : ""));
-    const dead = Object.keys(BUN_TEXT).filter(id => !bn.some(nm => (bs[nm].effect || {}).id === id));
-    if (dead.length) warn.push("使われていない BUN_TEXT: " + dead.join(" "));
-    // つなぎ以外は30種そろっていること（KENTO §6：コモン12・レア15・極3）
-    const c = { common:0, rare:0, kyoku:0 };
-    for (const nm of bn){ if (nm === "ゴマバンズ") continue; if (c[bs[nm].rar] != null) c[bs[nm].rar]++; }
-    if (c.common !== 12 || c.rare !== 15 || c.kyoku !== 3)
-      warn.push("バンズ30種の内訳が KENTO と違う: コモン" + c.common + "・レア" + c.rare + "・極" + c.kyoku + "（想定 12・15・3）");
-  }
-  // ⑫ アーティファクト（Wave7 Step5）。効果文の欠落・レアリティ・45種の内訳・〈使い切り〉の数を点検する。
+  // ⑫ アーティファクト（Wave7 Step5 → Wave17 でバンズの6種を廃止）。効果文の欠落・レアリティ・39種の内訳・〈使い切り〉の数を点検する。
   {
     const A = CONFIG.artifacts || {}, an = Object.keys(A);
-    if (an.length !== 45) warn.push("アーティファクトが45種でない: " + an.length + "種");
+    if (an.length !== 39) warn.push("アーティファクトが39種でない: " + an.length + "種");
     const noText = an.filter(nm => !artifactText(nm));
     if (noText.length) warn.push("効果文が無いアーティファクト: " + noText.join(" / "));
     const badR = an.filter(nm => RARITY_ORDER.indexOf(A[nm].rar) < 0);
@@ -6259,11 +5738,12 @@ function selfCheck(){
     const dups = Object.keys(dupId).filter(k => dupId[k] > 1);
     if (dups.length) warn.push("アーティファクトの id が重複: " + dups.join(" "));
     const once = an.filter(nm => ARTIFACT_ONCE.indexOf(A[nm].id) >= 0);
-    if (once.length !== 7) warn.push("〈使い切り〉が7種でない: " + once.length + "種（" + once.join(" ") + "）");
+    if (once.length !== 6) warn.push("〈使い切り〉が6種でない: " + once.length + "種（" + once.join(" ") + "）");
     const onceNoMark = once.filter(nm => !/〈使い切り〉/.test(artifactText(nm)));
     if (onceNoMark.length) warn.push("〈使い切り〉の表記が効果文に無い: " + onceNoMark.join(" / "));
     // 廃止した4種が残っていないこと（得点に直接触る型）
-    const banned = ["meatBase","vegBase","hygiene","regular","axisWa","axisChuka","axisKaisen","axisKokyu","axisAgemono"];
+    const banned = ["meatBase","vegBase","hygiene","regular","axisWa","axisChuka","axisKaisen","axisKokyu","axisAgemono",
+                    "bunSlotUp","bunBoardUp","bunRarUp","bunChoice","bunSkipPush","bunTwice"];   // Wave17：バンズの6種
     const left = an.filter(nm => banned.indexOf(A[nm].id) >= 0);
     if (left.length) warn.push("廃止・作り替えのはずのアーティファクトが残っている: " + left.join(" / "));
     if (Math.round((CONFIG.params.artifacts || {}).maxOwned || 0) !== 3) warn.push("アーティファクトの所持枠が3でない");
@@ -6297,7 +5777,6 @@ plog.bootStart(gameSeed); // プレイログ：ブート＝前回の未確定ラ
   const dl = $("plogDownload"); if (dl){ dl.addEventListener("click", () => plog.download()); }
   plog.renderList();
 })();
-resetBuns();     // バンズの4枠（Wave7 Step4）。ここで埋めないと1個も組めない
 renderPiles();
 renderSettings();
 updateStats();
