@@ -1153,7 +1153,27 @@ const DEFAULTS = {
                      //   回数で切ったうえに値上がりも掛かると、営業日をまたぐごとに実質使えなくなる。
                      reroll:   { onBuy: false, mul: 2.0 },   // 品揃えの引き直し（回数制・固定価格）
                      artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
-                     remove:   { onBuy: false, mul: 2.0 } } },// デッキから取り除く（回数制・固定価格 ¥75）
+                     remove:   { onBuy: false, mul: 2.0 } },// デッキから取り除く（回数制・固定価格 ¥75）
+            /* Wave16：店の値段を営業日ごとに置く。家賃（Wave11 の rentByDay）とまったく同じ形。
+                 ・添字は「1営業日目＝0」。rentByDay と揃えてある。
+                 ・値があればその日はその額。空欄（null）と配列の外は**これまでの式のまま**（家賃と同じ規則）。
+                 ・初期値は今の額を並べただけなので、置き換え前と1円も変わらない。
+               カードとアーティファクトは帯ごとに分けて持つ。いままで rarity.prices を共有していたが、
+               3枠しかない道具と、何枚でも入るカードでは適正価格が違う（Wave16 の要点）。
+               具材枠だけは「買うたび2倍」（scale.slot.onBuy）を持っている。**配列はその累積の土台**として使う。
+                 累積そのものをやめたいときは調整欄の「具材枠：購入で値上げ」を切る（配列だけが効く）。
+                 配列に置き換えて累積を廃止すると、買わなかった営業日がある run で今と額が変わってしまうため。 */
+            byDay: { card:     { nami: [100,100,100,100,100,100,100,100,100,100],
+                                 jou:  [250,250,250,250,250,250,250,250,250,250],
+                                 tokujou: [600,600,600,600,600,600,600,600,600,600],
+                                 kiwami:  [1500,1500,1500,1500,1500,1500,1500,1500,1500,1500] },
+                     artifact: { nami: [100,100,100,100,100,100,100,100,100,100],
+                                 jou:  [250,250,250,250,250,250,250,250,250,250],
+                                 tokujou: [600,600,600,600,600,600,600,600,600,600],
+                                 kiwami:  [1500,1500,1500,1500,1500,1500,1500,1500,1500,1500] },
+                     remove: [75,75,75,75,75,75,75,75,75,75],
+                     reroll: [50,50,50,50,50,50,50,50,50,50],
+                     ing:    [150,150,150,150,150,150,150,150,150,150] } },
     // レアリティ（Wave7 Step1・すべて仮値）。3択/店の出現率(rates)と店の基準価格(prices)。値段が進行で上がるかは scaleOnBuy。
     //   抽選は「軸 → レアリティ → カード」の3段。rates は軸の「主軸からの距離」ごとの表で、
     //   main=主軸（距離0）／mid=中間（距離0.5）／far=遠い軸（デッキに0枚・距離1）。距離で3行を線形に補間する。
@@ -1520,7 +1540,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 15", base: "67d8f08", date: "2026-08-14" };
+const BUILD = { label: "Wave 16", base: "ee42890", date: "2026-08-15" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -4417,13 +4437,40 @@ function rebuildRentByDay(){
   r.rentByDay = Array.from({ length: n }, (_, i) => Math.round((r.rentBase || 500) * Math.pow(r.rentMul || 1.5, i)));
   return r.rentByDay;
 }
+/* Wave16：いまの基準価格から shop.byDay を作り直す（調整欄のボタン用）。
+   どの品目も「基準価格を dayGoal の日数ぶん並べる」だけ。押した直後の挙動は押す前と同じになる。
+   具材枠は累積（買うたび2倍）の土台なので、並べるのも基準価格 ¥150 のまま（¥150→300→… は累積が作る）。 */
+function rebuildShopByDay(which){
+  const sh = CONFIG.params.shop || {}, rr = CONFIG.params.rarity || {};
+  const n = Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 10));
+  const fill = v => Array.from({ length: n }, () => Math.max(0, Math.round(v || 0)));
+  const std = k => (rr.on !== false && rr.prices && rr.prices[k] != null) ? rr.prices[k] : (sh.cardCost || 100);
+  sh.byDay = sh.byDay || {};
+  const doTable = key => { sh.byDay[key] = {}; for (const k of RARITY_ORDER) sh.byDay[key][k] = fill(std(k)); };
+  if (!which || which === "card")     doTable("card");
+  if (!which || which === "artifact") doTable("artifact");
+  if (!which || which === "remove")   sh.byDay.remove = fill(sh.removeCost);
+  if (!which || which === "reroll")   sh.byDay.reroll = fill(sh.rerollCost);
+  if (!which || which === "ing")      sh.byDay.ing    = fill(sh.ingredientSlotCost);
+  return sh.byDay;
+}
 // 家賃までに作れる数＝rentEvery。深夜営業（アーティファクト）があれば +extra 個ぶん延びる。
 function effRentEvery(){ const rn = CONFIG.params.run || {}; const ns = artById("nightshift"); return Math.max(1, Math.round((rn.rentEvery || 5) + (ns ? (ns.extra || 0) : 0))); }
 // 購入キー → 価格スケールの要素（具材枠/ソース枠は段数スロットとして slot に統合）。
 function scaleElemOf(key){ return key === "ing" ? "slot" : key === "sau" ? "sslot" : key; }   // 具材枠=slot / ソース枠=sslot（分離）
 function scaleFor(elem){ const sc = ((CONFIG.params.shop || {}).scale || {})[elem] || {}; return { on: !!sc.onBuy, mul: sc.mul || 1.5 }; }
+/* Wave16：営業日ごとの値段（shop.byDay）。添字は家賃と同じ「1営業日目＝0」。
+   店は家賃を払った直後に開くので、そのとき daysSurvived は「これから始める営業日 - 1」＝そのまま添字になる。
+   値が無い日（空欄・配列の外）は fallback＝これまでの式に戻す。家賃の rentByDay と同じ規則。 */
+function priceDayIdx(){ return Math.max(0, daysSurvived); }
+function byDayPrice(arr, fallback){
+  const i = priceDayIdx();
+  return (Array.isArray(arr) && arr[i] != null && Number.isFinite(+arr[i])) ? +arr[i] : fallback;
+}
+function shopByDay(key){ return ((CONFIG.params.shop || {}).byDay || {})[key]; }
 function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = shopBuys[key] || 0;
-  return Math.max(0, Math.round((base || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
+  const b = byDayPrice(shopByDay(key), base);
+  return Math.max(0, Math.round((b || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
 function bumpBuy(key){ if (key === "sau" || scaleFor(scaleElemOf(key)).on) shopBuys[key] = (shopBuys[key] || 0) + 1; }   // sau は固定価格なので何回目かを常に数える
 // ソース枠：上限（枚数）と、何回目かで決まる固定価格（Wave6 2-1/2-2）。scale.sslot は使わない。
 function sauceSlotMax(){                             // ソース枠の上限（寸胴鍋は上限を超える）
@@ -4441,8 +4488,11 @@ function sauceSlotPrice(){                          // 上限を手で上げた�
 // カード/アーティファクトの店の値段。rarity.on ならレアリティ別の基準価格、そうでなければ shop.cardCost。値上げは要素別スケール（card/artifact）。
 function rarityPrice(rar, buyKey){
   const rr = CONFIG.params.rarity || {}; const sh = CONFIG.params.shop || {};
-  const base = (rr.on !== false && rr.prices) ? (rr.prices[rar] != null ? rr.prices[rar] : 100) : (sh.cardCost || 100);
-  const sc = scaleFor(buyKey === "artifact" ? "artifact" : "card"); const n = buyKey ? (shopBuys[buyKey] || 0) : 0;
+  const isArt = buyKey === "artifact";
+  const std = (rr.on !== false && rr.prices) ? (rr.prices[rar] != null ? rr.prices[rar] : 100) : (sh.cardCost || 100);
+  // Wave16：カードとアーティファクトは別々の表を持つ。値の無い日は基準価格（rarity.prices）に戻る。
+  const base = byDayPrice((shopByDay(isArt ? "artifact" : "card") || {})[rar], std);
+  const sc = scaleFor(isArt ? "artifact" : "card"); const n = buyKey ? (shopBuys[buyKey] || 0) : 0;
   return Math.max(0, Math.round(base * (sc.on ? Math.pow(sc.mul, n) : 1)));
 }
 // カードの値段。値札の張り替え〈使い切り〉＝いちばん安いレアリティの値段／朝市・常連の要求＝割引。
@@ -5387,6 +5437,51 @@ function renderSettings(){
     }
   }
 
+  // ── 進行：営業日ごとの値段（Wave16）──
+  //   家賃と同じ形。値を消すと（空欄）その日はこれまでの式に戻る。
+  //   dayRows() は「配列1本＝営業日ぶんの数値欄」を並べる共通部品。カードと道具は帯ごとに4本並べる。
+  {
+    const shp = () => (CONFIG.params.shop.byDay = CONFIG.params.shop.byDay || {});
+    const dayN = () => Math.max(1, Math.round((CONFIG.params.run || {}).dayGoal || 10));
+    const dayRows = (grid, get, set, label, hint) => {
+      const n = Math.max((get() || []).length, dayN());
+      for (let i = 0; i < n; i++){
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.step = "10"; inp.placeholder = hint;
+        const a0 = get() || []; inp.value = a0[i] != null ? a0[i] : "";
+        inp.addEventListener("input", () => {
+          const a = Array.isArray(get()) ? get() : [];
+          while (a.length < i) a.push(null);
+          const v = parseFloat(inp.value);
+          a[i] = inp.value.trim() === "" || Number.isNaN(v) ? null : Math.max(0, Math.round(v));
+          set(a);
+        });
+        gridRow(grid, (i + 1) + "営業日目" + label, inp);
+      }
+    };
+    const rebuildBtn = (grid, which) => {
+      const b = document.createElement("button");
+      b.className = "shopbtn"; b.textContent = "いまの基準価格から作り直す（dayGoal の日数ぶん）";
+      // ボタンは input/change を出さないので、家賃と同じくここで明示的に保存する。
+      b.addEventListener("click", () => { rebuildShopByDay(which); saveCfg(); renderSettings(); });
+      gridRow(grid, "作り直し", b);
+    };
+    for (const [key, ttl] of [["card", "カード"], ["artifact", "アーティファクト"]]){
+      const gg = group("店：営業日ごとの" + ttl + "の値段（帯ごと・空欄なら基準価格）", "run");
+      rebuildBtn(gg, key);
+      for (const rk of RARITY_ORDER)
+        dayRows(gg, () => (shp()[key] || {})[rk],
+                     (a) => { shp()[key] = shp()[key] || {}; shp()[key][rk] = a; },
+                     "・" + RARITY_JA[rk], "基準価格");
+    }
+    for (const [key, ttl, hint] of [["remove", "取り除き", "基準価格"], ["reroll", "引き直し", "基準価格"],
+                                    ["ing", "具材枠+1", "基準価格（買うたび2倍の土台）"]]){
+      const gg = group("店：営業日ごとの" + ttl + "の値段（空欄なら基準価格）", "run");
+      rebuildBtn(gg, key);
+      dayRows(gg, () => shp()[key], (a) => { shp()[key] = a; }, "", hint);
+    }
+  }
+
   // ── 進行：店 ──
   g = group("店（家賃後に開く・値段は購入回数で上げるか切替）", "run");
   const sh = CONFIG.params.shop;
@@ -5861,6 +5956,7 @@ const plog = (function(){
              scale: JSON.parse(JSON.stringify(sh.scale || {})),
              shopBase: { cardCost: sh.cardCost, removeCost: sh.removeCost, ingredientSlotCost: sh.ingredientSlotCost,
                          sauceSlotCost: sh.sauceSlotCost, rerollCost: sh.rerollCost },
+             shopByDay: sh.byDay ? JSON.parse(JSON.stringify(sh.byDay)) : null,   // Wave16：その日いくらだったかを後から追える
              rarity: { on: (p.rarity||{}).on, prices: Object.assign({}, (p.rarity||{}).prices) } }; }
   function newRun(seed){ cumScore = 0;
     return { summary: { build: BUILD.label, base: BUILD.base, buildDate: BUILD.date,   // どのビルドで遊んだログか（4-2・base＝この波を積んだ土台のコミット）
