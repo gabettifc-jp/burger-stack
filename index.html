@@ -43,6 +43,16 @@
   /* 揺れはこの内側レイヤーだけに適用する。#stage（枠・背景・メーター）や画面下の固定バーは一切動かさない。 */
   #stageShake{position:absolute; inset:0; z-index:2; pointer-events:none}
   #stageShake.shake{animation:bshake .13s ease-out}   /* 帯にいる間、段が落ちるたびに揺れる（強さは帯で変わる） */
+  /* Wave19：倍率フェーズの揺れ。振幅(--mshake)は「そこまでの合計倍率」で決める（下がらない）。 */
+  #stageShake.mshake{animation:mshake var(--mshdur,.22s) cubic-bezier(.2,.8,.3,1)}
+  @keyframes mshake{
+    0%{transform:translate(0,0) rotate(0)}
+    18%{transform:translate(calc(var(--mshake,3px) * -1), calc(var(--mshake,3px) * .35)) rotate(calc(var(--mshrot,.5deg) * -1))}
+    38%{transform:translate(var(--mshake,3px), calc(var(--mshake,3px) * -.3)) rotate(var(--mshrot,.5deg))}
+    60%{transform:translate(calc(var(--mshake,3px) * -.55), 0) rotate(calc(var(--mshrot,.5deg) * -.5))}
+    80%{transform:translate(calc(var(--mshake,3px) * .35), 0) rotate(calc(var(--mshrot,.5deg) * .3))}
+    100%{transform:translate(0,0) rotate(0)}
+  }
   @keyframes bshake{0%,100%{transform:translate(0,0)}30%{transform:translate(0,calc(var(--bshake,0)*1px))}70%{transform:translate(0,calc(var(--bshake,0)*-1px))}}
   #stageInner{position:absolute; left:50%; bottom:14px; transform:translateX(-50%) scale(calc(var(--fit,1) * var(--zoom,1))); transform-origin:50% 100%; width:230px; height:0;
     filter:drop-shadow(0 0 var(--bedge,0px) var(--bcol,transparent)); transition:filter .3s ease, transform .18s ease}  /* 帯：ふちの光り／--zoom=カメラ寄り */
@@ -61,11 +71,20 @@
     background:radial-gradient(120% 95% at 50% 62%, var(--bcol,#fff), transparent 70%);
     opacity:var(--bbg,0); mix-blend-mode:screen; transition:opacity .4s ease, background .4s ease}
   /* 上部の計器：乗算の積（右上）。常時表示で積み上げ中に増えていく。基礎点はバーガーに重ねて出す（#burgerScore）。 */
-  .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:flex-end; pointer-events:none}
+  .meters{position:absolute; left:8px; right:8px; top:8px; z-index:6; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; pointer-events:none}
+  /* Wave19：得点の合計（落下フェーズで増える）と倍率の合計（倍率フェーズで増える）を常時出す。 */
+  #scoreMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px; color:#fff}
+  #scoreMeter::before{content:"合計 "; font-size:.62rem; opacity:.72; font-weight:700}
+  #multMeter::before{content:"倍率 "; font-size:.62rem; opacity:.72; font-weight:700}
+  #scoreMeter.bump{animation:mbump .18s ease-out}
   #multMeter{font-weight:800; font-size:1.05rem; background:rgba(0,0,0,.4); padding:2px 8px; border-radius:8px}
   /* 帯：乗算表示の色と大きさ（帯にいる間ずっと持続） */
   #multMeter{color:var(--bc,var(--accent)); font-size:calc(1.05rem * var(--bsize,1)); transition:color .3s ease, font-size .3s ease}
   #multMeter.bump{animation:mbump .18s ease-out}
+  /* Wave19：育った倍率（pm）を、どの画面でも同じ形でカードの隅に出す。 */
+  .pmb{display:inline-block; margin-left:4px; padding:0 5px; border-radius:6px; font-size:.68rem; font-weight:800;
+       background:#3a2b12; border:1px solid #6b4f1c; color:#ffd479; vertical-align:middle}
+  .tier .pmb{position:absolute; right:2px; top:2px; z-index:8; font-size:.6rem; padding:0 4px}
   @keyframes mbump{0%{transform:scale(1)}45%{transform:scale(1.28)}100%{transform:scale(1)}}
   /* 得点をバーガーに重ねて大きく表示。位置(--bsx/--bsy)・大きさ(--bss)・不透明度(--bso)は調整欄から変える。 */
   #burgerScore{position:absolute; left:var(--bsx,50%); top:var(--bsy,52%); z-index:10; pointer-events:none;
@@ -666,6 +685,7 @@
     <div id="stage">
       <div class="bandbg"></div>
       <div class="meters">
+        <div id="scoreMeter">0</div>
         <div id="multMeter">×1.00</div>
       </div>
       <div id="comboFeed"></div>
@@ -1014,6 +1034,10 @@ const DEFAULTS = {
       // Wave15：発動したカードの名前を右上に短く出す（「演出が何の演出か分からない」への対応）。
       //   バーガーの上に数字を飛ばす方式は Wave6 で撤回しているので、そこには戻さず、名前だけを別枠に出す。
       hitFeed:   { on:true, life:1.6, max:4 },
+      /* Wave19 倍率フェーズ：完成したあと、盤面の下から順に倍率カードを1枚ずつ光らせる。
+         gap＝1枚ごとの間隔（秒・落下の間隔とは別に持つ）／cap＝強さが最大になる合計倍率
+         （強さ t = min(1, log(合計倍率)/log(cap))）／shake・part＝揺れと破片の倍率。 */
+      multPhase: { on:true, gap:0.26, cap:1000, shake:1.0, part:1.0 },
       particles: { on:true, count:22, scale:1.4, speed:150, life:1.0, gravity:360, spread:0.75, max:800 }, // 文字を減らした分、密度は破片で確保。maxは総数上限（〜2000）
       hitstop:   { on:true, base:0.03, scale:1.35 },   // 大コンボ/帯上昇で画面停止 base×scale^L 秒（上限0.45s）
       trail:     { on:true, base:0.35, scale:1.25 },   // 落下段の残像（尾）の濃さ
@@ -1388,6 +1412,16 @@ const Sound = (() => {
       const rise = Math.min(24, (chain || 0) * 1);    // 連鎖1つにつき半音上げる（上限2オクターブ）
       const base = reachedFreq(rise);                 // 固定rootでなく「いま到達している音程」から＋連鎖ぶん（同じ音階の上に乗せる）
       chord(base, semis, { type: w, detune: d, dur: grade >= 2 ? 0.26 : 0.15, gain: grade >= 2 ? 0.24 : 0.18, stagger: grade >= 2 ? 0.02 : 0 }); },
+    /* Wave19 倍率フェーズ：1枚ずつ鳴らす。音程・厚み・長さは**そこまでの合計倍率**（t=0〜1）で決める。
+       これまでは倍率が増える音が連続して鳴り、何が起きたのか分からなかった。1枚1音にして、
+       合計が伸びるほど高く・厚く・長くする（t は下がらないので、音も下がらない）。 */
+    multStep(t, idx){ const C = scheme().combo, w = C.wave || bandWave(), d = bandDetune();
+      const tt = Math.max(0, Math.min(1, t || 0));
+      const rise = Math.round(tt * 19) + Math.min(6, idx || 0);     // 合計が伸びるほど高く（段ごとに少し積む）
+      const base = reachedFreq(rise);
+      const semis = tt >= 0.66 ? C.big : tt >= 0.33 ? C.mid : C.small;
+      chord(base, semis, { type: w, detune: d, dur: 0.14 + 0.22 * tt, gain: 0.14 + 0.14 * tt, stagger: 0.015 * tt });
+      if (tt >= 0.5 && scheme().noise) noise({ gain: 0.10 * tt, dur: 0.05, hp: 2600 }); },
     // 帯アップ：音を層にして押し寄せる。stage と fx.bandup.layers が上がるほど層と長さが増す。
     //  ★固定の高さで鳴らさない：いま到達している音程の1オクターブ上から鳴らし、必ず上がって聞こえるようにする。
     bandUp(mul, stage){ const U = scheme().up, w = U.wave || bandWave(), st = Math.max(1, stage || 1);
@@ -1467,7 +1501,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 18", base: "3866537", date: "2026-08-15" };
+const BUILD = { label: "Wave 19", base: "8324547", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -1966,6 +2000,18 @@ function onBuyCard(inst){
     if (e && e.id === "growOn" && e.trigger === "buy") bumpPb(x, e, e.per || 0); }
 }
 const rarityOf = name => (CONFIG.items[name] && CONFIG.items[name].rar) || "nami";   // 未指定は「並」
+/* Wave19：育った倍率（pm）を、デッキ・3択・店・盤面のどこでも同じ形で出す。
+   出すのは「いくら成長したか」ではなく「いまいくつか」（×(1+pm)）。
+   まだ所持していないカード（3択・店）は、その個体がまだ無いので開始値 pm0 を出す。 */
+function pmNowOf(name, inst){
+  if (inst) return inst.pm || 0;
+  const e = (CONFIG.items[name] || {}).effect || {};
+  return e.pm0 || 0;
+}
+function pmBadgeHTML(name, inst){
+  const pm = pmNowOf(name, inst);
+  return pm > 0 ? `<span class="pmb">×${r2(1 + pm)}</span>` : "";
+}
 // 所持アーティファクトのうち id が一致する最初のものの定義を返す（無ければ null）。
 function artById(id){ for (const nm of artifactsOwned){ const a = CONFIG.artifacts[nm]; if (a && a.id === id) return a; } return null; }
 function hasArt(id){ return !!artById(id); }
@@ -2669,7 +2715,7 @@ function computeLayout(stack){
    DOM / 描画
    ========================================================================= */
 const $ = id => document.getElementById(id);
-const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter");
+const stageInner = $("stageInner"), hintEl = $("hint"), multMeterEl = $("multMeter"), scoreMeterEl = $("scoreMeter");
 const stageShake = $("stageShake"), burgerScoreEl = $("burgerScore"), coinLayerEl = $("coinLayer");
 const cumTotalEl = $("cumTotal"), comboFeedEl = $("comboFeed"), offerEl = $("offer");
 const scoreEl = $("score"), fBase = $("fBase"), fGrow = $("fGrow"), fAdd = $("fAdd"), fMult = $("fMult"), fTotal = $("fTotal");
@@ -2764,6 +2810,13 @@ function onTap(){
   if (!runActive) return;                        // ラン終了（結果表示中）は「最初から」ボタン以外を無視
   if (offering) return;                          // 3択・家賃・店の最中はボタンを無視（画面内をタップして選ぶ）
   if (collectLocked) return;                     // 完成直後：点数を必ず見せるため入力を無視
+  if (multPhaseActive){                          // Wave19：倍率フェーズ中のタップは早送り（回収はしない）
+    if (CONFIG.params.fastForward !== false){
+      multPhaseFast = true;
+      if (multPhaseTimer){ clearTimeout(multPhaseTimer); multPhaseTimer = null; stepMultPhase(); }
+    }
+    return;
+  }
   if (awaitingCollect){ collect(); return; }     // 完成後の最初のタップ：回収して次を始める
   if (midSequence()){                            // 落下中／段間の待ち中：新規に始めず、早送り＋（予約）
     if (dropping && CONFIG.params.fastForward !== false) fastForward(); // 早送り：落下中の段を速める（既定ON）
@@ -2820,6 +2873,7 @@ function skipToEnd(){
   revealed = n; wantDrop = n; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   runBase = plan.final.base; runMult = plan.final.mult; bandLevelCur = plan.final.band;   // 最終値を反映
   multMeterEl.textContent = "×" + plan.sc.mult.toFixed(2);
+  scoreMeterEl.textContent = fmtJP(plan.final.base + (plan.sc.grow || 0) + plan.final.add);
   applyBandVisual(plan.final.band);                  // 帯の見た目は最終段位（planで確定）
   comboFeedEl.innerHTML = "";                         // コンボ履歴（×N の羅列）は廃止：倍率は右上の累計に集約
   complete();                                        // 完成（合計表示・回収待ち）へ
@@ -2844,6 +2898,7 @@ function startBurger(){
   revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = new Array(stack.length);
   runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; comboChain = 0; awaitingCollect = false;
+  multPhaseActive = false; multPhaseIdx = 0; multPhaseFast = false; multPhaseTimer = null;
   applyBandVisual(0); clearBandTransients();        // 帯の見た目と一時演出（バースト等）をリセット
   genToken++; clearTimers();
   hintEl.style.display = "none";
@@ -2855,7 +2910,7 @@ function startBurger(){
   stageInner.style.setProperty("--fit", s.toFixed(4)); stageInner.style.setProperty("--zoom", "1");
   // 得点欄（このバーガーの売値）は、前の回収のコイン満たしを見せ切るため、ここでは消さない。
   //  次バーガーの1段目が着地した時点で resetScorePanel() が空に戻す（＝前の回収の数字を上書きしない）。
-  multMeterEl.textContent = "×1.00"; burgerScoreClear();
+  multMeterEl.textContent = "×1.00"; scoreMeterEl.textContent = "0"; burgerScoreClear();
   return true;
 }
 
@@ -2909,32 +2964,57 @@ function buildPlan(){
   const firstIng = b.drawn.find(x => CONFIG.items[x.name].pile === "ingredient");   // まつたけ：最初に引かれた具材（引き順・整列前）
   const score = evaluate(st, rawG, inst, firstIng ? firstIng.id : null), lay = computeLayout(st), grades = computeGrades(score, st);   // ⑤得点（3項＋効果）
   const n = st.length;
-  const revealAt = {};                              // 各ヒットが「出そろう」段（両側が揃う＝max(idx)）
-  score.hits.forEach((h, i) => { const at = Math.max(...h.idx); (revealAt[at] = revealAt[at] || []).push(i); });
+  /* Wave19：演出を2フェーズに分ける。
+       落下フェーズ … 加算（kind:"add"）と表示専用（"note"）だけを出す。倍率カードはここでは光らない。
+       倍率フェーズ … 倍率（"multAdd" / "mult"）を、**盤面の下から順に**1枚ずつ光らせる。
+     倍率を出す段は「両側が揃う段（max(idx)）」ではなく**そのカード自身の位置（src）**にする。
+     盤面順に光らせるため。src を持たないもの（アーティファクト等）は最上段に寄せる。
+     並べ替えても最終値が変わらないのは、③が足し算・④が掛け算に別々に溜まるため。 */
+  const revealAt = {}, multAt = {};
+  score.hits.forEach((h, i) => {
+    if (h.kind === "multAdd" || h.kind === "mult"){
+      const at = (h.src != null && h.src >= 0 && h.src < n) ? h.src : (n - 1);
+      (multAt[at] = multAt[at] || []).push(i);
+    } else {
+      const at = Math.max(...h.idx); (revealAt[at] = revealAt[at] || []).push(i);
+    }
+  });
   const bA = score.baseArr, gA = score.growArr;     // 段ごとの running base ＝ 第1項＋第2項（Wave4・3-2）
-  const steps = []; let runBase = 0, runMult = 1;
+  const steps = []; let runBase = 0, runAdd = 0;
   for (let r = 0; r < n; r++){
     const stepBase = (bA[r] || 0) + (gA[r] || 0);
     runBase += stepBase;
     const reveals = revealAt[r] || [];
-    for (const i of reveals){ const h = score.hits[i]; if (h.kind === "mult") runMult *= h.mult; }
-    if (r === n - 1) runMult = score.mult;          // 最終段でコンボ数ボーナス等の全体倍率を織り込む（表示と一致）
-    steps.push({ r, item: st[r], base: stepBase, runBase, runMult, reveals, bandFrom: 0, bandTo: 0, reach: null });
+    for (const i of reveals){ const h = score.hits[i]; if (h.kind === "add") runAdd += (h.add || 0); }
+    // 落下フェーズの倍率は常に 1.0（帯もここでは動かさない）。
+    steps.push({ r, item: st[r], base: stepBase, runBase, runAdd, runScore: runBase + runAdd,
+                 runMult: 1, reveals, bandFrom: 0, bandTo: 0, reach: null });
   }
+  /* 倍率フェーズの段取り。合計倍率は (1 + ③の和) × ④の積。
+     ③の per は全てプラス、④の mult は最小 1.0 なので、合計は途中で一度も減らない。 */
+  const multSteps = []; let mAdd = 0, mMul = 1;
   for (let r = 0; r < n; r++){
-    steps[r].bandFrom = r > 0 ? bandLevelOf(steps[r-1].runMult) : 0;
-    steps[r].bandTo   = bandLevelOf(steps[r].runMult);
+    const hs = multAt[r]; if (!hs || !hs.length) continue;
+    for (const i of hs){ const h = score.hits[i];
+      if (h.kind === "multAdd") mAdd += (h.madd || 0); else mMul *= (h.mult || 1); }
+    multSteps.push({ r, hits: hs, multAfter: (1 + mAdd) * mMul });
   }
+  // コンボ数ボーナス等、カードに紐づかない全体倍率は最後にまとめて反映する（表示を最終値と一致させる）。
+  if (multSteps.length) multSteps[multSteps.length - 1].multAfter = score.mult;
+  else if (score.mult !== 1) multSteps.push({ r: n - 1, hits: [], multAfter: score.mult });
+  for (let r = 0; r < n; r++){ steps[r].bandFrom = 0; steps[r].bandTo = 0; }
   // 予告（リーチ）は「本当に届く回」だけに出す：確定した最終倍率が、その段の次の帯を実際に跨ぐときのみ立てる。
   // 外れる回に当たりそうな煽りは出さない（結果と乖離させない）。
-  const rc = CONFIG.params.reach, finalMult = steps[n-1].runMult;
+  /* Wave19：予告（リーチ）は倍率フェーズへ移す。落下中は倍率が動かないので、落下段に予告を出すと嘘になる。
+     倍率フェーズの各段で「この先まだ帯を跨ぐか」を見て立てる。 */
+  const rc = CONFIG.params.reach, finalMult = score.mult;
   if (rc && rc.on !== false){
-    for (let r = 0; r < n - 1; r++){
-      const left = (n - 1) - r;
+    for (let k = 0; k < multSteps.length - 1; k++){
+      const left = (multSteps.length - 1) - k;
       if (left < 1 || left > (rc.maxTiers || 2)) continue;
-      const cur = steps[r].runMult, nextT = bandThreshold(bandLevelOf(cur) + 1);
+      const cur = multSteps[k].multAfter, nextT = bandThreshold(bandLevelOf(cur) + 1);
       if (cur < nextT && finalMult >= nextT && (nextT / cur) <= (rc.window || 2.5)){
-        steps[r].reach = { need: nextT / cur, target: Math.round(nextT), threshold: nextT };
+        multSteps[k].reach = { need: nextT / cur, target: Math.round(nextT), threshold: nextT };
       }
     }
   }
@@ -2942,8 +3022,8 @@ function buildPlan(){
      そのまま混ぜるとデッキ側の id と衝突する。衝突すると盤面に出ていない個体が「出た」と誤判定され、
      昆布（引かれなかったスピンごとに育つ）が黙って育たない回ができる。Wave9 で豆板醤を足したときに露見したので、ここでバンズを外す。 */
   return { stack: st, inst, rawG, boardIds: new Set(inst.filter(x => (CONFIG.items[x.name]||{}).pile !== "bun").map(x => x.id)),
-           pendingDiscard: spinPendingDiscard.slice(), sc: score, layout: lay, grades, steps,
-           final: { base: score.base, add: score.add, mult: score.mult, total: score.total, band: steps[n-1].bandTo } };
+           pendingDiscard: spinPendingDiscard.slice(), sc: score, layout: lay, grades, steps, multSteps,
+           final: { base: score.base, add: score.add, mult: score.mult, total: score.total, band: bandLevelOf(score.mult) } };
 }
 
 const GRADE_JA = ["小","中","大"];
@@ -3145,7 +3225,8 @@ function bump(el){ if (reduced) return; el.classList.remove("bump"); void el.off
 function applyStep(r){
   const step = plan.steps[r];
   runBase = step.runBase;
-  burgerScoreShow(String(runBase), "running");      // 積み中の基礎点をバーガーに重ねて大きく（左上メーターは廃止）
+  burgerScoreShow(String(step.runScore), "running");   // Wave19：積み中は「得点の合計」（第1項＋第2項＋加算）
+  scoreMeterEl.textContent = fmtJP(step.runScore); bump(scoreMeterEl);
   Sound.land(r);                                    // 着地音（段が上がると音程が上がる・帯で音色が変わる）
   { const p = stageXY(r); spawnParticles(p.x, p.y, partKind(step.item), 0.8);     // 着地の破片（食材に応じた見た目）
     basePop(p.x, p.y, step.base); }                                               // 飛ばす数字は「段の基礎点」だけ（小さく短命）
@@ -3158,14 +3239,8 @@ function applyStep(r){
     below.classList.add("squash");
     animTimers.push(setTimeout(() => below.classList.remove("squash"), CONFIG.params.squash*1000 + 20));
   }
-  for (const i of step.reveals) presentHit(i);      // この段で出そろうコンボを再生（倍率はplanで確定済み）
-  runMult = step.runMult;
-  multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl);
-  if (step.bandTo > step.bandFrom) crossBands(step.bandFrom, step.bandTo);   // 跨ぐぶんを1段ずつ確定（跨いだ瞬間の爆発）
-  else bandLevelCur = step.bandTo;
-  applyBandVisual(fxLevelRaw());                     // 持続の見た目は連続レベルで滑らかに上げる（最終帯へ向けて先読み）
-  if (step.reach) showReach(step.reach);            // 予告：本当に届く回だけ（planで確定済み）
-  if (r === plan.stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→停止
+  for (const i of step.reveals) presentHit(i);      // Wave19：この段で出そろう「加算」だけを再生（倍率はここでは光らせない）
+  if (r === plan.stack.length - 1){ wantDrop = revealed; complete(); }  // 最終段で完成→倍率フェーズへ
 }
 
 function tierY(r){ return layout.bottoms[r] + layout.effs[r]/2; }
@@ -3303,7 +3378,7 @@ function celebrateComplete(){
 let rampToken = 0, rampTimer = null;
 function stopScoreRamp(){ rampToken++; if (rampTimer){ clearTimeout(rampTimer); rampTimer = null; }
   fxForceBand = null; bandLevelCur = 0; bandPeak = 0; comboChain = 0;   // デバッグ再生を止めて待機の見た目へ戻す
-  clearBandTransients(); applyBandVisual(0); burgerScoreClear(); multMeterEl.textContent = "×1.00"; }
+  clearBandTransients(); applyBandVisual(0); burgerScoreClear(); multMeterEl.textContent = "×1.00"; scoreMeterEl.textContent = "0"; }
 function runScoreRamp(){
   stopScoreRamp();
   const d = CONFIG.params.debug || {};
@@ -3386,6 +3461,44 @@ function hitFeed(h, grade){
   animTimers.push(setTimeout(() => { if (e.parentNode) e.remove(); }, Math.max(0.2, cf.life || 1.6) * 1000));
 }
 
+/* Wave19：倍率フェーズで1枚を光らせる。強さ t は「そこまでの合計倍率」から来る（個々の寄与ではない）。
+   +型（multAdd）と×型（mult）を画では区別しない。プレイヤーに要るのは合計がいくつ動いたかであって内部の型ではない。 */
+function presentMultHit(i, t){
+  const h = plan.sc.hits[i];
+  const grade = t >= 0.66 ? 2 : t >= 0.33 ? 1 : 0;
+  if (!reduced){
+    const glowMs = CONFIG.params.grade.glowMs * 1000;
+    for (const k of h.idx){ const el = tierEls[k]; if (!el) continue;
+      el.classList.add(grade >= 2 ? "hitbig" : "hit");
+      animTimers.push(setTimeout(() => el.classList.remove("hit","hitbig"), glowMs)); }
+    if (grade >= 2){ screenFlash(); cameraZoom(1); hitstop(1); }
+  }
+  hitFeed(h, grade);                                // 何が倍率を出したのかを名前で出す
+}
+// バーガー全体の揺れ。振幅は合計倍率で決める（上限つき＝画面が壊れない）。
+function multShake(t){
+  if (reduced) return;
+  const c = (CONFIG.params.fx || {}).multPhase || {};
+  const amp = (c.shake != null ? c.shake : 1) * (1.5 + 9 * t);      // 1.5px 〜 10.5px
+  stageShake.style.setProperty("--mshake", amp.toFixed(2) + "px");
+  stageShake.style.setProperty("--mshrot", (0.25 + 1.1 * t).toFixed(2) + "deg");
+  stageShake.style.setProperty("--mshdur", (0.18 + 0.12 * t).toFixed(2) + "s");
+  stageShake.classList.remove("mshake"); void stageShake.offsetWidth; stageShake.classList.add("mshake");
+  animTimers.push(setTimeout(() => stageShake.classList.remove("mshake"), 420));
+}
+/* Wave19：演出が終わったあとも読める内訳を盤面に残す（いままでは流れて消えていた）。 */
+function showFinalSummary(sc2){
+  const host = $("firedList"); if (!host) return;
+  const old = host.querySelector(".fl-sum"); if (old) old.remove();
+  const row = document.createElement("div"); row.className = "fl-row fl-sum";
+  const jp = v => Math.round(v).toLocaleString("ja-JP");   // 残す数字は略さない（後から読むため）
+  row.innerHTML = `<span class="fl-lbl">合計</span>`
+    + `<span class="chip">基礎点 <b>${jp(sc2.base + (sc2.grow || 0))}</b></span>`
+    + `<span class="chip add">加算 <b>${(sc2.add >= 0 ? "+" : "") + jp(sc2.add)}</b></span>`
+    + `<span class="chip mult">倍率 <b>×${r2(sc2.mult)}</b></span>`
+    + `<span class="chip">合計 <b>¥${jp(sc2.total)}</b></span>`;
+  host.appendChild(row);
+}
 // 具材の隣に一瞬出す +N / ×N。バッジではなく、ただの値。位置は具材ごと、種類ごとの寿命で消える。
 function popFlow(cls, y, text){
   const kind = cls.indexOf("base") === 0 ? "base" : "combo";
@@ -3606,26 +3719,88 @@ function applyEasing(){
   scoreEl.style.setProperty("--numease", EASINGS[e.number] || EASINGS.overshoot);
 }
 
-// 完成：ここで停止して合計点を大きく見せる。まだ銀行には入れない（回収は次のタップ）。
-// 予告は「本当に届く回」だけなので、届かず完成（＝止まった）は構造上起きない。
-function complete(){
-  // 得点欄（このバーガーの売値）は回収まで空にしておく（＝コインの着弾で満たす）。ここでは埋めない。
-  multMeterEl.textContent = "×" + sc.mult.toFixed(2);
-  wantDrop = revealed;                              // 予約された入力はここで破棄
-  bandPeak = Math.max(bandPeak, plan.final.band);   // 到達した最高帯（完成演出の基準）
-  Sound.complete(plan.stack.length - 1, plan.final.band);   // 到達した高さから続けて鳴らす＋帯で音色
+/* ── Wave19：倍率フェーズ ────────────────────────────────────────────────
+   バーガーが止まってから、盤面の下から順に「倍率を出したカード」が1枚ずつ光る。
+   光るたび：原因を出す → バーガーが揺れる → パーティクル → 倍率の合計が増える。
+   強さは**そこまでの合計倍率**で決める。個々のカードの寄与では決めない。
+     寄与で決めると ×3 → ×18 → ×6 の順に光ったとき 中 → 強 → 中 と下がる。
+     合計は途中で減らないので、合計に連動させれば強さが下がる場面は原理的に起きない。
+   式は対数（上限つき）：t = min(1, log(合計倍率) / log(cap))。cap は調整欄から変えられる。 */
+function multStrength(m){
+  const c = (CONFIG.params.fx || {}).multPhase || {};
+  const cap = Math.max(1.0001, c.cap != null ? c.cap : 1000);
+  return Math.min(1, Math.max(0, Math.log(Math.max(1, m || 1)) / Math.log(cap)));
+}
+let multPhaseActive = false, multPhaseIdx = 0, multPhaseTimer = null, multPhaseFast = false;
+function multGap(){
+  const c = (CONFIG.params.fx || {}).multPhase || {};
+  const g = (c.gap != null ? c.gap : 0.26);
+  return multPhaseFast ? Math.min(g, 0.04) : g;
+}
+function startMultPhase(){
+  const ms = (plan && plan.multSteps) ? plan.multSteps : [];
+  multPhaseActive = true; multPhaseIdx = 0; multPhaseFast = false;
+  runMult = 1; multMeterEl.textContent = "×1.00";
+  if (!ms.length || (CONFIG.params.fx || {}).multPhase && (CONFIG.params.fx.multPhase.on === false)){ finishMultPhase(); return; }
+  stepMultPhase();
+}
+function stepMultPhase(){
+  const ms = (plan && plan.multSteps) ? plan.multSteps : [];
+  if (!multPhaseActive) return;
+  if (multPhaseIdx >= ms.length){ finishMultPhase(); return; }
+  const e = ms[multPhaseIdx++];
+  const before = runMult;
+  runMult = e.multAfter;
+  const t = multStrength(runMult);
+  // ① 原因を出す（内訳のチップと同じ文言）＋その段が光る
+  for (const i of e.hits) presentMultHit(i, t);
+  // ② バーガー全体が揺れる（振幅は合計倍率で決める＝下がらない）
+  multShake(t);
+  // ③ パーティクル（強さも合計倍率で決める）
+  { const c = (CONFIG.params.fx || {}).multPhase || {};
+    const p = stageXY(e.r), amt = (c.part != null ? c.part : 1) * (0.8 + 2.6 * t);
+    spawnParticles(p.x, p.y, partKind(stack[e.r] || ""), amt); }
+  // ④ 倍率の合計が増える
+  multMeterEl.textContent = "×" + runMult.toFixed(2); bump(multMeterEl);
+  Sound.multStep(t, multPhaseIdx - 1);              // 1枚ずつ、倍率の大きさに応じた音
+  const bFrom = bandLevelOf(before), bTo = bandLevelOf(runMult);
+  if (bTo > bFrom) crossBands(bFrom, bTo); else bandLevelCur = bTo;
+  applyBandVisual(fxLevelRaw());
+  if (e.reach) showReach(e.reach);
+  multPhaseTimer = setTimeout(stepMultPhase, multGap() * 1000);
+  animTimers.push(multPhaseTimer);
+}
+function finishMultPhase(){
+  multPhaseActive = false; multPhaseTimer = null;
+  runMult = plan ? plan.final.mult : 1;
+  multMeterEl.textContent = "×" + runMult.toFixed(2);
+  bandLevelCur = bandLevelOf(runMult); applyBandVisual(fxLevelRaw());
+  bandPeak = Math.max(bandPeak, plan.final.band);
+  Sound.complete(plan.stack.length - 1, plan.final.band);
   awaitingCollect = true;
-  showFiredCards(sc);                               // item13：止まっている間に「効いたカード」の内訳を出す（読む時間を作る）
-  collectLocked = true;                             // 完成後しばらく入力を受け付けない（点数を必ず見せる）
+  showFiredCards(sc);                               // 止まっている間に「効いたカード」の内訳を出す（読む時間を作る）
+  showFinalSummary(sc);                             // Wave19：演出が終わっても内訳が盤面に残る
+  collectLocked = true;
   animTimers.push(setTimeout(() => { collectLocked = false; }, (CONFIG.params.completeLock || 0.30) * 1000));
   updateProgress();
-  celebrateComplete();                              // 最高帯に応じた完成演出（文字は出さず強さで示す）
+  celebrateComplete();
   const my = genToken;
-  const run = () => { if (my !== genToken) return; numberJuice(1.4);
-    burgerScoreShow("0", "total"); burgerCountUp(sc.total, my); };  // 完成：合計はバーガーに大きく重ねるだけ（下の得点欄は伏せたまま）
-  if (reduced || CONFIG.params.landPause <= 0) run();
+  numberJuice(1.4);
+  burgerScoreShow(String(plan.final.base + (plan.sc.grow || 0) + plan.final.add), "total");
+  burgerCountUp(sc.total, my);                      // 最後の掛け算：得点が一気に最終スコアまで回る
+}
+// 完成：落下が終わって止まった。ここから倍率フェーズに入る（回収はそのあと）。
+function complete(){
+  wantDrop = revealed;                              // 予約された入力はここで破棄
+  collectLocked = true;                             // 倍率フェーズが始まるまで入力を受け付けない
+  animTimers.push(setTimeout(() => { collectLocked = false; }, (CONFIG.params.completeLock || 0.30) * 1000));
+  if (CONFIG.params.skipFx){ startMultPhaseInstant(); return; }   // 演出省略（測定）：フェーズを回さず結果だけ
+  const my = genToken;
+  const run = () => { if (my !== genToken) return; startMultPhase(); };
+  if (CONFIG.params.landPause <= 0) run();
   else animTimers.push(setTimeout(run, CONFIG.params.landPause * 1000));
 }
+function startMultPhaseInstant(){ multPhaseActive = false; finishMultPhase(); }
 
 // 回収：得点欄（このバーガーの売値）と売上累計を、コインの着弾に同期して段階的に満たす。時間で勝手に数え上げない。
 function collect(){
@@ -3956,7 +4131,7 @@ function renderOfferScreen(picks, pool, nChoices){
     const sysTag = (it.type !== "sauce" && it.type !== "bun") ? "・" + TYPE_JA[it.type] : "";
     const cuiTag = it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : "";
     const eff = effectText(name) || "効果なし（暫定）";
-    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTag}${rarChipHTML(rarityOf(name))}</div><div class="nm">${name}</div>`
+    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTag}${rarChipHTML(rarityOf(name))}${pmBadgeHTML(name, null)}</div><div class="nm">${name}</div>`
                    + `<div class="bs">基礎${baseOf(name)}${sysTag}</div>`   // 重さの表示は撤去（Wave7 Step0：並びは抽選）
                    + `<div class="ef">${eff}</div>`;
     card.addEventListener("click", () => chooseOffer(name));
@@ -4009,7 +4184,7 @@ function chooseOffer(name){
     const pool = deck.filter(x => x.name !== name);
     if (!pool.length) break;
     const victim = pool[Math.floor(grand() * pool.length)];
-    discardInstance(victim, "artifact", false); plog.recordRemove(victim.name, "artifact");
+    discardInstance(victim, "artifact", false);   // Wave19：discardInstance の中で既に記録される（ここで recordRemove を呼ぶと二重になっていた）
   }
   if (n){ renderPiles(); renderAxisTally(); }
   if (hasArt("pickPushOut")){ showPushOut(name); return; }   // 押し出しを選ぶ画面へ（advanceOffer はそのあと）
@@ -4276,7 +4451,7 @@ function showShop(){
     const it = CONFIG.items[name]; const cost = cardPriceOf(name); const aff = money >= cost;
     const card = document.createElement("div"); card.className = "offer-card shopcard" + (aff ? "" : " cant");
     const eff = effectText(name) || "効果なし（暫定）";
-    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTagHTML(it)}${rarChipHTML(rarityOf(name))}</div><div class="nm">${name}</div>`
+    card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTagHTML(it)}${rarChipHTML(rarityOf(name))}${pmBadgeHTML(name, null)}</div><div class="nm">${name}</div>`
                    + `<div class="bs">基礎${baseOf(name)}</div>`   // 重さの表示は撤去（Wave7 Step0：並びは抽選）
                    + `<div class="ef">${eff}</div><div class="price">¥${cost}</div>`;
     if (aff) card.addEventListener("click", () => buyCard(name, cost));
@@ -4781,11 +4956,12 @@ function resetBurger(){
   stack = null; plan = null; revealed = 0; wantDrop = 0; dropping = false; dropTimer = null; dropEl = null; dropIdx = -1;
   shown = new Set(); tierEls = [];
   runMult = 1; runBase = 0; bandLevelCur = 0; bandPeak = 0; comboChain = 0; awaitingCollect = false; collectLocked = false; offering = false;
+  multPhaseActive = false; multPhaseIdx = 0; multPhaseFast = false; multPhaseTimer = null;
   applyBandVisual(0); clearBandTransients(); clearParticles();
   offerEl.classList.remove("show"); offerEl.innerHTML = "";
   stageInner.innerHTML = ""; stageInner.style.setProperty("--fit","1"); stageInner.style.setProperty("--zoom","1"); comboFeedEl.innerHTML = "";
   resetScorePanel();                                // 得点欄を空へ（collectFillActive も false＝古いコインは書かない）
-  multMeterEl.textContent = "×1.00"; burgerScoreClear();
+  multMeterEl.textContent = "×1.00"; scoreMeterEl.textContent = "0"; burgerScoreClear();
   hintEl.style.display = "";
   updateProgress();
 }
@@ -5290,7 +5466,13 @@ function renderSettings(){
   g = group("操作（クリックと落下）", "fx");
   gridRow(g, "1クリックで落ちる段数(0=全段)", numInput(()=>CONFIG.params.perClick, v=>CONFIG.params.perClick=Math.max(0,Math.round(v)), 1));
   gridRow(g, "段が落ちる間隔(秒)", numInput(()=>CONFIG.params.dropGap, v=>CONFIG.params.dropGap=Math.max(0,v), 0.02));
-  gridRow(g, "早送り(落下中クリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
+  gridRow(g, "早送り(落下中・倍率フェーズのクリックで加速)", boolInput(()=>CONFIG.params.fastForward, v=>CONFIG.params.fastForward=v));
+  { const mp = (CONFIG.params.fx.multPhase = CONFIG.params.fx.multPhase || { on:true, gap:0.26, cap:1000, shake:1, part:1 });
+    gridRow(g, "倍率フェーズを出す", boolInput(()=>mp.on!==false, v=>mp.on=v));
+    gridRow(g, "倍率フェーズ：1枚ごとの間隔(秒)", numInput(()=>mp.gap, v=>mp.gap=Math.max(0,v), 0.02));
+    gridRow(g, "倍率フェーズ：強さが最大になる合計倍率", numInput(()=>mp.cap, v=>mp.cap=Math.max(2,v), 50));
+    gridRow(g, "倍率フェーズ：揺れの倍率", numInput(()=>mp.shake, v=>mp.shake=Math.max(0,v), 0.1));
+    gridRow(g, "倍率フェーズ：破片の倍率", numInput(()=>mp.part, v=>mp.part=Math.max(0,v), 0.1)); }
   gridRow(g, "演出を省略(結果だけ表示)", boolInput(()=>CONFIG.params.skipFx, v=>CONFIG.params.skipFx=v));
 
   // 落下速度＝その回の期待度。最終到達帯（planで確定）ごとに個別に落下時間を設定できる。
@@ -5543,7 +5725,9 @@ const plog = (function(){
     cur.summary.daysSurvived = daysSurvived; cur.summary.finalDeck = dk;
     // Wave14：settings は newRun() のとき1回だけ撮っていたので、ラン中に調整欄を触ると記録と実態がずれた。
     //   ここで撮り直すと「そのランで最後に使われた設定」が残る（開始時の写しは残らない）。
-    cur.summary.settings = settingsSnap(); }
+    cur.summary.settings = settingsSnap();
+    // Wave19：ビルドも撮り直す。記録が始まった時点の値のまま固まると、遊んでいる版と食い違う。
+    cur.summary.build = BUILD.label; cur.summary.base = BUILD.base; cur.summary.buildDate = BUILD.date; }
   // ランの頭に残す設定の写し（Wave5 4-2）。あとで「どの設定で遊んだログか」を突き合わせるため。
   function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
     return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
@@ -5569,9 +5753,13 @@ const plog = (function(){
     setDetail(v){ detail = !!v; return detail; },
     isDetail: () => detail,
     setEnabled(v){ enabled = !!v; try { localStorage.setItem(K_EN, enabled ? "1" : "0"); } catch(e){} },
-    bootStart(seed){                                  // ブート：前回の未確定ランがあれば継続、無ければ新規（別ランに分けない）。
+    /* Wave19：ブートでも必ず新しい記録を始める。
+       ゲームはリロードでランを継続しない（デッキも所持金も営業日も初期化される）のに、記録だけ前回の
+       未確定ランに書き足していた。その結果 spin:1 が何度も現れ、cum だけが途切れず伸び、build も
+       最初のランの値のまま残っていた。前回の未確定ぶんは finalize して一覧に残す（捨てない）。 */
+    bootStart(seed){
       if (!enabled){ cur = null; return; }
-      if (cur){ refreshSummary(); saveCurrent(); renderList(); return; }
+      if (cur && cur.spins.length) finalize(); else cur = null;
       cur = newRun(seed); saveCurrent(); renderList();
     },
     startRun(seed){                                   // 明示的なラン開始（最初から／履歴クリア／設定リセット）。前ランを確定して新規。
