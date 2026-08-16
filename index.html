@@ -1141,7 +1141,12 @@ const DEFAULTS = {
     // Wave11：家賃は営業日ごとに置く（rentByDay）。初期値は rentBase 300 × rentMul 1.4^(営業日-1) を
     //   丸めたもので、置き換え前とまったく同じ額になる。配列の外（11営業日目以降）は等比のまま。
     run: { on: true, rentEvery: 5, rentBase: 300, rentMul: 1.4, dayGoal: 5,
-           rentByDay: [300, 420, 588, 823, 1152, 1613, 2259, 3162, 4427, 6198] },   // rentBase/rentMul は配列の外の日と、配列を作り直すときの雛形に残す
+           rentByDay: [300, 420, 588, 823, 1152, 1613, 2259, 3162, 4427, 6198],
+           /* Wave24：家賃を固定額ではなく**所持金からの比**で出すモード。**測定のための道具で、既定はOFF。**
+              家賃＝所持金÷(1+ratio)。払ったあとに残るのは所持金×ratio/(1+ratio)＝家賃の ratio 倍。
+              買い物の予算が得点の幅に関係なく一定になるので、価格を得点の帯から逆算できる。
+              お金は増えない（所持金を叩いて補填する形ではない）。家賃が所持金を超えないので閉店も前借りも起きない。 */
+           rentFromMoney: { on: false, ratio: 3 } },   // rentBase/rentMul は配列の外の日と、配列を作り直すときの雛形に残す
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
@@ -4549,8 +4554,17 @@ function el(cls, text){ const d = document.createElement("div"); d.className = c
 function cuiTagHTML(it){ return it.cuisine && it.cuisine !== "none" ? `<span class="ct">${CUISINE_JA[it.cuisine]}</span>` : ""; }
 // 家賃（Wave11）。rentByDay[営業日-1] があればその額、無ければ等比 rentBase×rentMul^(営業日-1)。
 //   artRentMul＝前借りの次回倍率。
+/* Wave24：所持金比モード（測定用・既定OFF）。ONなら rentByDay も等比の式も artRentMul も使わない。
+   artRentMul（前借りの次回倍率）は、このモードでは家賃が常に払えるので立たないが、
+   万一立っていても無視する（掛けると比が壊れる）。 */
+function rentFromMoneyCfg(){ const c = ((CONFIG.params.run || {}).rentFromMoney) || {}; return c; }
+function rentFromMoneyOn(){ return rentFromMoneyCfg().on === true; }
+function rentRatio(){ const v = +rentFromMoneyCfg().ratio; return Number.isFinite(v) && v >= 0 ? v : 3; }
+// 所持金比モードのとき、予告に添える注記（「所持金の1/4」）。分母は 1+ratio から作る。
+function rentModeNoteJa(){ return rentFromMoneyOn() ? `（所持金の1/${r2(1 + rentRatio())}）` : ""; }
 function rentDue(){
   const r = CONFIG.params.run || {};
+  if (rentFromMoneyOn()) return Math.round(Math.max(0, money) / (1 + rentRatio()));
   const a = r.rentByDay, v = (Array.isArray(a) && a[daysSurvived] != null && Number.isFinite(+a[daysSurvived]))
     ? +a[daysSurvived]
     : (r.rentBase || 500) * Math.pow(r.rentMul || 1.5, daysSurvived);
@@ -4662,7 +4676,7 @@ function showRent(){
   offerEl.innerHTML = "";
   const due = rentDue();
   offerEl.appendChild(el("offer-title", `家賃の支払い（${daysSurvived + 1}営業日目）`));
-  offerEl.appendChild(el("offer-runinfo", `家賃 ¥${due}　／　所持金 ¥${money}`));
+  offerEl.appendChild(el("offer-runinfo", `家賃 ¥${due}${rentModeNoteJa()}　／　所持金 ¥${money}`));
   const payDay = () => {                             // 支払い後の共通処理（営業日をまたぐ）
     daysSurvived++; onDay();                                                                     // 営業日トリガ：熟成肉・しらす・かまぼこ・キムチ・マッシュルーム
     plog.recordRent(due, money); Sound.coinChink(0, 0.5); renderPiles(); updateRunStatus();
@@ -4771,7 +4785,7 @@ function showShop(){
     //   測定ハーネスもここを読む）。見た目だけ店用に組み替え、画面の識別方法は変えない。
     head.innerHTML = `<div class="sh-l"><div class="sh-k offer-title">店（${daysSurvived + 1}営業日目）</div></div>`
                    + `<div class="sh-r"><div class="sh-money">所持金 <b>¥${Math.round(money).toLocaleString()}</b></div>`
-                   + `<div class="sh-rent">次の家賃 ¥${rentDue().toLocaleString()}</div></div>`;
+                   + `<div class="sh-rent">次の家賃 ¥${rentDue().toLocaleString()}${rentModeNoteJa()}</div></div>`;
     offerEl.appendChild(head);
   }
   flushDiscardNotices(offerEl, false);              // Wave12：営業日をまたぐときに消えたカード（大海老フライ・南蛮酢 等）
@@ -5149,7 +5163,7 @@ function updateRunStatus(){
   const goal = Math.max(1, Math.round(rn.dayGoal || 20));
   const hasMush = deck.some(x => (CONFIG.items[x.name].effect || {}).id === "dayAxisAdd");
   const ax = hasMush ? `　本日の軸 <b>${CUISINE_JA[dayAxis]}</b>` : "";   // マッシュルーム所持時だけ出す
-  e.innerHTML = `<b>${daysSurvived + 1}/${goal}営業日</b>　次の家賃 <b>¥${rentDue()}</b>（あと ${nspin} スピン）${art}${ax}`;
+  e.innerHTML = `<b>${daysSurvived + 1}/${goal}営業日</b>　次の家賃 <b>¥${rentDue()}</b>${rentModeNoteJa()}（あと ${nspin} スピン）${art}${ax}`;
   updateGoalBanner();
 }
 // 目標（次の家賃）の大表示を更新（item3）。あといくら足りないかも出す。
@@ -5163,7 +5177,9 @@ function updateGoalBanner(){
   const gA = $("goalAmount"), gN = $("goalNeed"), gD = $("goalDay"), gM = $("gbMoney");
   if (gM) gM.textContent = "¥" + Math.round(money).toLocaleString();   // Wave15：所持金（判定に使う論理値のほう）
   if (gA) gA.textContent = due;
-  if (gD) gD.textContent = `${daysSurvived + 1}営業日目・あと${nspin}スピン`;
+  // Wave24：大表示は幅が狭いので、注記は「家賃＝所持金÷4」の短い形にする（意味は他の画面と同じ）。
+  if (gD) gD.textContent = `${daysSurvived + 1}営業日目・あと${nspin}スピン`
+                         + (rentFromMoneyOn() ? `・家賃＝所持金÷${r2(1 + rentRatio())}` : "");
   const short = due - money;                          // 現在いくら足りないか（真の所持金で判定）
   if (short > 0){ gb.classList.remove("paid"); if (gN) gN.textContent = `あと ¥${short}`; }
   else { gb.classList.add("paid"); if (gN) gN.textContent = `支払える（+¥${-short}）`; }
@@ -5544,7 +5560,20 @@ function renderSettings(){
   // ── 進行：営業日ごとの家賃（Wave11）──
   //   rentByDay に値があればその額を使う。空欄（削除）にすると、その日は等比 rentBase×rentMul^(日-1) に戻る。
   g = group("ラン制：営業日ごとの家賃（rentByDay・空欄なら等比の式）", "run");
+  /* Wave24：所持金比モード（測定用）。ONの間、下の rentByDay と等比の式は使われない。 */
   {
+    const rf = (CONFIG.params.run.rentFromMoney = CONFIG.params.run.rentFromMoney || { on:false, ratio:3 });
+    gridRow(g, "【測定用】家賃を所持金比で出す", boolInput(()=>rf.on === true, v=>{ rf.on = v; updateRunStatus(); renderSettings(); }));
+    gridRow(g, "　支払い後に残す割合（3＝300%）", numInput(()=>rf.ratio, v=>{ rf.ratio = Math.max(0, v); updateRunStatus(); renderSettings(); }, 0.5));
+    const note = document.createElement("p"); note.className = "barnote";
+    note.textContent = rf.on
+      ? `※ ONのあいだ、下の rentByDay と等比の式は使われません。家賃＝所持金の1/${r2(1 + Math.max(0, +rf.ratio || 0))}（支払い時点の所持金で決まる）。閉店と前借りは起きません。`
+      : "※ 測定用のモードです。ONにすると、支払い後に残る額が家賃の一定倍に固定され、買い物の予算が得点の幅に左右されなくなります。";
+    g.appendChild(note);
+  }
+  {
+    const rf2 = CONFIG.params.run.rentFromMoney || {};
+    const from = g.children.length;                   // Wave24：ここから下が rentByDay の欄（淡くする範囲）
     const rebuild = document.createElement("button");
     rebuild.className = "shopbtn"; rebuild.textContent = "等比の式から作り直す（dayGoal の日数ぶん）";
     // ボタンは input/change を出さないので、入れ物の監視には引っかからない。ここで明示的に保存する。
@@ -5564,6 +5593,13 @@ function renderSettings(){
         updateRunStatus();
       });
       gridRow(g, (i + 1) + "営業日目の家賃", inp);
+    }
+    if (rf2.on === true){                             // Wave24：所持金比モードのあいだは使われていないことを見せる
+      for (let k = from; k < g.children.length; k++){
+        const x = g.children[k];
+        x.style.opacity = ".42";
+        if (x.tagName === "INPUT" || x.tagName === "BUTTON"){ x.disabled = true; x.title = "所持金比モードのあいだは使われません"; }
+      }
     }
   }
 
@@ -6109,6 +6145,8 @@ const plog = (function(){
   function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
     return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
              rentByDay: Array.isArray(r.rentByDay) ? r.rentByDay.slice() : null,
+             // Wave24：所持金比モードで走ったランと普通のランを、後から区別できるようにする。
+             rentFromMoney: { on: rentFromMoneyOn(), ratio: rentRatio() },
              tiers: { ingredients: p.tiers.ingredients, sauces: p.tiers.sauces },
              growPer: GROW_PER, comboBonus: { threshold: (p.comboBonus||{}).threshold, perCombo: (p.comboBonus||{}).perCombo },
              scale: JSON.parse(JSON.stringify(sh.scale || {})),
