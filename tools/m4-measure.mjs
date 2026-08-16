@@ -185,9 +185,13 @@ async function runOne(page, seed, policy) {
           madd: plan ? Math.round((plan.sc.multAdd||0)*1000)/1000 : 0,
           mmul: plan ? Math.round((plan.sc.multMul||1)*1000)/1000 : 1,
           gr: window.__deep ? (plan ? plan.inst.map((x,i)=>({ n:plan.stack[i], pb:x.pb||0, pm:x.pm||0, mx:(x.mx!=null?x.mx:1) })) : undefined) : undefined,
-          /* Wave32：ブイヤベースが実際にどこまで育ったか。mx＝現在の倍率、ch＝次の段までの持ち越し、
-             on＝このスピンで盤面に出たか。デッキに無ければ空配列。 */
-          bui: d.filter(x => x.name === 'ブイヤベース').map(x => ({ mx: Math.round((x.mx!=null?x.mx:1)*1000)/1000, ch: Math.round(x.charge||0) })),
+          /* Wave32：ブイヤベースが実際にどこまで育ったか。
+             ch（次の段までの持ち越し）は RUN.deck() から取れるが、**mx は RUN.deck() の射影に入っていない**ので
+             盤面に出たスピンだけ plan.inst から読む（出ていないスピンは null）。ここを取り違えると
+             「一度も育っていない」という誤った読みになる。 */
+          bui: d.filter(x => x.name === 'ブイヤベース').map(x => ({ ch: Math.round(x.charge||0) })),
+          buiMx: (plan ? plan.stack.map((n,i)=> n === 'ブイヤベース' ? (plan.inst[i].mx != null ? plan.inst[i].mx : 1) : null)
+                              .filter(v => v != null) : []).map(v => Math.round(v*1000)/1000),
           buiOn: plan ? plan.stack.filter(x => x === 'ブイヤベース').length : 0 });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
