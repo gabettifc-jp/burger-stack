@@ -34,6 +34,7 @@ const OUT = arg('out', `tools/out/m4-${POLICY}.jsonl`);
 const HTML = arg('html', 'file:///home/user/burger-stack/index.html');   // Wave25：変更前の index.html を指定して同じ方策で測るため
 const RENTRATIO = arg('rentratio', '');   // Wave26：家賃を所持金比で出すモード（Wave24）。空なら OFF
 const AXIS = arg('axis', '');   // Wave29：この軸に寄せる（kokyu/wa/chuka/kaisen/agemono）。空なら軸に寄せない＝基準方策
+const DEEP = arg('deep', '') === '1';   // Wave29-2：スピンごとの盤面と hits、最終デッキの中身まで残す（解剖用・JSON が大きくなる）
 const WORKERS = +arg('workers', 4);
 const DAYS = +arg('days', 10);
 const TARGET = HTML;   // Wave25：--html= で差し替え可能（変更前後を同じ方策で比べるため）
@@ -117,7 +118,7 @@ async function runOne(page, seed, policy) {
   page.on('console', m => { if (m.type() === 'error') errs.push('CE ' + m.text()); });
   await page.goto(TARGET);
   await page.waitForFunction(() => typeof window.RUN !== 'undefined');
-  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis]) => {
+  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis, deep]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
       sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0, shop: [], noneOffer: 0, noneTake: 0, noneShop: 0, noneShopBuy: 0 };
     eval(proxySrc); eval(perCardSrc);
@@ -125,6 +126,7 @@ async function runOne(page, seed, policy) {
     window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
     window.__perCard = perCardHits; window.__botRand = botRand; window.__rngState = seed * 7919;
     window.__axisTarget = axis || '';   // Wave29：軸に寄せる方策（空なら従来どおり）
+    window.__deep = !!deep;             // Wave29-2：解剖用の詳しい記録
     CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
     if (RUN.plogDetail) RUN.plogDetail(false);   // Wave13：スピンごとの盤面・内訳はプレイログに残さない（測定では要らない・JSON が膨らむ）
     RUN.setPendingSeed(seed); RUN.reset();
@@ -134,7 +136,7 @@ async function runOne(page, seed, policy) {
       CONFIG.params.run.rentFromMoney.on = true;
       CONFIG.params.run.rentFromMoney.ratio = +rentRatio;
     }
-  }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO, AXIS]);
+  }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO, AXIS, DEEP]);
 
   const st = () => page.evaluate(() => ({
     show: document.getElementById('offer').classList.contains('show'),
@@ -164,7 +166,14 @@ async function runOne(page, seed, policy) {
           cards: window.__perCard(),
           // Wave29：得点のどこで伸びたか（第1項＋第2項／加算／倍率）と、盤面の軸の内訳
           b1: plan ? (plan.sc.base + (plan.sc.grow || 0)) : 0, ad: plan ? plan.sc.add : 0, mu: plan ? plan.sc.mult : 1,
-          cui: (() => { const c = {}; for (const x of d){ const k = CONFIG.items[x.name].cuisine || 'none'; c[k] = (c[k]||0)+1; } return c; })() });
+          cui: (() => { const c = {}; for (const x of d){ const k = CONFIG.items[x.name].cuisine || 'none'; c[k] = (c[k]||0)+1; } return c; })(),
+          // Wave29-2：盤面と hits をそのまま残す（何が噛み合ったかを後から読むため）
+          st: window.__deep && plan ? plan.stack.slice() : undefined,
+          hits: window.__deep && plan ? plan.sc.hits.map(h => ({ k:h.kind, l:h.label, e:h.effect,
+            m:(h.mult!=null?Math.round(h.mult*1000)/1000:undefined), a:h.add, ma:h.madd })) : undefined,
+          madd: plan ? Math.round((plan.sc.multAdd||0)*1000)/1000 : 0,
+          mmul: plan ? Math.round((plan.sc.multMul||1)*1000)/1000 : 1,
+          gr: window.__deep ? (plan ? plan.inst.map((x,i)=>({ n:plan.stack[i], pb:x.pb||0, pm:x.pm||0, mx:(x.mx!=null?x.mx:1) })) : undefined) : undefined });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;
@@ -323,7 +332,8 @@ async function runOne(page, seed, policy) {
       // ソース枠が空いていればソースを優先する（枚数の制約より優先）
       if (useSauce && window.__sauceRoom() > 0) {
         const sa = cand.find(o => CONFIG.items[o.nm].pile === 'sauce');
-        if (sa) { noteTake(sa.nm); cs[sa.k].click(); M.takes[day] = (M.takes[day] || 0) + 1; return 'offer'; }
+        if (sa) { noteTake(sa.nm); if (window.__deep) M.buys.push({ d: day, nm: sa.nm, kind: 'offer' });
+          cs[sa.k].click(); M.takes[day] = (M.takes[day] || 0) + 1; return 'offer'; }
       }
       const room = window.__cap() - window.__deckN();
       const best = cand[0];
@@ -332,7 +342,8 @@ async function runOne(page, seed, policy) {
       else if (useRemove && M.credit < 1) { take = true; M.credit++; }   // ② 今日の削除1回ぶんを先に使う
       else if (best.v >= 2 * window.__avg()) take = true;                // ③ 平均の2倍以上なら薄まる損を承知で取る
       if (!take) { skip(); return 'skip'; }
-      noteTake(best.nm); cs[best.k].click(); M.takes[day] = (M.takes[day] || 0) + 1;
+      noteTake(best.nm); if (window.__deep) M.buys.push({ d: day, nm: best.nm, kind: 'offer' });
+      cs[best.k].click(); M.takes[day] = (M.takes[day] || 0) + 1;
       return 'offer';
     }, policy);
     await page.waitForTimeout(handled === 'shop' ? 40 : 25);
@@ -342,6 +353,10 @@ async function runOne(page, seed, policy) {
     const M = window.__M4;
     return { spins: M.spins, days: M.days, shop: M.shop, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots, sauSlots: M.sauSlots,
       artBuys: M.artBuys, artSwaps: M.artSwaps, fills: M.fills, noneOffer: M.noneOffer, noneTake: M.noneTake, noneShop: M.noneShop, noneShopBuy: M.noneShopBuy,
+      // Wave29-2：最終デッキの中身（個体ごとの育ち）と所持アーティファクト
+      finalDeck: window.__deep ? RUN.deck().map(x => ({ n:x.name, pb:x.pb||0, pm:x.pm||0, mx:(x.mx!=null?x.mx:1),
+        cui:(CONFIG.items[x.name]||{}).cuisine||'none', rar:(CONFIG.items[x.name]||{}).rar })) : undefined,
+      arts2: window.__deep ? (RUN.state().artifacts || []).slice() : undefined,
       arts: (RUN.state().artifacts || []).slice(),
       fb: (RUN.rarityFallbacks ? RUN.rarityFallbacks().length : 0),
       warn: selfCheck().length, warnMsg: selfCheck(), deck: RUN.deck().length, cap: window.__cap(),
