@@ -941,8 +941,8 @@ const DEFAULTS = {
     "ラーメン": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"growOn", trigger:"spin", per:40}, ph:true },  // 毎スピン +40（永続・Wave22：50→40）
     "たい": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:80, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
     "かまぼこ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:150, count:0, tier:null, rar:"nami", effect:{id:"growOn", trigger:"day", per:-30, dieAtZero:true}, ph:true },  // 営業日をまたぐごとに −30。基礎点が0になったら廃棄される
-    "白身魚": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"nami", effect:{id:"adjGrantAdd", cui:"kaisen", per:10, perm:true}, ph:true },  // 上下に接する海鮮のカードに +10点（永続）
-    "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"draw", per:15}, ph:true },  // 引かれるたび +15点（永続）
+    "白身魚": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"nami", effect:{id:"adjGrantAdd", cui:"kaisen", per:20, perm:true}, ph:true },  // 上下に接する海鮮のカードに +20点（永続・Wave32：10→20）
+    "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"draw", per:20}, ph:true },  // 引かれるたび +20点（永続・Wave32：15→20）
     "昆布": { pile:"ingredient", type:"veg", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"undrawn", per:60}, ph:true },  // 盤面に出なかったスピンごとに +60点（永続）
     "フグ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"coinFlipAdd", p:0.5, per:480}, ph:true },  // 1/2 で 0、1/2 で +480
     "あわび": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"sacrificeBelowAdd", ratio:0.5, notCui:"kaisen"}, ph:true },  // 真下の海鮮以外1枚を消して、その基礎点の半分を加算（永続）
@@ -999,7 +999,7 @@ const DEFAULTS = {
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxPbMultX", step:50, per:1.3, maxMul:8}, ph:true },  // Wave22：盤面で最も高い永続点50ごとに 倍率×1.3（上限 ×8）。軸は問わない
-    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:200, maxMul:20}, ph:true },  // 上下の具材の永続点を0にし、吸収した200点ごとに 倍率×1.20（Wave21：step 100→200）
+    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:100, maxMul:20}, ph:true },  // 上下の具材の永続点を0にし、吸収した100点ごとに 倍率×1.20（Wave21：step 100→200／Wave32：200→100。per と maxMul は据え置き）
     "オーロラソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の揚げ物1枚につき 倍率+0.3（自分も数える）
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "タルタルソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeAdjRareMult", minRar:"tokujou", cui:"agemono", mult:10}, ph:true },  // 上下に接する特上以上の揚げ物の具材を破棄し、破棄した枚数につき ×10（2枚なら ×20）
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 30", base: "e938f9e", date: "2026-08-16" };
+const BUILD = { label: "Wave 32", base: "6fefc4e", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
