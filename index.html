@@ -117,24 +117,22 @@
   .flowpop.combo.add{color:var(--good)}
   @keyframes flowfloat{0%{opacity:0; transform:translateY(7px)}18%{opacity:1}100%{opacity:0; transform:translateY(-16px)}}
   /* Wave23：右端の行。盤面のカード1枚につき1行（効果の有無によらない）。#multMeter が左へ移ったので top を上げる。
-     行は時間では消えない。**左端の計器に着弾した瞬間に消える**（当たっていない数字が消えると累計と合わない）。 */
-  #comboFeed{position:absolute; right:8px; top:8px; z-index:6; display:flex; flex-direction:column; gap:3px; align-items:flex-end; pointer-events:none}
-  .cfx{background:rgba(0,0,0,.52); border:1px solid #3a4553; font-weight:800; font-size:.72rem; padding:1px 7px; border-radius:999px;
-       box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out; max-width:60vw; overflow:hidden; text-overflow:ellipsis}
+     Wave26：行は時間でも着弾でも消えない。**上限（既定9行）を超えたときだけ古いほうから消して詰める。** */
+  #comboFeed{position:absolute; right:8px; top:8px; max-width:62%; z-index:6; display:flex; flex-direction:column; gap:3px; align-items:flex-end; pointer-events:none}
+  /* Wave26：名前と値を横並びにし、詰まるときは**名前だけ**を省略する（値は必ず出す）。
+     以前は行ごと overflow:hidden で、長い名前が黙って切れていた（「マッシュルーム」が「…ム」になっていた）。 */
+  .cfx{display:flex; align-items:baseline; max-width:100%; background:rgba(0,0,0,.52); border:1px solid #3a4553;
+       font-weight:800; font-size:.72rem; padding:1px 7px; border-radius:999px;
+       box-shadow:0 1px 4px rgba(0,0,0,.45); white-space:nowrap; animation:cfin .14s ease-out}
+  .cfx .cfn{min-width:0; overflow:hidden; text-overflow:ellipsis}
   /* 3色で型が読める：白＝得点／青＝+型／橙＝×型。琥珀は×型の橙と紛れるので得点には使わない。 */
   .cfx{color:#eaf4ff}
   .cfx.tp{color:var(--tplus); border-color:#2f5470}
   .cfx.tx{color:var(--ttimes); border-color:#6b4f1c}
   .cfx.neg{color:var(--bad); border-color:#6b2530}
-  .cfx .cfv{margin-left:8px; font-variant-numeric:tabular-nums}
-  /* 飛び立った行：数字だけが抜けて、名前は着弾まで残る。行そのものは**着弾で**消える。 */
-  .cfx.sent{opacity:.62}
-  .cfx.sent .cfv{opacity:0; transition:opacity .1s linear}
+  .cfx .cfv{flex:none; margin-left:8px; font-variant-numeric:tabular-nums}
+  /* Wave26：上限を超えて押し出される行はここで消える（新しい行が下に足され、上が押し出される）。 */
   .cfx.gone{opacity:0; transform:translateX(10px); transition:opacity .12s linear, transform .12s linear}
-  .cfx.hid{display:none}
-  /* 行から計器へ飛ぶ数字。着弾するまで行と同じ色を保つ。 */
-  .flyval{position:fixed; left:0; top:0; z-index:60; pointer-events:none; font-weight:900; font-size:.82rem;
-          white-space:nowrap; text-shadow:0 1px 3px #000, 0 0 7px rgba(0,0,0,.8); will-change:transform,opacity}
   @keyframes cfin{0%{opacity:0; transform:translateX(12px) scale(.9)}100%{opacity:1; transform:none}}
   /* 累計マイルストーン：乗算の積が閾値(×3など)を超えた瞬間の大演出。中央に大きく出す＋メーターが弾ける。 */
   /* 帯バースト：--bamp まで拡大・--bdur だけ持続。イージングは「速く出てゆっくり消える」 */
@@ -1069,14 +1067,11 @@ const DEFAULTS = {
       // 徐々に上がる（跨いだ瞬間だけ上げない）。curve=強度カーブ / stages=段階数（増やせる）。
       //   linear(直線) / exp(下は緩く上で急) / log(下で一気・上は緩やか) / smooth(S字：両端緩やか)。既定は log。
       scaling:   { curve:"log", stages:5 },
-      /* Wave23：右端に盤面のカード1枚につき1行を出し、少し置いてから左端の計器へ1個ずつ飛ばす。
-         行は時間では消えず、**着弾で**消える。累計は着弾の瞬間にだけ動く（原因と結果を線で結ぶ）。
-           hold     … 行が出てから飛び立つまでの間（秒）
-           gap      … 次の1個を発射するまでの間（秒）。同時に2個以上飛ばさない
-           speed    … 飛行時間（秒）／arc＝弧の高さ(px)
-           queueMax … 待機中の行がこれを超えたら発射間隔を半分にして追いつく（行は捨てない）
-           max      … 画面に並べる行の上限。超えた分は**捨てず**に隠すだけ（値は必ず飛んで着弾する） */
-      valueFly:  { on:true, hold:0.24, gap:0.11, speed:0.38, arc:34, queueMax:6, max:9 },
+      /* Wave23：右端に盤面のカード1枚につき1行を出す。Wave26：**飛ぶ動きはやめた**（目障りで、飛んでいる
+         数字が読めなかった）。行が出た瞬間に左端の計器も同時に増える＝目の端で右と左が繋がる。
+           on   … OFFで行そのものを出さない
+           max  … 同時に並ぶ行の上限。超えたら**古いほうから消して詰める** */
+      valueFly:  { on:true, max:9 },
       /* Wave19 倍率フェーズ：完成したあと、盤面の下から順に倍率カードを1枚ずつ光らせる。
          gap＝1枚ごとの間隔（秒・落下の間隔とは別に持つ）／cap＝強さが最大になる合計倍率
          （強さ t = min(1, log(合計倍率)/log(cap))）／shake・part＝揺れと破片の倍率。 */
@@ -1166,17 +1161,21 @@ const DEFAULTS = {
             artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
             // 価格スケールを要素ごとに分離（一律をやめる）。回数はランごとの通算（shopBuys・日次に戻さない）。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
-            scale: { slot:     { onBuy: true,  mul: 2.0 },   // 具材枠（購入で2倍ずつ：150→300→600→…）※試験値
+            /* Wave26：mul を全品目 2.5 に揃えた。1.5 では回数制限にならなかった——**収入の伸び（1日 ×2.1〜2.8）が
+               値上がりの伸び（1日 ×1.5）を追い越していた。**shopBuys は品目ごとに独立したカウンタで、各品目は
+               1営業日にだいたい1回しか買われないので、値段は1日あたり ×mul しか上がらない。 */
+            scale: { slot:     { onBuy: true,  mul: 2.5 },   // 具材枠（Wave26：2.0→2.5）150→375→938→2344→5859
                      sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠：Wave6 2-2 で固定価格（sauceSlotPrices）に移したので**使っていない**。後方互換で残置
                      /* Wave25：繰り返し買えるものが全部据え置きで、5営業日目以降は金が店を完全に追い越していた
                         （買うものが無いのではなく、選ぶ理由が消えていた）。回数はランごとの**通算**（shopBuys）。 */
-                     card:     { onBuy: true,  mul: 1.5 },   // カード（Wave25：1.2→1.5・onBuy を入れた）
-                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（Wave25：onBuy を入れた。50→100→200→…）
-                     artifact: { onBuy: true,  mul: 1.5 },   // アーティファクト（Wave25：カードと同率。片方だけ上げると抜け道になる）
+                     card:     { onBuy: true,  mul: 2.5 },   // カード（Wave26：1.5→2.5）極 1500→3750→9375→23438→58594
+                     reroll:   { onBuy: true,  mul: 2.5 },   // 品揃えの引き直し（Wave26：2.0→2.5）50→125→313→781→1953
+                     artifact: { onBuy: true,  mul: 2.5 },   // アーティファクト（Wave26：1.5→2.5・カードと同率）
                      /* 取り除きは入れない。高級軸が「削ってデッキを薄くする」線で、白トリュフ・キャビアが
                         ランの削除累計（runRemovals）を読む。値段を上げるとその軸の打点がそのまま落ちる＝
                         経済の調整ではなく軸のバランス変更になる。経済側の効果を測ってから別に判断する。 */
-                     remove:   { onBuy: false, mul: 2.0 } },// デッキから取り除く（回数制・固定価格 ¥75）
+                     // Wave26：mul だけ 2.5 に揃える。onBuy の切り替えはこの波では判断しない（Wave25 のまま false）。
+                     remove:   { onBuy: false, mul: 2.5 } },// デッキから取り除く 75→188→469→1172→2930（onBuy が入ったとき）
             /* Wave16：店の値段を営業日ごとに置く。家賃（Wave11 の rentByDay）とまったく同じ形。
                  ・添字は「1営業日目＝0」。rentByDay と揃えてある。
                  ・値があればその日はその額。空欄（null）と配列の外は**これまでの式のまま**（家賃と同じ規則）。
@@ -1553,7 +1552,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 23", base: "b2602e8", date: "2026-08-16" };
+const BUILD = { label: "Wave 26", base: "c56bab9", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -3697,58 +3696,19 @@ function presentHit(i){
   }
   if (m.grade >= 2){ screenFlash(); cameraZoom(1); hitstop(1); }  // 大：画面反応＋カメラ寄り＋ヒットストップ
 }
-/* ── Wave23：右端の行 → 左端の計器へ飛ぶ ────────────────────────────────
-   行は右端に出て、少し置いてから左端の計器へ飛び、**着弾した瞬間に**計器の数字が増えて行が消える。
-   累計が動く理由が画の上で線になる。時間で消すと、当たっていない数字が消えて累計と合わなくなる。
-   飛ばすのは1個ずつ（同時に2個以上飛ばさない）。落下は止めない＝追いつかなければ行が右に溜まる。
-   溜まりすぎたら発射間隔を半分にして追いつく。**行は絶対に捨てない。** */
+/* ── Wave23：右端の行 ／ Wave26：飛ぶ動きはやめた ────────────────────────
+   Wave23 は「行が左端の計器へ飛び、着弾で数字が増える」形だった。狙い（原因と結果を線で結ぶ）は
+   否定されていないが、**飛行という手段が、動きの邪魔さで狙いを上回った**（目障りで、飛んでいる
+   数字が読めない）。いまは **行が出た瞬間に左端の計器も同時に増える。**右で行が出た瞬間に左が跳ねるので、
+   目の端で右と左が繋がる。行は時間でも着弾でも消えず、**上限を超えたときだけ古いほうから消して詰める。** */
 const flyCfg = () => (CONFIG.params.fx || {}).valueFly || {};
-let flyQueue = [], flyTimer = null, flyBusy = 0, flyTimers = [], flyDrained = null;
+let flyTimers = [];
 function flyClear(){
   for (const t of flyTimers) clearTimeout(t);
-  flyTimers = []; flyQueue = []; flyTimer = null; flyBusy = 0; flyDrained = null;
+  flyTimers = [];
   if (comboFeedEl) comboFeedEl.innerHTML = "";
-  document.querySelectorAll(".flyval").forEach(e => e.remove());
 }
-function flyPending(){ return flyQueue.length + flyBusy; }
-// 行を1つ出す。kind: "score" | "tp"（+型）| "tx"（×型）。val は表示用の文字列、after は着弾後の計器の値。
-function feedRow(kind, name, text, after, neg){
-  if (!comboFeedEl || flyCfg().on === false){ flyLand(kind, after); return; }
-  const e = document.createElement("div");
-  e.className = "cfx" + (kind === "tp" ? " tp" : kind === "tx" ? " tx" : "") + (neg ? " neg" : "");
-  e.innerHTML = `<span class="cfn"></span><span class="cfv"></span>`;
-  e.querySelector(".cfn").textContent = name;
-  e.querySelector(".cfv").textContent = text;
-  comboFeedEl.appendChild(e);
-  flyTrim();
-  flyQueue.push({ el:e, kind, after });
-  if (!flyTimer) flyPump(Math.max(0, flyCfg().hold != null ? flyCfg().hold : 0.16));
-}
-/* 画面に並べる行の上限。超えた分は**捨てず**に隠すだけ（値は必ず飛んで着弾する）。
-   Wave23-2：隠す向きが逆だった。flyQueue は FIFO なので、古い行＝**次に飛ぶ行**である。
-   古いほうから隠すと、飛ぶ画が出ないまま計器だけ跳ねて、「原因が飛んで当たるから数字が増える」
-   という因果が切れる。隠すのは**新しいほう**（まだ順番の来ない行）にする。 */
-function flyTrim(){
-  const mx = Math.max(1, Math.round(flyCfg().max || 9));
-  const kids = [...comboFeedEl.children];
-  kids.forEach((k, i) => k.classList.toggle("hid", i >= mx));
-}
-function flyGap(){
-  const c = flyCfg(), g = Math.max(0.01, c.gap != null ? c.gap : 0.11);
-  return flyQueue.length > Math.max(1, Math.round(c.queueMax || 6)) ? g / 2 : g;   // 溜まったら倍速で追いつく
-}
-function flyPump(delay){
-  flyTimer = setTimeout(() => {
-    flyTimer = null;
-    const it = flyQueue.shift();
-    if (!it){ flyCheckDrained(); return; }
-    flyLaunch(it);
-    if (flyQueue.length) flyPump(flyGap()); else flyCheckDrained();
-  }, Math.max(0, delay) * 1000);
-  flyTimers.push(flyTimer);
-}
-function flyTargetEl(kind){ return kind === "score" ? scoreMeterEl : multMeterEl; }
-// 着弾：計器の数字を after に置き、弾ませる。帯は倍率から導かれる値なので、ここで一緒に動かす。
+// 計器を after に置いて弾ませる。帯は倍率から導かれる値なので、ここで一緒に動かす。
 function flyLand(kind, after){
   if (kind === "score"){ scoreMeterEl.textContent = fmtJP(Math.round(after)); bump(scoreMeterEl); return; }
   const before = runMult; runMult = after;
@@ -3757,30 +3717,29 @@ function flyLand(kind, after){
   if (bT > bF) crossBands(bF, bT); else bandLevelCur = bT;
   applyBandVisual(fxLevelRaw());
 }
-function flyLaunch(it){
-  const done = () => { flyBusy--; if (it.el && it.el.parentNode){ it.el.classList.add("gone");
-      const t = setTimeout(() => { if (it.el.parentNode) it.el.remove(); flyTrim(); }, 130); flyTimers.push(t); }
-    flyLand(it.kind, it.after); flyCheckDrained(); };
-  flyBusy++;
-  if (it.el) it.el.classList.remove("hid");          // Wave23-2：これから飛ぶ行は必ず見えている状態にする
-  const tgt = flyTargetEl(it.kind);
-  if (reduced || !tgt || !it.el || !it.el.getBoundingClientRect){ done(); return; }
-  const from = it.el.getBoundingClientRect(), to = tgt.getBoundingClientRect();
-  if (!from.width && !from.height){ done(); return; }               // 隠れている行（.hid）は飛ばさず即着弾
-  const el = document.createElement("div");
-  el.className = "flyval" + (it.kind === "tp" ? " tplus" : it.kind === "tx" ? " ttimes" : "");
-  if (it.kind === "score") el.style.color = "#eaf4ff";
-  el.textContent = (it.el.querySelector(".cfv") || {}).textContent || "";
-  document.body.appendChild(el);
-  it.el.classList.add("sent");                       // 数字だけが抜ける。行は着弾まで残す
-  const c = flyCfg();
-  launchCoin(from.left + from.width - 8, from.top + from.height / 2,
-             to.left + to.width / 2, to.top + to.height / 2,
-             Math.max(0.05, c.speed != null ? c.speed : 0.34), c.arc != null ? c.arc : 34,
-             () => { el.remove(); done(); }, el);
+// 行を1つ出し、同じタイミングで計器も増やす。kind: "score" | "tp"（+型）| "tx"（×型）。
+function feedRow(kind, name, text, after, neg){
+  if (comboFeedEl && flyCfg().on !== false){
+    const e = document.createElement("div");
+    e.className = "cfx" + (kind === "tp" ? " tp" : kind === "tx" ? " tx" : "") + (neg ? " neg" : "");
+    e.innerHTML = `<span class="cfn"></span><span class="cfv"></span>`;
+    e.querySelector(".cfn").textContent = name;
+    e.querySelector(".cfv").textContent = text;
+    comboFeedEl.appendChild(e);
+    flyTrim();
+  }
+  flyLand(kind, after);
 }
-function flyCheckDrained(){ if (flyPending() === 0 && flyDrained){ const f = flyDrained; flyDrained = null; f(); } }
-function flyWhenDrained(fn){ if (flyPending() === 0) fn(); else flyDrained = fn; }
+/* 画面に並べる行の上限（既定9行）。段の高さ20px・行間3px・ステージ250px なので10行を超えると入らない。
+   Wave26：飛行が無くなったので、押し出された行はそのまま消す（古いほうから消して詰める）。
+   落下フェーズの行と倍率フェーズの行は同じ列に続けて積む。 */
+function flyTrim(){
+  const mx = Math.max(1, Math.round(flyCfg().max || 9));
+  while (comboFeedEl.children.length > mx){
+    const old = comboFeedEl.firstElementChild; if (!old) break;
+    old.remove();
+  }
+}
 
 /* Wave19：倍率フェーズで1枚を光らせる。強さ t は「そこまでの合計倍率」から来る（個々の寄与ではない）。
    +型（multAdd）と×型（mult）を画では区別しない。プレイヤーに要るのは合計がいくつ動いたかであって内部の型ではない。 */
@@ -4106,10 +4065,7 @@ function stepMultPhase(){
 }
 function finishMultPhase(){
   multPhaseActive = false; multPhaseTimer = null;
-  /* Wave23：飛行中の数字が残っている間は先へ進まない。最終値の反映・数え上げ・回収の解放は、
-     全部が着弾してからにする（途中で最終値を入れると、まだ飛んでいる数字の行き先が消える）。 */
-  if (flyPending() > 0){ flyWhenDrained(finishMultPhase2); return; }
-  finishMultPhase2();
+  finishMultPhase2();   // Wave26：飛行が無くなったので、着弾を待つ必要がなくなった
 }
 function finishMultPhase2(){
   runMult = plan ? plan.final.mult : 1;
@@ -5257,11 +5213,10 @@ function coinArrive(cid, scoreAfter, delta, pitchSemi, thick, sound){
 function refreshMoney(bounce){ if (!cumTotalEl) return; cumTotalEl.textContent = moneyShown; if (bounce) numBounce(cumTotalEl);
   updateGoalBanner(); }   // Wave15：ノルマの帯にも所持金を出しているので、コインが着くたびに一緒に更新する
 function setMoney(v){ money = Math.max(0, Math.round(v)); moneyShown = money; refreshMoney(false); updateGoalBanner(); }   // 家賃・買い物で即時に増減
-/* useEl を渡すと、コインの代わりにその要素を同じ軌道で飛ばす（Wave23：行の数字を計器へ飛ばす）。 */
-function launchCoin(fx, fy, tx, ty, dur, arc, onArrive, useEl){
-  if (reduced || (!coinLayerEl && !useEl)){ if (onArrive) onArrive(); return; } // reduced：飛ばさず着弾処理だけ
-  let el = useEl;
-  if (!el){ el = document.createElement("div"); el.className = "coin"; coinLayerEl.appendChild(el); }
+function launchCoin(fx, fy, tx, ty, dur, arc, onArrive){
+  if (reduced || !coinLayerEl){ if (onArrive) onArrive(); return; }            // reduced：飛ばさず着弾処理だけ
+  const el = document.createElement("div"); el.className = "coin";
+  coinLayerEl.appendChild(el);
   const jx = (Math.random()*2 - 1) * 22;                                       // 軌道を少しばらす
   const cx = (fx + tx) / 2 + jx, cy = Math.min(fy, ty) - arc * (0.6 + Math.random()*0.7);   // 制御点＝山なりの頂点
   const s0 = performance.now(), D = dur * 1000, spin = 360 + Math.random()*360;
@@ -5935,15 +5890,10 @@ function renderSettings(){
   gridRow(g, "カーブ(linear/exp/log/S字)", selectInput(CURVES, ()=>Math.max(0,CURVES.indexOf(fx.scaling.curve)), v=>{ fx.scaling.curve=CURVES[v]; }));
   gridRow(g, "段階数(5〜。増やせる)", numInput(()=>fx.scaling.stages, v=>fx.scaling.stages=Math.max(1,Math.min(30,Math.round(v))), 1));
 
-  { const vf = CONFIG.params.fx.valueFly || (CONFIG.params.fx.valueFly = { on:true, hold:0.24, gap:0.11, speed:0.38, arc:34, queueMax:6, max:9 });
-    g = group("演出：右端の行 → 左端の計器へ飛ぶ（Wave23）", "fx");
-    gridRow(g, "出す（OFFなら計器だけ即時に増える）", boolInput(()=>vf.on !== false, v=>vf.on=v));
-    gridRow(g, "行が出てから飛び立つまで(秒)", numInput(()=>vf.hold, v=>vf.hold=Math.max(0,v), 0.02));
-    gridRow(g, "次の1個を発射するまで(秒)", numInput(()=>vf.gap, v=>vf.gap=Math.max(0.01,v), 0.01));
-    gridRow(g, "飛行時間(秒)", numInput(()=>vf.speed, v=>vf.speed=Math.max(0.05,v), 0.02));
-    gridRow(g, "弧の高さ(px)", numInput(()=>vf.arc, v=>vf.arc=Math.max(0,v), 2));
-    gridRow(g, "この数を超えたら発射間隔を半分に", numInput(()=>vf.queueMax, v=>vf.queueMax=Math.max(1,Math.round(v)), 1));
-    gridRow(g, "画面に並べる行の上限(超えた分は隠すだけ)", numInput(()=>vf.max, v=>vf.max=Math.max(1,Math.round(v)), 1)); }
+  { const vf = CONFIG.params.fx.valueFly || (CONFIG.params.fx.valueFly = { on:true, max:9 });
+    g = group("演出：右端の行（盤面のカード1枚につき1行）", "fx");
+    gridRow(g, "出す（OFFなら計器だけ増える）", boolInput(()=>vf.on !== false, v=>vf.on=v));
+    gridRow(g, "同時に並ぶ行の上限（超えたら古いほうから消す）", numInput(()=>vf.max, v=>vf.max=Math.max(1,Math.round(v)), 1)); }
   g = group("演出：パーティクル（着地/コンボ/完成の破片）", "fx");
   gridRow(g, "ON", boolInput(()=>fx.particles.on, v=>fx.particles.on=v));
   gridRow(g, "数(base)", fxNum(fx.particles,"count",1));
