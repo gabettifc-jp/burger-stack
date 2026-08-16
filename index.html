@@ -991,11 +991,11 @@ const DEFAULTS = {
     "デミグラスソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の高級1枚につき 倍率+0.3（自分も数える）
     "ペリグーソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "トリュフオイル": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"soloAxisSpin", pm0:2.0, per:0.3, pmMax:5.0}, ph:true },  // 盤面の軸が1種類だけのスピンに 倍率+0.3 ずつ育つ（初期値 +2.0）
-    "フォンドヴォー": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"under", ref:20, per:1.15, maxMul:20}, ph:true },  // デッキが20枚を下回る1枚ごとに 倍率×1.15
+    "フォンドヴォー": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"under", ref:20, per:1.30, maxMul:20}, ph:true },  // デッキが20枚を下回る1枚ごとに 倍率×1.30（Wave35：1.15→1.30。ref と maxMul は据え置き。上限×20 に要るデッキが「−2枚以下＝到達不可能」→「8枚以下」になる）
     "甜麺醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の中華1枚につき 倍率+0.3（自分も数える）
     "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "黒酢": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"reroll", pm0:2.0, per:2.0}, ph:true },  // ×3。リロールするたび 倍率+2（永続）
-    "花椒油": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"over", per:1.10, maxMul:20}, ph:true },  // デッキ1枚につき 倍率×1.10
+    "花椒油": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"over", per:1.20, maxMul:20}, ph:true },  // デッキ1枚につき 倍率×1.20（Wave35：1.10→1.20。maxMul は据え置き。上限×20 に要るデッキが 32枚→17枚になる）
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxPbMultX", step:50, per:1.3, maxMul:8}, ph:true },  // Wave22：盤面で最も高い永続点50ごとに 倍率×1.3（上限 ×8）。軸は問わない
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 34", base: "279afe5", date: "2026-08-16" };
+const BUILD = { label: "Wave 35", base: "b4a62bf", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
