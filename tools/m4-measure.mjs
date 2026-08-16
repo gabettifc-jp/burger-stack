@@ -184,7 +184,11 @@ async function runOne(page, seed, policy) {
             m:(h.mult!=null?Math.round(h.mult*1000)/1000:undefined), a:h.add, ma:h.madd })) : undefined,
           madd: plan ? Math.round((plan.sc.multAdd||0)*1000)/1000 : 0,
           mmul: plan ? Math.round((plan.sc.multMul||1)*1000)/1000 : 1,
-          gr: window.__deep ? (plan ? plan.inst.map((x,i)=>({ n:plan.stack[i], pb:x.pb||0, pm:x.pm||0, mx:(x.mx!=null?x.mx:1) })) : undefined) : undefined });
+          gr: window.__deep ? (plan ? plan.inst.map((x,i)=>({ n:plan.stack[i], pb:x.pb||0, pm:x.pm||0, mx:(x.mx!=null?x.mx:1) })) : undefined) : undefined,
+          /* Wave32：ブイヤベースが実際にどこまで育ったか。mx＝現在の倍率、ch＝次の段までの持ち越し、
+             on＝このスピンで盤面に出たか。デッキに無ければ空配列。 */
+          bui: d.filter(x => x.name === 'ブイヤベース').map(x => ({ mx: Math.round((x.mx!=null?x.mx:1)*1000)/1000, ch: Math.round(x.charge||0) })),
+          buiOn: plan ? plan.stack.filter(x => x === 'ブイヤベース').length : 0 });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;
