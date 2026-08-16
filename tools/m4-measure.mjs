@@ -199,7 +199,14 @@ async function runOne(page, seed, policy) {
           // Wave33：在庫側（うに）と、その参照先（ナンプラー）
           uni: d.filter(x => x.name === 'うに').map(x => Math.round(x.pb||0)),
           nam: plan ? (plan.sc.hits || []).filter(h => h.kind === 'mult' && /^ナンプラー/.test(h.label))
-                        .reduce((m,h) => Math.max(m, h.mult||1), 0) : 0 });
+                        .reduce((m,h) => Math.max(m, h.mult||1), 0) : 0,
+          /* Wave34：しらすの第1項（base + pb）。dayBaseMul は伸びを pb に入れるので、
+             ブイヤベースに吸われうる。吸われたかを後から読めるように pb ごと残す。 */
+          sir: d.filter(x => x.name === 'しらす')
+                .map(x => ({ pb: Math.round(x.pb||0), t1: Math.round((CONFIG.items['しらす'].base||0) + (x.pb||0)) })),
+          // Wave34：いかの加算（上限1000に張り付いているか）
+          ika: plan ? (plan.sc.hits || []).filter(h => h.kind === 'add' && /^いか：盤面の加算合計/.test(h.label))
+                        .reduce((m,h) => Math.max(m, h.add||0), 0) : 0 });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;

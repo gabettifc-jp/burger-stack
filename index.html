@@ -949,7 +949,7 @@ const DEFAULTS = {
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"adjCountAdd", count:{cui:"kaisen"}, per:200}, ph:true },  // 上下に接する海鮮1枚につき +200
     "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"deckTopAdd"}, ph:true },  // デッキで最も点数が高いカードの点数を加算
     "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"boardAddSum", max:1000}, ph:true },  // 盤面の具材に加算された点数の合計と同じだけ加算（上限 +1000）
-    "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"dayBaseMul", mult:2, max:1280}, ph:true },  // 営業日をまたぐごとに基礎点2倍（上限 1,280）
+    "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:160, count:0, tier:null, rar:"tokujou", effect:{id:"dayBaseMul", mult:2, max:1280}, ph:true },  // 営業日をまたぐごとに基礎点2倍（上限 1,280・Wave33 まで base:10 で、上限は dayGoal が10だった頃の値。Wave34：base 10→160）
     "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"growOn", trigger:"spin", per:300, halveChance:0.2}, ph:true },  // スピンごとに +300点（永続・Wave33：200→300）。20% で永続点が半減
     "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:80, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
     "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"nami", effect:{id:"boardCountAdd", count:{pile:"sauce"}, per:50}, ph:true },  // 盤面のソース1枚につき +50
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 33", base: "e49e367", date: "2026-08-16" };
+const BUILD = { label: "Wave 34", base: "279afe5", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
