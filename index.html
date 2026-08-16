@@ -961,7 +961,7 @@ const DEFAULTS = {
     "ささ身": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"runCountAdd", count:{artifact:"count"}, per:240}, ph:true },  // 所持しているアーティファクト1つにつき +240
     "串カツ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"runLenAdd", cui:"agemono", per:150}, ph:true },  // 揚げ物が連続して並ぶ長さ1つにつき +150
     "大海老フライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:60, count:0, tier:null, rar:"tokujou", effect:{id:"growOn", trigger:"dayDiscard", per:60, notCui:"agemono"}, ph:true },  // 営業日ごとにデッキから揚げ物以外を無作為1枚廃棄し、廃棄のたび +60点（永続・Wave22：120→60）
-    "カツサンド": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"adjTwice"}, ph:true },  // 上下に接するカードの効果を、このスピンでもう一度発動
+    "カツサンド": { pile:"ingredient", type:"meat", cuisine:"agemono", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"adjDoublePoints"}, ph:true },  // Wave30：上下に接する具材の点数を2倍（効果の再発動ではない）
     "アジフライ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:360, count:0, tier:null, rar:"kiwami", effect:{id:"decayShare", per:60, cui:"agemono", grant:360}, ph:true },  // 盤面に出るたび基礎点が永久に −60。0になったら廃棄され、デッキの揚げ物すべてに +360点（永続）
     "たくあん": { pile:"ingredient", type:"veg", cuisine:"wa", base:80, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
     "豆腐": { pile:"ingredient", type:"veg", cuisine:"wa", base:10, count:0, tier:null, rar:"nami", effect:{id:"adjGrantAdd", cui:"wa", per:80, perm:false}, ph:true },  // 上下に接する和のカードに +80（このスピンだけ）
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 29", base: "3e060c6", date: "2026-08-16" };
+const BUILD = { label: "Wave 30", base: "e938f9e", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -2468,7 +2468,7 @@ const EFFECT_TEXT = {
   deckTopAdd:    e => `デッキで最も点数が高いカードの点数を加算`,
   boardAddSum:   e => `盤面の具材に加算された点数の合計と同じだけ加算` + capJa(e.max),
   decayShare:    e => `盤面に出るたび基礎点が永久に ${sgn(-(e.per||60))}。0になったら廃棄され、デッキの${CUISINE_JA[e.cui]||e.cui}すべてに ${sgn(e.grant||360)}点（永続）`,
-  adjTwice:      e => `上下に接するカードの効果を、このスピンでもう一度発動する`,
+  adjDoublePoints: e => `上下に接する具材の点数を2倍にする`,
   matsutakeTwice:e => `このバーガーで最初に引かれた具材の効果が2回発動する`,
   konjacMeat:    e => `引いた肉は段に乗らず消える。1枚につき デッキの${CUISINE_JA[e.cui]||e.cui}すべてに ${sgn(e.per)}点（永続）`,
   belowTierAdd:  e => `自分より下の段1つにつき ${sgn(e.per)}（下のバンズも数える）`,
@@ -2655,9 +2655,7 @@ function buildTimesMap(stack, ctx){
     if (e.id === "matsutakeTwice"){                     // 「最初に引かれた」は buildBurger の引き順（整列前）で決める
       const fid = ctx.firstIngId;
       if (fid != null && ctx.inst) for (let k = 0; k < n; k++) if (ctx.inst[k] && ctx.inst[k].id === fid) out[k] = 2;
-    } else if (e.id === "adjTwice"){                    // カツサンド：上下2枚の効果をこのスピンでもう一度
-      for (const j of [i-1, i+1]) if (j >= 0 && j < n && items[stack[j]].pile !== "bun") out[j] = 2;
-    }
+    }   // Wave30：カツサンドは発動回数を増やす型をやめた（applyAdjDouble で点数を2倍する）
   }
   return out;
 }
@@ -2707,6 +2705,37 @@ function applyBoardAddSum(stack, ctx, acc){
     }
     if (e.max != null) sum = Math.min(sum, e.max);   // Wave18：いかは上限 +1000
     if (sum > 0){ acc.add += sum; acc.hits.push({ label: stack[i]+"：盤面の加算合計", effect:"+"+sum, idx:[i], kind:"add", add:sum, src:i }); }
+  }
+}
+/* Wave30 カツサンド：上下に接する**具材**の点数を2倍にする。
+     点数 ＝ 第1項（基礎点）＋ 第2項（育ち）＋ そのカードが src の加算
+   **効果を再発動しない。**乗算（③の+型・④の×型）には一切触れない。
+   Wave29-2 の事故：旧 adjTwice は発動回数を2にしていたので、隣が×型ソースだと ×N が ×N² になった
+   （×12 と ×10 に挟まれて ×120 のはずが ×14,400。同じデッキでも並び次第で ×15 にしかならない）。
+   **対象を具材に限る**ことで、二乗の経路が構造的に閉じる（具材に×型は1枚も無い・selfCheck で監視）。
+   2倍する量は**押し込む前の点数を全部先に控えてから**足す（カツサンドが2枚隣り合っても積み重ならない）。 */
+function applyAdjDouble(stack, ctx, acc){
+  const n = stack.length, items = ctx.items;
+  const pointsOf = j => {
+    let v = ((acc.baseArr || [])[j] || 0) + ((acc.growArr || [])[j] || 0);
+    for (const h of acc.hits){ if (h.disabled || h.kind !== "add") continue;
+      if (h.src === j) v += (h.add || 0); }
+    return v;
+  };
+  const plan = [];
+  for (let i = 0; i < n; i++){
+    const e = items[stack[i]].effect; if (!e || e.id !== "adjDoublePoints") continue;
+    for (const j of [i-1, i+1]){
+      if (j < 0 || j >= n) continue;
+      if (items[stack[j]].pile !== "ingredient") continue;   // ソース・パンには効かない
+      const v = pointsOf(j); if (!v) continue;
+      plan.push({ i, j, v });
+    }
+  }
+  for (const p of plan){
+    acc.add += p.v;
+    acc.hits.push({ label: stack[p.i]+"："+stack[p.j]+"を2倍", effect:(p.v>=0?"+":"")+p.v,
+                    idx:[p.i, p.j], kind:"add", add:p.v, src:p.j });
   }
 }
 function applyBelowPrev(stack, ctx, acc){
@@ -2814,7 +2843,7 @@ function resolveCard(i, ctx){
       if (isMidAt(i-1) || isMidAt(i+1)) pushAdd(nm+"：高いほうと同値", amAdd(baseArr[i] || 0), [i, ...neigh(i)]);
       break; }
     case "baseCopyMax": note(nm+"：盤面の最高と同値", [i]); break;
-    case "adjTwice":    note(nm+"：上下をもう一度", [i, ...neigh(i)]); break;   // 発動は evaluate のドライバ側
+    case "adjDoublePoints": break;  // カツサンド：加算が出そろってから点数を2倍する（applyAdjDouble で後段に処理）
     case "matsutakeTwice": note(nm+"：最初の具材をもう一度", [i]); break;
     case "konjacMeat":  note(nm+"：肉は乗らない", [i]); break;
     case "decayShare":  note(nm+"：出るたび基礎点が減る", [i]); break;
@@ -2922,6 +2951,7 @@ function applyCardEffects(stack, acc){
   // ⑦ 味醂の後段修飾（第3項の hit だけを ×1.6）→ そのあとフライドポテト（暫定合計で判定）
   applySauceMultUp(stack, ctx, acc); // バーベキューソース：+型ソースの倍率を持ち上げる（③の相の最後）
   applyBoardAddSum(stack, ctx, acc); // いか：他の加算が出そろってから、その合計と同じだけ足す
+  applyAdjDouble(stack, ctx, acc);   // Wave30 カツサンド：上下の具材の点数（第1項＋第2項＋加算）を2倍
   applyBelowPrev(stack, ctx, acc);   // フライドポテト：暫定合計で判定する
   // ⑧ アーティファクト（第3層・盤面を希釈しない）。盤面の形に効くものはここで適用。数値は CONFIG.artifacts。
   const pushAddA = (label, a, idx) => { if (a === 0) return; acc.add += a; acc.hits.push({ label, effect:(a>=0?"+":"")+a, idx, kind:"add", add:a, src:-1 }); };
@@ -6581,6 +6611,25 @@ function selfCheck(){
   // ① 効果があるのに効果文が無い（3択・店で「効果なし（暫定）」と出てしまう＝SHIYOU 第5節違反）
   const noText = names.filter(n => { const e = items[n].effect; return e && e.id && !EFFECT_TEXT[e.id]; });
   if (noText.length) warn.push("効果文が無いカード: " + noText.join(" / "));
+  /* Wave30：**具材に×型（④の乗算）が1枚でもあると、写しの二乗が復活する。**
+     いまは具材63枚すべてが加算・+型・note だけだが、これはたまたま成り立っている条件で、
+     コードのどこにも書かれていなかった。ここで明文化して見張る。
+     ×型の id は一覧を手で持たない——`resolveCard` の中身を読んで、`case "<id>":` の本体が
+     `pushMult(` を呼ぶものを機械的に拾う（新しい×型を足しても一覧の更新漏れが起きない）。
+     育ちの×型（inst.mx を増やす型）は case の外で掛かるので、その2つだけ明示的に足す。 */
+  { const src = String(resolveCard);
+    const multIds = new Set(["growMx", "drainAdjGrowX"]);
+    const parts = src.split('case "');
+    for (let k = 1; k < parts.length; k++){
+      const id = parts[k].slice(0, parts[k].indexOf('"'));
+      const body = parts[k].slice(0, parts[k].length);   // 次の case までがこの分岐の本体
+      const upto = body.indexOf('case "');
+      if ((upto < 0 ? body : body.slice(0, upto)).includes("pushMult(")) multIds.add(id);
+    }
+    const bad = names.filter(n => items[n].pile === "ingredient" && multIds.has((items[n].effect || {}).id));
+    if (bad.length) warn.push("具材が×型（④の乗算）を持っている＝写しの二乗が復活する: " + bad.join(" / ")
+      + "（Wave30。カツサンドは具材の点数だけを2倍する形なので、具材に×型があると掛け算が二重になる）");
+  }
   // ② 効果文があるのにどのカードも使っていない（死んだコード）
   const deadText = Object.keys(EFFECT_TEXT).filter(id => !usedIds.has(id));
   if (deadText.length) warn.push("使われていない EFFECT_TEXT: " + deadText.join(" "));
