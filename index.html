@@ -260,6 +260,17 @@
   .res-grade.g-D .rg-letter{background:linear-gradient(180deg,#f2f5fa,#9fb2c8)}
   .res-grade.g-E .rg-letter{background:linear-gradient(180deg,#e8e2ea,#a08fa8)}
   .res-grade.g-F .rg-letter{background:linear-gradient(180deg,#e8d6dc,#b07f92)}
+  /* Wave27-2：保存設定が既定値を上書きしている項目の一覧（調整欄の先頭） */
+  .cfgdiff{border:1px solid #6b4f1c; background:#2a2213; border-radius:10px; padding:8px 10px; margin:0 0 10px}
+  .cfgdiff.none{border-color:#2c333d; background:#1c2029}
+  .cfgdiff-h{font-weight:800; font-size:.82rem; color:#ffd98c; margin-bottom:6px}
+  .cfgdiff.none .cfgdiff-h{color:var(--muted)}
+  .cfgdiff-t{width:100%; border-collapse:collapse; font-size:.7rem; margin-bottom:8px}
+  .cfgdiff-t th{text-align:left; color:var(--muted); font-weight:700; padding:2px 6px 4px; border-bottom:1px solid #3a4553}
+  .cfgdiff-t td{padding:2px 6px; border-bottom:1px dashed #2c333d; vertical-align:top; word-break:break-all}
+  .cfgdiff-t td.k{color:var(--text); font-weight:700}
+  .cfgdiff-t td.a{color:var(--muted)}
+  .cfgdiff-t td.b{color:#ffd98c; font-weight:800}
   .res-money{font-size:.95rem; font-weight:800; color:var(--text)}
   .res-money b{color:#ffd98c}
   .res-sec{background:#171a20; border:1px solid var(--line); border-radius:12px; padding:10px}
@@ -706,7 +717,8 @@
 </head>
 <body>
 <div class="wrap" id="wrap">
-  <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span></h1>
+  <h1>burger-stack <span style="color:var(--muted);font-weight:400;font-size:.8rem">試作0</span>
+    <span id="buildTag" style="color:var(--muted);font-weight:700;font-size:.68rem;margin-left:6px"></span></h1>
   <p class="sub">ボタンを押すと1段ずつ積み上がり、価格がその場で増えていく。<b>段の数だけ押すと完成して停止</b>し、このバーガーの<b>売値（価格）</b>が大きく出る。<b>次の1回で回収</b>して売上に加算、新しいバーガーが始まる（段数は調整欄で変更可）。デッキ（山）の中身を変えて、売値の落差が出るかを見る。指標は <b style="color:var(--accent)">最高÷平均</b>（3倍以上で落差あり）。</p>
 
   <!-- 軸の内訳（デッキに各軸が何枚。常に表示して偏りが分かるようにする） -->
@@ -1376,6 +1388,39 @@ function rebuildConfig(diff){
   window.CONFIG = CONFIG;
 }
 function clearSavedCfg(){ try { localStorage.removeItem(K_CFG); } catch(e){} }
+/* ── Wave27-2：保存設定（bstack.cfg.v1）が既定値を黙って上書きしていることを画面に出す ──────
+   同じ事故が3回起きた（remove.onBuy が false のはずが true／dayGoal が 5 のはずが 10／
+   dayGoal を 7 にしたのに 10 のまま）。設計の判断が「いま何の値で遊んでいるか」に依存しているのに、
+   その値が画面から読めなかった。比較の基準は cfgRef()＝DEFAULTS の複製なので、
+   保存設定を読み込んだ後でも「素の既定値」はいつでも作れる。 */
+function cfgDiffList(){
+  const ref = cfgRef(), d = cfgDiff(CONFIG, ref);
+  const out = [];
+  const walk = (node, r, path) => {
+    if (node === null || typeof node !== "object" || Array.isArray(node)){
+      out.push({ path: path.join("."), ref: r, cur: node }); return;
+    }
+    for (const k of Object.keys(node)) walk(node[k], (r && typeof r === "object") ? r[k] : undefined, path.concat(k));
+  };
+  if (d) walk(d, ref, []);
+  return out;
+}
+// 差分のある枝だけを既定値に戻す（デッキ枚数などランの状態には触らない）。
+function cfgResetToDefaults(){
+  const ref = cfgRef(), d = cfgDiff(CONFIG, ref);
+  if (!d) return 0;
+  let n = 0;
+  const build = (node, r) => {
+    if (node === null || typeof node !== "object" || Array.isArray(node)){ n++; return r; }
+    const o = {};
+    for (const k of Object.keys(node)) o[k] = build(node[k], (r && typeof r === "object") ? r[k] : undefined);
+    return o;
+  };
+  cfgApply(CONFIG, build(d, ref));
+  clearSavedCfg();
+  return n;
+}
+const cfgValJa = v => v === undefined ? "（無し）" : (typeof v === "object" ? JSON.stringify(v) : String(v));
 { let saved = null;                                  // 起動時：保存されていれば載せる
   try { const t = localStorage.getItem(K_CFG); if (t) saved = JSON.parse(t); } catch(e){}
   if (saved) cfgApply(CONFIG, saved);
@@ -5597,6 +5642,33 @@ function renderSettings(){
   const CATS = [["run","進行（ラン・家賃・店・3択）"], ["board","盤面（段数・傾斜）"], ["cards","カードの数値（基礎点・各カードの効果）"],
                 ["fx","演出・見た目（落下速度・帯・パーティクル・揺れ・カメラ・数字）"], ["sound","音"],
                 ["debug","デバッグ操作（帯レベル強制・点数ランプ・演出を試す）"]];
+  /* Wave27-2：既定値と違っている項目を先頭に一覧で出す。違いが0件のときも「既定値のまま」と出す
+     （何も出さないと、機能が動いていないのか違いが無いのかが区別できない）。 */
+  { const diffs = cfgDiffList();
+    const box = document.createElement("div"); box.className = "cfgdiff" + (diffs.length ? "" : " none");
+    const h = document.createElement("div"); h.className = "cfgdiff-h";
+    h.textContent = diffs.length
+      ? `保存された設定が既定値を上書きしています（${diffs.length}件）　ビルド ${BUILD.label}`
+      : `設定は既定値のまま（0件）　ビルド ${BUILD.label}`;
+    box.appendChild(h);
+    if (diffs.length){
+      const tb = document.createElement("table"); tb.className = "cfgdiff-t";
+      tb.innerHTML = "<thead><tr><th>項目</th><th>既定値</th><th>いまの値</th></tr></thead>";
+      const body = document.createElement("tbody");
+      for (const x of diffs.slice(0, 200)){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="k">${x.path}</td><td class="a">${cfgValJa(x.ref)}</td><td class="b">${cfgValJa(x.cur)}</td>`;
+        body.appendChild(tr);
+      }
+      tb.appendChild(body); box.appendChild(tb);
+      if (diffs.length > 200) box.appendChild(el("res-note", `（${diffs.length - 200}件は省略）`));
+      const btn = document.createElement("button"); btn.className = "shopbtn";
+      btn.textContent = "すべて既定値に戻す（保存も消す）";
+      btn.addEventListener("click", () => { const n = cfgResetToDefaults(); updateRunStatus(); renderPiles(); renderSettings();
+        $("msg").textContent = n ? `設定を既定値に戻しました（${n}件）` : ""; });
+      box.appendChild(btn);
+    }
+    host.appendChild(box); }
   for (const [k, t] of CATS){ const d = document.createElement("details"); d.className = "setcat";
     const s = document.createElement("summary"); s.textContent = t; d.appendChild(s); host.appendChild(d); cats[k] = d; }
   const group = (title, cat) => { const g = document.createElement("div"); g.className="setgroup";
@@ -6212,6 +6284,10 @@ const plog = (function(){
   function settingsSnap(){ const p = CONFIG.params, r = p.run || {}, sh = p.shop || {};
     return { rentEvery: r.rentEvery, rentBase: r.rentBase, rentMul: r.rentMul, dayGoal: r.dayGoal,
              rentByDay: Array.isArray(r.rentByDay) ? r.rentByDay.slice() : null,
+             /* Wave27-2：**既定値と何が違ったか。**設定の写しだけでは「このランはどの設定で走ったか」しか
+                読めず、既定と違うかどうかが分からない。後からログを読むときはこちらが要る。 */
+             diffFromDefaults: (typeof cfgDiffList === "function")
+               ? cfgDiffList().map(x => ({ path: x.path, def: x.ref, now: x.cur })) : null,
              // Wave24：所持金比モードで走ったランと普通のランを、後から区別できるようにする。
              rentFromMoney: { on: rentFromMoneyOn(), ratio: rentRatio() },
              tiers: { ingredients: p.tiers.ingredients, sauces: p.tiers.sauces },
@@ -6531,6 +6607,8 @@ plog.bootStart(gameSeed); // プレイログ：ブート＝前回の未確定ラ
   const dl = $("plogDownload"); if (dl){ dl.addEventListener("click", () => plog.download()); }
   plog.renderList();
 })();
+// Wave27-2：どの波で遊んでいるかが画面から読めなかった（作者の環境が Wave26 のままだった事故）。
+{ const bt = $("buildTag"); if (bt) bt.textContent = BUILD.label; }
 renderPiles();
 renderSettings();
 updateStats();
