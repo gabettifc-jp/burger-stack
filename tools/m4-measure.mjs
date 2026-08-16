@@ -13,6 +13,7 @@
    使い方：
      node tools/m4-measure.mjs --policy=base --from=4001 --to=4060 --out=tools/out/m4-base.jsonl
      --workers=N でページを並列に走らせる（既定4）。--days=10 で dayGoal。
+     --axis=agemono --axismode=weak  で軸に寄せる（weak＝罰なし／strong＝Wave29 と同じ）。
 
    方策（--policy）：
      base    基準：枠（引く枚数）とデッキ枚数を揃える。空きがあるとき／削除で入れ替えるとき／
@@ -34,6 +35,13 @@ const OUT = arg('out', `tools/out/m4-${POLICY}.jsonl`);
 const HTML = arg('html', 'file:///home/user/burger-stack/index.html');   // Wave25：変更前の index.html を指定して同じ方策で測るため
 const RENTRATIO = arg('rentratio', '');   // Wave26：家賃を所持金比で出すモード（Wave24）。空なら OFF
 const AXIS = arg('axis', '');   // Wave29：この軸に寄せる（kokyu/wa/chuka/kaisen/agemono）。空なら軸に寄せない＝基準方策
+/* Wave31：軸方策の強さ。Wave29 は「狙う軸×3／別の軸×0.4」の一択で、別の軸への罰が
+   「強いカードでも軸が違えば避ける」方策を作っていた。制約つきの方策が制約なしの方策に
+   勝てないのは当たり前なので、罰のない「弱」を足す。
+     weak   … 狙う軸 ×2.0／別の軸 ×1.0／無軸 ×1.0（罰なし）
+     strong … 狙う軸 ×3.0／別の軸 ×0.4／無軸 ×1.0（Wave29 と同じ。比較用に残す） */
+const AXISMODE = arg('axismode', 'strong');
+const AXISW = AXISMODE === 'weak' ? { on: 2.0, off: 1.0 } : { on: 3.0, off: 0.4 };
 const DEEP = arg('deep', '') === '1';   // Wave29-2：スピンごとの盤面と hits、最終デッキの中身まで残す（解剖用・JSON が大きくなる）
 const WORKERS = +arg('workers', 4);
 const DAYS = +arg('days', 10);
@@ -59,11 +67,13 @@ const PROXY = `
   function proxyWithAxis(nm, useAxis){
     const v = proxy(nm);
     const cu = (CONFIG.items[nm] || {}).cuisine || "none";
-    /* Wave29：軸に寄せる方策。狙う軸は3倍、別の軸は0.4倍に見積もる。無軸（none）は素のまま
-       （無軸は序盤を支える札なので、寄せる／寄せないの判断から外す）。 */
+    /* Wave29／Wave31：軸に寄せる方策。係数は __axisW（weak なら 2.0/1.0、strong なら 3.0/0.4）。
+       無軸（none）は素のまま（無軸は序盤を支える札なので、寄せる／寄せないの判断から外す）。
+       方策そのもの（買い方・取捨の手順）は変えていない。変えたのは代理打点の係数だけ。 */
     if (window.__axisTarget){
-      if (cu === window.__axisTarget) return Math.round(v * 3);
-      if (cu !== "none") return Math.round(v * 0.4);
+      const W = window.__axisW || { on: 3, off: 0.4 };
+      if (cu === window.__axisTarget) return Math.round(v * W.on);
+      if (cu !== "none") return Math.round(v * W.off);
       return v;
     }
     if (!useAxis) return v;
@@ -118,7 +128,7 @@ async function runOne(page, seed, policy) {
   page.on('console', m => { if (m.type() === 'error') errs.push('CE ' + m.text()); });
   await page.goto(TARGET);
   await page.waitForFunction(() => typeof window.RUN !== 'undefined');
-  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis, deep]) => {
+  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis, deep, axisW]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
       sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0, shop: [], noneOffer: 0, noneTake: 0, noneShop: 0, noneShopBuy: 0 };
     eval(proxySrc); eval(perCardSrc);
@@ -126,6 +136,7 @@ async function runOne(page, seed, policy) {
     window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
     window.__perCard = perCardHits; window.__botRand = botRand; window.__rngState = seed * 7919;
     window.__axisTarget = axis || '';   // Wave29：軸に寄せる方策（空なら従来どおり）
+    window.__axisW = axisW;             // Wave31：軸方策の係数（weak / strong）
     window.__deep = !!deep;             // Wave29-2：解剖用の詳しい記録
     CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
     if (RUN.plogDetail) RUN.plogDetail(false);   // Wave13：スピンごとの盤面・内訳はプレイログに残さない（測定では要らない・JSON が膨らむ）
@@ -136,7 +147,7 @@ async function runOne(page, seed, policy) {
       CONFIG.params.run.rentFromMoney.on = true;
       CONFIG.params.run.rentFromMoney.ratio = +rentRatio;
     }
-  }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO, AXIS, DEEP]);
+  }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO, AXIS, DEEP, AXISW]);
 
   const st = () => page.evaluate(() => ({
     show: document.getElementById('offer').classList.contains('show'),
@@ -358,6 +369,9 @@ async function runOne(page, seed, policy) {
         cui:(CONFIG.items[x.name]||{}).cuisine||'none', rar:(CONFIG.items[x.name]||{}).rar })) : undefined,
       arts2: window.__deep ? (RUN.state().artifacts || []).slice() : undefined,
       arts: (RUN.state().artifacts || []).slice(),
+      // Wave31：最終デッキの軸の内訳と評価（--deep なしでも常に残す。§1-3 の純度と §3 の分布のため）
+      cuiEnd: (() => { const c = {}; for (const x of RUN.deck()){ const k = (CONFIG.items[x.name]||{}).cuisine || 'none'; c[k] = (c[k]||0)+1; } return c; })(),
+      grade: (typeof gradeOf === 'function') ? gradeOf(RUN.state().money) : null,
       fb: (RUN.rarityFallbacks ? RUN.rarityFallbacks().length : 0),
       warn: selfCheck().length, warnMsg: selfCheck(), deck: RUN.deck().length, cap: window.__cap(),
       ing: Math.round(CONFIG.params.tiers.ingredients), sau: Math.round(CONFIG.params.tiers.sauces),
