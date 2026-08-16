@@ -192,7 +192,14 @@ async function runOne(page, seed, policy) {
           bui: d.filter(x => x.name === 'ブイヤベース').map(x => ({ ch: Math.round(x.charge||0) })),
           buiMx: (plan ? plan.stack.map((n,i)=> n === 'ブイヤベース' ? (plan.inst[i].mx != null ? plan.inst[i].mx : 1) : null)
                               .filter(v => v != null) : []).map(v => Math.round(v*1000)/1000),
-          buiOn: plan ? plan.stack.filter(x => x === 'ブイヤベース').length : 0 });
+          /* Wave33：RUN.deck() の射影に mx を足したので、盤面に出ていないスピンでも読める。
+             buiMx（plan.inst 由来）と突き合わせて、同じ値になることを確認する。 */
+          buiMxDeck: d.filter(x => x.name === 'ブイヤベース').map(x => Math.round((x.mx != null ? x.mx : 1)*1000)/1000),
+          buiOn: plan ? plan.stack.filter(x => x === 'ブイヤベース').length : 0,
+          // Wave33：在庫側（うに）と、その参照先（ナンプラー）
+          uni: d.filter(x => x.name === 'うに').map(x => Math.round(x.pb||0)),
+          nam: plan ? (plan.sc.hits || []).filter(h => h.kind === 'mult' && /^ナンプラー/.test(h.label))
+                        .reduce((m,h) => Math.max(m, h.mult||1), 0) : 0 });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;
