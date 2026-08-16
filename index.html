@@ -518,8 +518,11 @@
     border:1px solid #0d1a3a; border-radius:7px; padding:0 4px; line-height:1.35; white-space:nowrap}
   .pb-inline{display:inline-block; margin-left:4px; font-size:.66rem; font-weight:800; color:#241a05;
     background:linear-gradient(#ffdf8a,#e8ab2c); border:1px solid #3a2a05; border-radius:6px; padding:0 4px}
-  .pm-inline{display:inline-block; margin-left:4px; font-size:.66rem; font-weight:800; color:#f4f7ff;
-    background:linear-gradient(#7aa2f7,#3355c9); border:1px solid #0d1a3a; border-radius:6px; padding:0 4px}
+  /* Wave23-2：デッキ一覧・店の取り除きに出す育ちの現在値。.pmb（盤面・3択・店のカード）と同じ色にする。
+     +型は青（--tplus）、×型は橙（--ttimes）。Wave20 で決めた型の色分けをここにも通す。 */
+  .pm-inline{display:inline-block; margin-left:4px; font-size:.66rem; font-weight:800;
+    background:#152230; border:1px solid #2f5470; color:var(--tplus); border-radius:6px; padding:0 4px}
+  .pm-inline.times{background:#2f2413; border-color:#6b4f1c; color:var(--ttimes)}
   .grow-inline{display:inline-block; margin-left:5px; font-size:.66rem; font-weight:800; color:#0b2a12;
     background:linear-gradient(#7ef0a0,#37c46b); border:1px solid #0a3a1c; border-radius:6px; padding:0 4px}
   .food[data-ph="1"][data-cuisine="wa"]{--phc1:#e0996b; --phc2:#b56a3c}       /* 和：朱土 */
@@ -3710,11 +3713,14 @@ function feedRow(kind, name, text, after, neg){
   flyQueue.push({ el:e, kind, after });
   if (!flyTimer) flyPump(Math.max(0, flyCfg().hold != null ? flyCfg().hold : 0.16));
 }
-// 画面に並べる行の上限。超えた分は**捨てず**に隠すだけ（値は必ず飛んで着弾する）。
+/* 画面に並べる行の上限。超えた分は**捨てず**に隠すだけ（値は必ず飛んで着弾する）。
+   Wave23-2：隠す向きが逆だった。flyQueue は FIFO なので、古い行＝**次に飛ぶ行**である。
+   古いほうから隠すと、飛ぶ画が出ないまま計器だけ跳ねて、「原因が飛んで当たるから数字が増える」
+   という因果が切れる。隠すのは**新しいほう**（まだ順番の来ない行）にする。 */
 function flyTrim(){
   const mx = Math.max(1, Math.round(flyCfg().max || 9));
   const kids = [...comboFeedEl.children];
-  kids.forEach((k, i) => k.classList.toggle("hid", i < kids.length - mx));
+  kids.forEach((k, i) => k.classList.toggle("hid", i >= mx));
 }
 function flyGap(){
   const c = flyCfg(), g = Math.max(0.01, c.gap != null ? c.gap : 0.11);
@@ -3745,6 +3751,7 @@ function flyLaunch(it){
       const t = setTimeout(() => { if (it.el.parentNode) it.el.remove(); flyTrim(); }, 130); flyTimers.push(t); }
     flyLand(it.kind, it.after); flyCheckDrained(); };
   flyBusy++;
+  if (it.el) it.el.classList.remove("hid");          // Wave23-2：これから飛ぶ行は必ず見えている状態にする
   const tgt = flyTargetEl(it.kind);
   if (reduced || !tgt || !it.el || !it.el.getBoundingClientRect){ done(); return; }
   const from = it.el.getBoundingClientRect(), to = tgt.getBoundingClientRect();
@@ -4954,8 +4961,11 @@ function showShopRemove(cost){
     const sysTag = (it.type !== "sauce" && it.type !== "bun") ? `<span class="tag">${TYPE_JA[it.type]}</span>` : "";
     const gTag  = inst.g > 0 ? `<span class="grow-inline">育 ${inst.g}</span>` : "";
     const pbTag = (inst.pb || 0) !== 0 ? `<span class="pb-inline">${inst.pb>0?"+":""}${inst.pb}</span>` : "";
-    const pmTag = (inst.pm || 0) > 0 ? `<span class="pm-inline">×${r2(1+inst.pm)}</span>` : "";
-    rowEl.innerHTML = `<span class="nm">${inst.name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}${gTag}${pbTag}${pmTag}`;
+    /* Wave23-2：+型の育ち（pm）を ×(1+pm) に換算していたので、同じカードがデッキ一覧と店で
+       違う数字に見えていた。**+型は +型のまま出す。**×型（mx）は×型のまま出す。 */
+    const pmTag = (inst.pm || 0) > 0 ? `<span class="pm-inline">${maddJa(inst.pm)}</span>` : "";
+    const mxTag = (inst.mx != null && inst.mx !== 1) ? `<span class="pm-inline times">${multJa(inst.mx)}</span>` : "";
+    rowEl.innerHTML = `<span class="nm">${inst.name}</span><span class="pl">${PILE_JA[it.pile]}</span>${cuiTag}${sysTag}${gTag}${pbTag}${pmTag}${mxTag}`;
     // 店の取り除きは「廃棄」ではない（D3）。白トリュフ・天かすのフックを走らせない（fireHooks=false）。
     if (!last) rowEl.addEventListener("click", () => {
       if (money < cost || shopDayLeft("remove") <= 0) return;          // 1営業日の回数（Wave7 Step3）
@@ -5342,22 +5352,24 @@ function renderPiles(){
       const pbs = instancesOf(n).map(x => x.pb || 0).filter(v => v !== 0);            // 個体ごとの pb（Wave4）
       const pbTag = pbs.length ? `<span class="pb-inline">${pbs.map(v=>(v>0?"+":"")+v).join("・")}</span>` : "";
       const pms = instancesOf(n).map(x => x.pm || 0).filter(v => v > 0);              // 個体ごとの pm（Wave4）
-      const pmTag = pms.length ? `<span class="pm-inline">${pms.map(v=>"倍率 +"+r2(v)).join("・")}</span>` : "";
+      const pmTag = pms.length ? `<span class="pm-inline">${pms.map(v=>maddJa(v)).join("・")}</span>` : "";
       const mxs = instancesOf(n).map(x => (x.mx != null ? x.mx : 1));                  // Wave20：個体ごとの mx（×型の育ち）
       const mxTag = (growsMx((it.effect||{})) || mxs.some(v => v !== 1))
-        ? `<span class="pm-inline">${mxs.map(v=>"×"+r2(v)+"倍").join("・")}</span>` : "";
+        ? `<span class="pm-inline times">${mxs.map(v=>multJa(v)).join("・")}</span>` : "";
       row.innerHTML = `<span class="nm">${n}</span>${cui}${tag}<span class="tag">基礎${it.base}</span>${growTag}${pbTag}${pmTag}${mxTag}`;
       // Wave15：取ったカードの効果を後から読む場所が無かった。行をタップすると効果文と、いまの値を開く。
       //   pb / pm は個体ごとに違うので、個体1つずつ「印字＋pb」「×(1+pm)」を並べる（上のバッジと同じ値）。
       row.classList.add("tappable");
-      const det = document.createElement("div"); det.className = "rowdet";
+      const det = document.createElement("div"); det.className = "rowdet";   // Wave23-2：明細も +型は換算しない
       row.addEventListener("click", (ev) => {
         if (ev.target.closest(".stepper")) return;     // ＋／− は今までどおり
         if (det.classList.toggle("open")){
           const insts = instancesOf(n);
           const now = insts.map((x, k) => {
             const b1 = it.base + (x.pb || 0);
-            return `${insts.length > 1 ? (k + 1) + "枚目 " : ""}第1項 ${b1}` + ((x.pm || 0) > 0 ? ` ／ ×${r2(1 + x.pm)}倍` : "");
+            return `${insts.length > 1 ? (k + 1) + "枚目 " : ""}第1項 ${b1}`
+                 + ((x.pm || 0) > 0 ? ` ／ ${maddJa(x.pm)}` : "")
+                 + ((x.mx != null && x.mx !== 1) ? ` ／ ${multJa(x.mx)}` : "");
           });
           det.innerHTML = `<div class="ef">${effectHTML(n) || "効果なし"}</div>`
                         + (now.length ? `<div class="nowv">${now.join("　｜　")}</div>` : "");
