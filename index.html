@@ -935,7 +935,7 @@ const DEFAULTS = {
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxGrowToAdj", mult:6, cui:"kaisen"}, ph:true },  // ×6。盤面で最も永続点が高い海鮮の具材の永続点を、上下2枚にもコピーして計算する
-    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:100, maxMul:20}, ph:true },  // 上下の具材の永続点を0にし、吸収した100点ごとに 倍率×1.20
+    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:200, maxMul:20}, ph:true },  // 上下の具材の永続点を0にし、吸収した200点ごとに 倍率×1.20（Wave21：step 100→200）
     "オーロラソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の揚げ物1枚につき 倍率+0.3（自分も数える）
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "タルタルソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeAdjRareMult", minRar:"tokujou", cui:"agemono", mult:10}, ph:true },  // 上下に接する特上以上の揚げ物の具材を破棄し、破棄した枚数につき ×10（2枚なら ×20）
@@ -944,7 +944,7 @@ const DEFAULTS = {
     "みりん": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ぽん酢": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"adjNamiJou", pm0:0.5, per:0.5, pmMax:5.0}, ph:true },  // 盤面で接する並または上1枚につき 倍率+0.5（永続）
     "煎り酒": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"adjTierMult", cui:"wa", one:6, both:28}, ph:true },  // 上下の片方が和なら ×6、両方なら ×28
-    "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:1, tier:null, rar:"nami", effect:{id:"flatMult", mult:1.2}, ph:true },  // 初期デッキ。常に ×1.2
+    "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:1, tier:null, rar:"nami", effect:{id:"flatMultAdd", per:0.2}, ph:true },  // 初期デッキ。Wave21：並は全部+型（常に 倍率 +0.2）
     // ── Wave20：特上ソース5枚（各軸1枚）。すべて×型。数値は仮の初期値で、全部が調整欄から変えられる。──
     "オランデーズソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeBelowMult", mult:6}, ph:true },  // 真下の具材を破棄して 倍率×6
     "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"deckDupMultX", per:1.4, maxMul:8}, ph:true },  // デッキで最も多い同名の枚数1枚につき 倍率×1.4
@@ -953,7 +953,7 @@ const DEFAULTS = {
     "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"runLenMultX", cui:"wa", per:1.3, maxMul:8}, ph:true },  // 和が連続して並ぶ最長の長さ1枚につき 倍率×1.3
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjTypeMultAdd", type:"meat", per:1.0}, ph:true },  // 上下に接する肉1枚につき 倍率+1.0
     "ランチドレッシング": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjTypeMultAdd", type:"veg", per:1.0}, ph:true },  // 上下に接する野菜1枚につき 倍率+1.0
-    "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"jou", effect:{id:"coinFlipMult", p:0.5, mult:6}, ph:true },  // 1/2 で何も出さず、1/2 で ×6
+    "ウスターソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"jou", effect:{id:"coinFlipMultAdd", p:0.5, per:6}, ph:true },  // Wave21：上は全部+型（1/2 で 0、1/2 で 倍率 +6）
     "サウザンアイランド": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"adjDiffCuiMult", mult:6}, ph:true },  // 上下2枚が互いに違う軸なら ×6
     "マスタード": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"drawFewerMult", draw:-2, mult:18}, ph:true, pool:false },  // Wave20：候補（未採用）。pool:false で3択・店の抽選から外す（強さが理由ではない）
     "チポトレ": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"undrawn", pm0:0.5, per:0.5, pmMax:5.0}, ph:true },  // 盤面に出なかったスピンごとに 倍率+0.5（永続）
@@ -1517,7 +1517,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 20", base: "0cf8be6", date: "2026-08-16" };
+const BUILD = { label: "Wave 21", base: "1e5856e", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -2293,7 +2293,7 @@ const EFFECT_TEXT = {
   // 連続・賭け
   runLenAdd:     e => `${CUISINE_JA[e.cui]||e.cui}が連続して並ぶ最長の長さ1枚につき ${sgn(e.per)}`,
   coinFlipAdd:   e => `${Math.round((1-(e.p!=null?e.p:0.5))*100)}% で 0、${Math.round((e.p!=null?e.p:0.5)*100)}% で ${sgn(e.per)}`,
-  coinFlipMult:  e => `${Math.round((1-(e.p!=null?e.p:0.5))*100)}% で何も出さず、${Math.round((e.p!=null?e.p:0.5)*100)}% で 倍率 ×${e.mult}`,
+  coinFlipMultAdd: e => `${Math.round((1-(e.p!=null?e.p:0.5))*100)}% で 0、${Math.round((e.p!=null?e.p:0.5)*100)}% で 倍率 ${sgn(e.per)}`,
   sameAdjPairAdd:e => `盤面で同じ軸が隣り合っている組1つにつき ${sgn(e.per)}`,
   // 永続で伸びる（第1項の pb）。餌は trigger
   growOn:        e => `${trigJa(e)} ${sgn(e.per)}点（永続）`
@@ -2310,7 +2310,7 @@ const EFFECT_TEXT = {
   boardCuiMultAdd: e => `盤面の同じ軸1枚につき 倍率 ${sgn(e.per)}（自分も数える）`,
   adjCuiMultAdd:  e => `上下に接する同じ軸1枚につき 倍率 ${sgn(e.per)}`,
   adjTypeMultAdd: e => `上下に接する${TYPE_JA[e.type]||e.type}1枚につき 倍率 ${sgn(e.per)}`,
-  flatMult:      e => `常に 倍率 ×${e.mult}（条件なし）`,
+  flatMultAdd:   e => `常に 倍率 ${sgn(e.per)}（条件なし）`,
   adjDiffCuiMult:e => `上下2枚が互いに違う軸なら 倍率 ×${e.mult}`,
   axisKindsMult: e => `倍率 ×（${e.base!=null?e.base:1} + ${e.per} × 盤面の軸の種類数）`,
   deckSizeMultX: e => (e.dir === "under" ? `デッキが${e.ref}枚を下回る1枚ごとに 倍率 ×${e.per}` : `デッキ1枚につき 倍率 ×${e.per}`) + mulCapJa(e),
@@ -2648,9 +2648,12 @@ function resolveCard(i, ctx){
     case "coinFlipAdd": { const win = ctx.forceWin(i) || grand() < (e.p != null ? e.p : 0.5);
       pushAdd(nm+"："+(win ? "当たり" : "はずれ"), win ? amAdd(e.per) : 0, [i]);
       if (!win) hits.push({ label:nm+"：はずれ", effect:"+0", idx:[i], kind:"note", src:i }); break; }
-    case "coinFlipMult": { const win = ctx.forceWin(i) || grand() < (e.p != null ? e.p : 0.5);
-      if (win) pushMult(nm+"：当たり", amMul(e.mult), [i]);
-      else hits.push({ label:nm+"：はずれ", effect:"×1", idx:[i], kind:"note", src:i }); break; }
+    /* Wave21 ウスターソース：確率つきの+型。はずれは **multAdd に 0 を足すのではなく、③に触らない**。
+       0 を足しても合計は変わらないが、hits に「倍率 +0」の行を kind:"multAdd" で出すと、
+       倍率フェーズで「何も起きないカードが1拍ぶん光る」ことになる。はずれは kind:"note"（表示専用）で出す。 */
+    case "coinFlipMultAdd": { const win = ctx.forceWin(i) || grand() < (e.p != null ? e.p : 0.5);
+      if (win) pushMultAdd(nm+"：当たり", (e.per || 0), [i]);
+      else hits.push({ label:nm+"：はずれ", effect:"倍率 +0", idx:[i], kind:"note", src:i }); break; }
     case "sameAdjPairAdd": { const mid = []; for (let k = 0; k < n; k++) if (items[stack[k]].pile !== "bun") mid.push(k);
       let pairs = 0; const idx = [i];
       for (let k = 0; k + 1 < mid.length; k++){ const a = mid[k], b = mid[k+1];
@@ -2698,7 +2701,7 @@ function resolveCard(i, ctx){
     // Wave20：削除の累計を読む（白トリュフ・キャビア）／直前に削除されたカードを拾う（フォアグラ）。
     case "removedCountAdd": pushAdd(nm+"：削除"+runRemovals+"枚", amAdd((e.per || 0) * runRemovals), [i]); break;
     case "lastRemovedAdd":  pushAdd(nm+"：直前の削除"+lastRemovedBase, amAdd(Math.round(Math.max(0, lastRemovedBase) * (e.ratio || 1.5))), [i]); break;
-    case "flatMult":     pushMult(nm, amMul(e.mult), [i]); break;
+    case "flatMultAdd":  pushMultAdd(nm, (e.per || 0), [i]); break;   // Wave21：ケチャップ（③の+型・条件なし）
     case "adjTypeMult":  { const r = countAdj({ type: e.type }, i, ctx);   // Wave18：軸ではなく系統を見る one/both
       if (r.c >= 2) pushMult(nm+"：上下とも"+(TYPE_JA[e.type]||e.type), amMul(e.both), [i, ...r.idx]);
       else if (r.c === 1) pushMult(nm+"：片方が"+(TYPE_JA[e.type]||e.type), amMul(e.one), [i, ...r.idx]); break; }
@@ -5465,8 +5468,10 @@ function renderSettings(){
   gridRow(g, "【帯の代表】上ソースの per（みりん）", numInput(()=>effOf("みりん").per, v=>{ for (const n2 of ["みりん","ペリグーソース","オイスターソース","アイオリ","とんかつソース"]) effOf(n2).per = Math.max(0,v); }, 0.1));
   for (const nm of ["デミグラスソース","甜麺醤","レモン","オーロラソース","醤油",
                     "ペリグーソース","オイスターソース","アイオリ","とんかつソース","みりん",
-                    "テリヤキソース","ランチドレッシング","バーベキューソース"])
+                    "テリヤキソース","ランチドレッシング","バーベキューソース",
+                    "ケチャップ","ウスターソース"])                       // Wave21：この2枚も+型になった
     gridRow(g, nm+"：per（倍率 +）", numInput(()=>effOf(nm).per, v=>effOf(nm).per=Math.max(0,v), 0.05));
+  gridRow(g, "ウスターソース：当たる確率", numInput(()=>effOf("ウスターソース").p, v=>effOf("ウスターソース").p=Math.max(0,Math.min(1,v)), 0.05));
   // 個体ごとに育つ+型（pm）。pm0＝開始／per＝1回あたり／pmMax＝上限。
   for (const nm of ["トリュフオイル","ぽん酢","チポトレ","黒酢"]){
     gridRow(g, nm+"：開始（倍率 +）", numInput(()=>effOf(nm).pm0, v=>effOf(nm).pm0=Math.max(0,v), 0.1));
@@ -5478,7 +5483,7 @@ function renderSettings(){
     gridRow(g, nm+"：片方（倍率 ×）", numInput(()=>effOf(nm).one, v=>effOf(nm).one=Math.max(1,v), 0.5));
     gridRow(g, nm+"：両方（倍率 ×）", numInput(()=>effOf(nm).both, v=>effOf(nm).both=Math.max(1,v), 1));
   }
-  for (const nm of ["ケチャップ","ウスターソース","サウザンアイランド","ナンプラー","タルタルソース","南蛮酢","マスタード","オランデーズソース"])
+  for (const nm of ["サウザンアイランド","ナンプラー","タルタルソース","南蛮酢","マスタード","オランデーズソース"])
     gridRow(g, nm+"：倍率 ×", numInput(()=>effOf(nm).mult, v=>effOf(nm).mult=Math.max(0,v), 0.5));
   gridRow(g, "スペシャルソース：軸1種あたり", numInput(()=>effOf("スペシャルソース").per, v=>effOf("スペシャルソース").per=Math.max(0,v), 0.5));
   // 指数で伸びる×型：per は「1段あたり掛ける値」。maxMul で必ず頭を止める。
