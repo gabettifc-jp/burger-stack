@@ -32,6 +32,7 @@ const POLICY = arg('policy', 'base');
 const FROM = +arg('from', 4001), TO = +arg('to', 4060);
 const OUT = arg('out', `tools/out/m4-${POLICY}.jsonl`);
 const HTML = arg('html', 'file:///home/user/burger-stack/index.html');   // Wave25：変更前の index.html を指定して同じ方策で測るため
+const RENTRATIO = arg('rentratio', '');   // Wave26：家賃を所持金比で出すモード（Wave24）。空なら OFF
 const WORKERS = +arg('workers', 4);
 const DAYS = +arg('days', 10);
 const TARGET = HTML;   // Wave25：--html= で差し替え可能（変更前後を同じ方策で比べるため）
@@ -107,7 +108,7 @@ async function runOne(page, seed, policy) {
   page.on('console', m => { if (m.type() === 'error') errs.push('CE ' + m.text()); });
   await page.goto(TARGET);
   await page.waitForFunction(() => typeof window.RUN !== 'undefined');
-  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc]) => {
+  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
       sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0, shop: [] };
     eval(proxySrc); eval(perCardSrc);
@@ -119,7 +120,11 @@ async function runOne(page, seed, policy) {
     RUN.setPendingSeed(seed); RUN.reset();
     CONFIG.params.skipFx = true; CONFIG.params.completeLock = 0.001;
     CONFIG.params.run.dayGoal = days;
-  }, [seed, DAYS, policy, PROXY, PERCARD]);
+    if (rentRatio !== '' && CONFIG.params.run.rentFromMoney){    // Wave26：所持金比モードで測るとき
+      CONFIG.params.run.rentFromMoney.on = true;
+      CONFIG.params.run.rentFromMoney.ratio = +rentRatio;
+    }
+  }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO]);
 
   const st = () => page.evaluate(() => ({
     show: document.getElementById('offer').classList.contains('show'),
