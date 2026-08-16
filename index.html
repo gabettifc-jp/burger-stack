@@ -228,6 +228,9 @@
   /* ラン制（家賃・店・結果）の画面 */
   .offer-card.cant, .shopbtn.cant{opacity:.4; cursor:default}
   .offer-card .price, .shopbtn .price{display:block; margin-top:4px; color:#ffd98c; font-weight:800; font-size:.72rem}
+  /* Wave25：買うたび値上がりするものは、いま何回目で次いくらかを値札の下に小さく出す。
+     これが無いと「買うと次が高くなる」ことが買ってからしか分からず、選択にならない。 */
+  .offer-card .nextp, .shopbtn .nextp{display:block; margin-top:1px; color:#9fb2c8; font-weight:700; font-size:.62rem}
   .shopbtn .reason{display:block; margin-top:3px; color:#ffb0a0; font-weight:700; font-size:.64rem}   /* 買えない理由（ソース枠の上限など） */
   .offer-runinfo{text-align:center; font-size:.9rem; color:var(--text); font-weight:700}
   .offer-runinfo.warn{color:#ffb0a0}
@@ -1161,15 +1164,18 @@ const DEFAULTS = {
             //   序盤の残金は中央値 ¥225 で値上がりが効かず、後半の ¥1万には無意味だった（M1 実測）。
             dayLimits: { reroll: 1, ing: 1, sau: 1, remove: 1 },
             artifactsShown: 2, scaleOnBuy: false, scaleMul: 1.5,   // scaleOnBuy/scaleMul は旧・一律スケール（後方互換用に残置。ゲーム本体は下の scale を使う）
-            // 価格スケールを要素ごとに分離（一律をやめる）。値は未変更＝初期は全て onBuy:false で現状と同じ挙動。
+            // 価格スケールを要素ごとに分離（一律をやめる）。回数はランごとの通算（shopBuys・日次に戻さない）。
             // 具材枠とソース枠は「段数スロット」として slot に統合（分けていない）。各設定は調整欄から変更可。
             scale: { slot:     { onBuy: true,  mul: 2.0 },   // 具材枠（購入で2倍ずつ：150→300→600→…）※試験値
                      sslot:    { onBuy: true,  mul: 3.0 },   // ソース枠：Wave6 2-2 で固定価格（sauceSlotPrices）に移したので**使っていない**。後方互換で残置
-                     card:     { onBuy: false, mul: 1.2 },   // カード（既定のまま）
-                     // 引き直しと取り除きは Wave7 Step3 で回数制にしたので、値上がりを止めた（常に基準価格）。
-                     //   回数で切ったうえに値上がりも掛かると、営業日をまたぐごとに実質使えなくなる。
-                     reroll:   { onBuy: false, mul: 2.0 },   // 品揃えの引き直し（回数制・固定価格）
-                     artifact: { onBuy: false, mul: 1.2 },   // アーティファクト（既定のまま）
+                     /* Wave25：繰り返し買えるものが全部据え置きで、5営業日目以降は金が店を完全に追い越していた
+                        （買うものが無いのではなく、選ぶ理由が消えていた）。回数はランごとの**通算**（shopBuys）。 */
+                     card:     { onBuy: true,  mul: 1.5 },   // カード（Wave25：1.2→1.5・onBuy を入れた）
+                     reroll:   { onBuy: true,  mul: 2.0 },   // 品揃えの引き直し（Wave25：onBuy を入れた。50→100→200→…）
+                     artifact: { onBuy: true,  mul: 1.5 },   // アーティファクト（Wave25：カードと同率。片方だけ上げると抜け道になる）
+                     /* 取り除きは入れない。高級軸が「削ってデッキを薄くする」線で、白トリュフ・キャビアが
+                        ランの削除累計（runRemovals）を読む。値段を上げるとその軸の打点がそのまま落ちる＝
+                        経済の調整ではなく軸のバランス変更になる。経済側の効果を測ってから別に判断する。 */
                      remove:   { onBuy: false, mul: 2.0 } },// デッキから取り除く（回数制・固定価格 ¥75）
             /* Wave16：店の値段を営業日ごとに置く。家賃（Wave11 の rentByDay）とまったく同じ形。
                  ・添字は「1営業日目＝0」。rentByDay と揃えてある。
@@ -4608,6 +4614,16 @@ function byDayPrice(arr, fallback){
   return (Array.isArray(arr) && arr[i] != null && Number.isFinite(+arr[i])) ? +arr[i] : fallback;
 }
 function shopByDay(key){ return ((CONFIG.params.shop || {}).byDay || {})[key]; }
+/* Wave25：値上がりする品目だけ「N回目・次 ¥M」を値札の下に出す。N はランの通算（shopBuys）。
+   次の額は「いまの額 × mul」＝この品目をもう1つ買ったあとの額。割引（朝市・常連の要求）は
+   いまと同じだけ効くものとして掛ける。値上がりしない品目では何も出さない。 */
+/* 出す場所は .price の**外**。測定ハーネスは .price のテキストから数字だけを抜いて値段にするので、
+   同じ入れ物に別の金額を入れると値段の読み取りが壊れる（Wave15 で同種の事故がある）。 */
+function nextPriceHTML(key, cost){
+  const sc = scaleFor(scaleElemOf(key)); if (!sc.on || cost == null) return "";
+  const n = (shopBuys[key] || 0) + 1;                      // これが何回目の購入か
+  return `<span class="nextp">${n}回目・次 ¥${Math.max(0, Math.round(cost * sc.mul)).toLocaleString()}</span>`;
+}
 function shopPrice(key, base){ const sc = scaleFor(scaleElemOf(key)); const n = shopBuys[key] || 0;
   const b = byDayPrice(shopByDay(key), base);
   return Math.max(0, Math.round((b || 0) * (sc.on ? Math.pow(sc.mul, n) : 1))); }
@@ -4797,7 +4813,7 @@ function showShop(){
     const eff = effectHTML(name) || "効果なし（暫定）";
     card.innerHTML = `<div class="pl">${PILE_JA[it.pile]}${cuiTagHTML(it)}${rarChipHTML(rarityOf(name))}${pmBadgeHTML(name, null)}</div><div class="nm">${name}</div>`
                    + `<div class="bs">基礎${baseOf(name)}</div>`   // 重さの表示は撤去（Wave7 Step0：並びは抽選）
-                   + `<div class="ef">${eff}${pickPreviewHTML(name)}</div><div class="price">¥${cost}</div>`;
+                   + `<div class="ef">${eff}${pickPreviewHTML(name)}</div><div class="price">¥${cost}</div>${nextPriceHTML("card", cost)}`;
     if (aff) card.addEventListener("click", () => buyCard(name, cost));
     row.appendChild(card);
   }
@@ -4811,7 +4827,7 @@ function showShop(){
       const a = CONFIG.artifacts[name]; const cost = artPriceOf(name); const aff = money >= cost && !full;
       const card = document.createElement("div"); card.className = "offer-card shopcard artcard" + (aff ? "" : " cant");
       card.innerHTML = `<div class="pl">アーティファクト${rarChipHTML(a.rar||"nami")}</div><div class="nm">${name}</div>`
-                     + `<div class="ef">${artifactText(name)}</div><div class="price">${full?"所持上限":"¥"+cost}</div>`;
+                     + `<div class="ef">${artifactText(name)}</div><div class="price">${full?"所持上限":"¥"+cost}</div>${full?"":nextPriceHTML("artifact", cost)}`;
       if (aff) card.addEventListener("click", () => buyArtifact(name, cost));
       arow.appendChild(card);
     }
@@ -4837,8 +4853,10 @@ function showShop(){
   }
   offerEl.appendChild(el("offer-subtitle", "枠と手入れ"));
   const acts = document.createElement("div"); acts.className = "shop-acts";
-  const mkbtn = (label, cost, fn, aff, note) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
-    b.innerHTML = `${label}` + (note ? `<span class="reason">${note}</span>` : "") + (cost != null ? `<span class="price">¥${cost}</span>` : "");
+  const mkbtn = (label, cost, fn, aff, note, key) => { const b = document.createElement("button"); b.className = "shopbtn" + (aff ? "" : " cant");
+    b.innerHTML = `${label}` + (note ? `<span class="reason">${note}</span>` : "")
+                + (cost != null ? `<span class="price">¥${cost}</span>` : "")
+                + (cost != null && key ? nextPriceHTML(key, cost) : "");
     if (aff) b.addEventListener("click", fn); return b; };
   const rc = removeCostBase();
   const ic = Math.round(shopPrice("ing", sh.ingredientSlotCost) * shopPriceMul());
@@ -4857,7 +4875,7 @@ function showShop(){
   };
   const canDo = (key, cost, blocked) => !blocked && shopDayLeft(key) > 0 && money >= cost;
   acts.appendChild(mkbtn("デッキから取り除く", rc, () => showShopRemove(rc), canDo("remove", rc), why("remove", rc)));
-  acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), canDo("ing", ic), why("ing", ic)));
+  acts.appendChild(mkbtn("具材枠 +1", ic, () => buySlot("ingredients", "ing", ic), canDo("ing", ic), why("ing", ic), "ing"));
   acts.appendChild(mkbtn("ソース枠 +1", sCap ? null : scst, () => buySlot("sauces", "sau", scst),
     canDo("sau", scst, sCap), why("sau", scst, sCap ? `ソース枠は${sauceSlotMax()}枚まで` : null)));
   // 見習いの独立〈使い切り〉：デッキを半分にする（残す札はプレイヤーが選ぶ）。以後3択が増える。
@@ -4866,7 +4884,7 @@ function showShop(){
       deck.length < 2 ? "デッキが少なすぎます" : null));
   acts.appendChild(mkbtn("品揃えの引き直し", rr,
     () => { setMoney(money - rr); bumpBuy("reroll"); useShopDay("reroll"); plog.recordBuy("reroll", "reroll", rr); onReroll(); rerollStock(); showShop(); },
-    canDo("reroll", rr), why("reroll", rr)));
+    canDo("reroll", rr), why("reroll", rr), "reroll"));
   offerEl.appendChild(acts);
   const leave = el("offer-skip", "店を出る →");
   leave.addEventListener("click", () => {
@@ -5709,7 +5727,8 @@ function renderSettings(){
   gridRow(g, "白トリュフ：削除1枚につき", numInput(()=>effOf("白トリュフ").per, v=>effOf("白トリュフ").per=Math.max(0,Math.round(v)), 10));
   gridRow(g, "キャビア：削除1枚につき", numInput(()=>effOf("キャビア").per, v=>effOf("キャビア").per=Math.max(0,Math.round(v)), 10));
   g = group("店：価格スケール", "run");
-  // 価格スケールは要素ごとに独立（段数スロット・カード・引き直し・アーティファクト・取り除き）。初期は全て切＝現状と同じ挙動。
+  // 価格スケールは要素ごとに独立（段数スロット・カード・引き直し・アーティファクト・取り除き）。
+  //   Wave25：カード1.5／アーティファクト1.5／引き直し2.0 を入れた。取り除きだけ切ったまま（高級軸の打点に直結するため）。
   const scaleRow = (label, elem) => {
     gridRow(g, label+"：購入で値上げ", boolInput(()=>sh.scale[elem].onBuy, v=>sh.scale[elem].onBuy=v));
     gridRow(g, label+"：値上げ倍率", numInput(()=>sh.scale[elem].mul, v=>sh.scale[elem].mul=Math.max(1,v), 0.05)); };

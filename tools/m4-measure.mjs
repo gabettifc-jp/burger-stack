@@ -31,9 +31,10 @@ const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k +
 const POLICY = arg('policy', 'base');
 const FROM = +arg('from', 4001), TO = +arg('to', 4060);
 const OUT = arg('out', `tools/out/m4-${POLICY}.jsonl`);
+const HTML = arg('html', 'file:///home/user/burger-stack/index.html');   // Wave25：変更前の index.html を指定して同じ方策で測るため
 const WORKERS = +arg('workers', 4);
 const DAYS = +arg('days', 10);
-const TARGET = 'file:///home/user/burger-stack/index.html';
+const TARGET = HTML;   // Wave25：--html= で差し替え可能（変更前後を同じ方策で比べるため）
 
 if (!existsSync('tools/out')) mkdirSync('tools/out', { recursive: true });
 writeFileSync(OUT, '');
@@ -108,7 +109,7 @@ async function runOne(page, seed, policy) {
   await page.waitForFunction(() => typeof window.RUN !== 'undefined');
   await page.evaluate(([seed, days, policy, proxySrc, perCardSrc]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
-      sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0 };
+      sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0, shop: [] };
     eval(proxySrc); eval(perCardSrc);
     window.__proxy = proxy; window.__proxyAxis = proxyWithAxis; window.__weakest = weakestInDeck;
     window.__avg = avgInDeck; window.__cap = capacity; window.__deckN = deckN; window.__sauceRoom = sauceRoom;
@@ -185,6 +186,7 @@ async function runOne(page, seed, policy) {
       // ③ 店　買う順序：削除 → 具材枠 → アーティファクト → カード（今日の家賃ぶんは常に残す）
       if (/店（/.test(title)) {
         const money = () => RUN.state().money;
+        const m0 = RUN.state().money;                       // Wave25：店に入った時点（家賃を払った直後）の所持金
         const keep = () => Math.round(300 * Math.pow(1.4, RUN.state().daysSurvived));   // 今日の家賃ぶんは残す
         const btn = re => [...document.querySelectorAll('#offer .shopbtn')].find(y => re.test(y.textContent));
         const price = el => +((el.querySelector('.price') || {}).textContent || '0').replace(/\D/g, '');
@@ -262,6 +264,8 @@ async function runOne(page, seed, policy) {
             pick.x.click(); M.buys.push({ d: day, nm: pick.nm, kind: 'card' });
           }
         }
+        // Wave25：この営業日に店で使った額と、店を出た時点の残り
+        M.shop.push({ d: day, in: m0, out: RUN.state().money, spent: m0 - RUN.state().money });
         const out = [...document.querySelectorAll('#offer .offer-skip')].find(y => /店を出る/.test(y.textContent));
         if (out) out.click();
         return 'shop';
@@ -309,7 +313,7 @@ async function runOne(page, seed, policy) {
 
   const out = await page.evaluate(() => {
     const M = window.__M4;
-    return { spins: M.spins, days: M.days, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots, sauSlots: M.sauSlots,
+    return { spins: M.spins, days: M.days, shop: M.shop, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots, sauSlots: M.sauSlots,
       artBuys: M.artBuys, artSwaps: M.artSwaps, fills: M.fills,
       arts: (RUN.state().artifacts || []).slice(),
       fb: (RUN.rarityFallbacks ? RUN.rarityFallbacks().length : 0),
