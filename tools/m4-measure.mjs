@@ -206,7 +206,12 @@ async function runOne(page, seed, policy) {
                 .map(x => ({ pb: Math.round(x.pb||0), t1: Math.round((CONFIG.items['しらす'].base||0) + (x.pb||0)) })),
           // Wave34：いかの加算（上限1000に張り付いているか）
           ika: plan ? (plan.sc.hits || []).filter(h => h.kind === 'add' && /^いか：盤面の加算合計/.test(h.label))
-                        .reduce((m,h) => Math.max(m, h.add||0), 0) : 0 });
+                        .reduce((m,h) => Math.max(m, h.add||0), 0) : 0,
+          /* Wave35：デッキ枚数を読む極ソース2枚。hit の label は「名前：デッキN枚」なので
+             倍率とそのときのデッキ枚数を一緒に取る（フォンドヴォーは薄いほど、花椒油は厚いほど強い）。 */
+          ksauce: plan ? (plan.sc.hits || []).filter(h => h.kind === 'mult' && /^(フォンドヴォー|花椒油)：デッキ/.test(h.label))
+                        .map(h => ({ n: h.label.split('：')[0], m: Math.round((h.mult||1)*1000)/1000,
+                                     dk: +(h.label.match(/デッキ(\d+)枚/) || [0,0])[1] })) : [] });
       });
       for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;
