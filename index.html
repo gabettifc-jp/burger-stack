@@ -945,12 +945,12 @@ const DEFAULTS = {
     "ほたて": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:20, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"draw", per:20}, ph:true },  // 引かれるたび +20点（永続・Wave32：15→20）
     "昆布": { pile:"ingredient", type:"veg", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"undrawn", per:60}, ph:true },  // 盤面に出なかったスピンごとに +60点（永続）
     "フグ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"coinFlipAdd", p:0.5, per:480}, ph:true },  // 1/2 で 0、1/2 で +480
-    "あわび": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"sacrificeBelowAdd", ratio:0.5, notCui:"kaisen"}, ph:true },  // 真下の海鮮以外1枚を消して、その基礎点の半分を加算（永続）
+    "あわび": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"sacrificeBelowAdd", ratio:1.5, notCui:"kaisen"}, ph:true },  // 真下の海鮮以外1枚を消して、その基礎点の1.5倍を加算（永続・Wave33：0.5→1.5。notCui は据え置き）
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"adjCountAdd", count:{cui:"kaisen"}, per:200}, ph:true },  // 上下に接する海鮮1枚につき +200
     "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"deckTopAdd"}, ph:true },  // デッキで最も点数が高いカードの点数を加算
     "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"boardAddSum", max:1000}, ph:true },  // 盤面の具材に加算された点数の合計と同じだけ加算（上限 +1000）
     "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"dayBaseMul", mult:2, max:1280}, ph:true },  // 営業日をまたぐごとに基礎点2倍（上限 1,280）
-    "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"growOn", trigger:"spin", per:200, halveChance:0.2}, ph:true },  // スピンごとに +200点（永続）。20% で永続点が半減
+    "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"growOn", trigger:"spin", per:300, halveChance:0.2}, ph:true },  // スピンごとに +300点（永続・Wave33：200→300）。20% で永続点が半減
     "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:80, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
     "コロッケ": { pile:"ingredient", type:"veg", cuisine:"agemono", base:10, count:0, tier:null, rar:"nami", effect:{id:"boardCountAdd", count:{pile:"sauce"}, per:50}, ph:true },  // 盤面のソース1枚につき +50
     "フライドポテト": { pile:"ingredient", type:"veg", cuisine:"agemono", base:30, count:0, tier:null, rar:"nami", effect:{id:"belowPrevAdd", add:150}, ph:true },  // 前のスピンより得点が低いとき +150
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 32", base: "6fefc4e", date: "2026-08-16" };
+const BUILD = { label: "Wave 33", base: "e49e367", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -6569,7 +6569,9 @@ window.RUN = {
   seedNow: (s) => seedRun(s),                        // ゲーム乱数の生成器を今すぐ張り替える（返り値＝確定シード。ハーネスの再生用）
   setPendingSeed: (s) => { pendingSeed = (s == null) ? null : (s >>> 0); },  // 次の resetRun で使うシードを予約（未指定なら自動）
   // 個体・育ち（Wave3）：計測・テストからデッキを組み立て／読み出す口。
-  deck: () => deck.map(x => ({ id: x.id, name: x.name, g: x.g, pb: x.pb, pm: x.pm, uses: x.uses, charge: x.charge })),
+  // Wave33：mx（育った倍率）を射影に足した。測定・調査の読み出し口で、得点計算はこの関数を通らない。
+  //   足す前は mx が undefined になり、ハーネスが既定値1と読んで「ブイヤベースが一度も育っていない」と誤集計した（Wave 32）。
+  deck: () => deck.map(x => ({ id: x.id, name: x.name, g: x.g, pb: x.pb, pm: x.pm, mx: x.mx, uses: x.uses, charge: x.charge })),
   addInstance: (name, g) => { const inst = addInstance(name, g); renderPiles(); renderAxisTally(); updateProgress(); updateRunStatus(); return inst ? { id: inst.id, name: inst.name, g: inst.g } : null; },
   clearDeck: () => { deck = []; instSeq = 0; syncCounts(); renderPiles(); renderAxisTally(); updateProgress(); },
   setGrowth: (id, g) => { const x = deck.find(d => d.id === id); if (x){ x.g = g|0; renderPiles(); } },
