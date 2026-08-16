@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 28", base: "d8ad6e8", date: "2026-08-16" };
+const BUILD = { label: "Wave 29", base: "3e060c6", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -3092,7 +3092,7 @@ function makeTier(name, i){
   tier.className = "tier";
   tier.dataset.i = String(i);                        // Wave15：内訳と結びつけるための盤面の位置
   // 完成して止まっている間だけ、盤面のカードをタップするとそのカードの内訳に絞れる。
-  tier.addEventListener("click", (ev) => { if (!awaitingCollect) return; ev.stopPropagation(); focusCard(i); });
+  tier.addEventListener("click", (ev) => { if (!runActive || !awaitingCollect) return; ev.stopPropagation(); focusCard(i); });   // Wave29
   const food = document.createElement("div");
   food.className = "food";
   const it = CONFIG.items[name];
@@ -3196,6 +3196,10 @@ function skipToEnd(){
 // スキップボタン：演出中なら最終へ飛ぶ。停止中（未開始）なら1個作って即結果表示。
 function onSkip(){
   Sound.unlock();
+  /* Wave29：ラン終了（結果表示中）は、リザルトの操作以外を全部無視する。ここにガードが無かったので、
+     「飛ばす」を押すと startBurger() が走って新しいバーガーが始まっていた。
+     **この状態の持ち主は runActive だけ。**他のフラグで代用しない。 */
+  if (!runActive) return;
   if (offering || awaitingCollect) return;           // 3択中／回収待ちは対象外
   if (stack === null){ if (!startBurger()) return; }
   skipToEnd();
@@ -5252,6 +5256,7 @@ function endRun(outcome){
   wrap.appendChild(btn);
   offerEl.appendChild(wrap);
   offerEl.classList.add("show"); updateProgress();
+  setInputEnabled(false);                            // Wave29：ラン終了中は「積む」「結果」を押せなくする
   Sound.coinChink(cleared ? 8 : 0, cleared ? 0.7 : 0.4);
   revealGrade(money, grade, gtable);                  // Wave28：数字を回す → 止まる → 評価と表が出る
 }
@@ -5322,7 +5327,7 @@ function resetRun(){
   pendingDraw = 0; pendingForced = []; pendingDrawCui = {};   // 引き枚数の持ち越しもリセット
   runRemovals = 0; lastRemovedBase = 0;                       // Wave20：削除の累計はランごと
   boardRerollCredit = 0;                                      // Wave22：オニオンの引き直し権もランごと（スピンごとの0戻しは onBoard 側）
-  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
+  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; setInputEnabled(true);   // Wave29：「最初から」で入力を戻す shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; forcedCard = null;
   artAxis = {}; artFirstAxis = null; artDayAxis = null; artOnceUsed = {}; artPendingFix = null;   // アーティファクトの状態（Wave7 Step5）
   artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; artChipArmed = null;
@@ -6258,6 +6263,7 @@ function renderSettings(){
 /* ===== 起動・イベント ===== */
 // タップは pointerdown で主動作＋長押し判定。押しっぱなしの間は落下を早送りし続ける。
 function pressStart(){
+  if (!runActive) return;                             // Wave29：ラン終了中は長押し（早送り）も立てない
   if (holdTimer) clearTimeout(holdTimer);
   holdTimer = setTimeout(() => {                      // 長押し確定：以後 dropTier ごとに早送り＋今落下中なら即
     holding = true;
@@ -6265,6 +6271,11 @@ function pressStart(){
   }, HOLD_MS);
 }
 function pressEnd(){ holding = false; if (holdTimer){ clearTimeout(holdTimer); holdTimer = null; } }
+/* Wave29：押せないことを見た目でも出す。runActive を唯一の持ち主にして、endRun と resetRun の両方から呼ぶ。 */
+function setInputEnabled(on){
+  for (const id of ["tap", "skip"]){ const b = $(id); if (b){ b.disabled = !on; b.setAttribute("aria-disabled", String(!on)); } }
+  if (!on) pressEnd();                                // 長押し中に終わったときの取り残しを消す
+}
 $("tap").addEventListener("pointerdown", e => { if (e.button && e.button > 0) return; onTap(); pressStart(); });
 window.addEventListener("pointerup", pressEnd);
 window.addEventListener("pointercancel", pressEnd);
@@ -6273,6 +6284,7 @@ window.addEventListener("keydown", e => {
   if (e.code !== "Space" && e.code !== "Enter") return;
   e.preventDefault();
   if (e.repeat){                                      // キー押しっぱなし（オートリピート）＝早送り扱い
+    if (!runActive) return;                           // Wave29：ラン終了中は早送りも通さない
     holding = true;
     if (dropping && CONFIG.params.fastForward !== false) fastForward();
     return;
