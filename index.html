@@ -250,16 +250,17 @@
   .res-sub{font-size:.76rem; color:var(--muted); margin-top:3px}
   /* Wave27：最終所持金の評価。画面で一番大きい文字にする（このランが何だったのかを一目で伝える）。 */
   .res-grade{margin:6px 0 2px; line-height:1}
+  /* Wave28：background-clip:text は、親に transform（評価を遅らせて出すための移動）が掛かると
+     合成の都合で文字が塗りつぶしの箱になることがある。塗りは単色＋発光にして、どこでも同じに出す。 */
   .rg-letter{display:inline-block; font-size:4.6rem; font-weight:900; letter-spacing:-.03em;
-    background:linear-gradient(180deg,#fff,#c8d4e4); -webkit-background-clip:text; background-clip:text; color:transparent;
-    filter:drop-shadow(0 3px 10px rgba(0,0,0,.7))}
-  .res-grade.g-S .rg-letter{background:linear-gradient(180deg,#fff7d0,#ffb02e); filter:drop-shadow(0 0 22px rgba(255,190,70,.85)) drop-shadow(0 3px 10px #000)}
-  .res-grade.g-A .rg-letter{background:linear-gradient(180deg,#fff2c8,#f5b73c); filter:drop-shadow(0 0 14px rgba(255,190,70,.6)) drop-shadow(0 3px 10px #000)}
-  .res-grade.g-B .rg-letter{background:linear-gradient(180deg,#e6f2ff,#7fd4ff)}
-  .res-grade.g-C .rg-letter{background:linear-gradient(180deg,#eaffef,#7ef0a0)}
-  .res-grade.g-D .rg-letter{background:linear-gradient(180deg,#f2f5fa,#9fb2c8)}
-  .res-grade.g-E .rg-letter{background:linear-gradient(180deg,#e8e2ea,#a08fa8)}
-  .res-grade.g-F .rg-letter{background:linear-gradient(180deg,#e8d6dc,#b07f92)}
+    color:#dbe6f5; text-shadow:0 3px 10px rgba(0,0,0,.75)}
+  .res-grade.g-S .rg-letter{color:#ffc648; text-shadow:0 0 26px rgba(255,190,70,.9), 0 0 60px rgba(255,170,40,.5), 0 3px 10px #000}
+  .res-grade.g-A .rg-letter{color:#f5c451; text-shadow:0 0 16px rgba(255,190,70,.65), 0 3px 10px #000}
+  .res-grade.g-B .rg-letter{color:#8fd9ff; text-shadow:0 0 12px rgba(120,200,255,.45), 0 3px 10px #000}
+  .res-grade.g-C .rg-letter{color:#8bf0ac}
+  .res-grade.g-D .rg-letter{color:#a9bccf}
+  .res-grade.g-E .rg-letter{color:#a795ae}
+  .res-grade.g-F .rg-letter{color:#b98a9a}
   /* Wave27-2：保存設定が既定値を上書きしている項目の一覧（調整欄の先頭） */
   .cfgdiff{border:1px solid #6b4f1c; background:#2a2213; border-radius:10px; padding:8px 10px; margin:0 0 10px}
   .cfgdiff.none{border-color:#2c333d; background:#1c2029}
@@ -271,8 +272,25 @@
   .cfgdiff-t td.k{color:var(--text); font-weight:700}
   .cfgdiff-t td.a{color:var(--muted)}
   .cfgdiff-t td.b{color:#ffd98c; font-weight:800}
-  .res-money{font-size:.95rem; font-weight:800; color:var(--text)}
-  .res-money b{color:#ffd98c}
+  .res-money{font-size:1.05rem; font-weight:800; color:var(--text)}
+  .res-money b{color:#ffd98c; font-variant-numeric:tabular-nums}
+  /* Wave28：評価と表は、数字が止まってから出す（pending の間は伏せる）。 */
+  .res-grade.pending, .res-sec.grades.pending{opacity:0; transform:translateY(6px)}
+  .res-grade, .res-sec.grades{transition:opacity .28s ease-out, transform .28s ease-out}
+  .rg-shop{display:block; margin-top:2px; font-size:.92rem; font-weight:900; color:#ffd98c; letter-spacing:.02em}
+  /* 評価の表（S〜F の全段・自分の位置）。7段がスマホ幅で読めるように詰める。 */
+  .gr-t{width:100%; border-collapse:collapse; font-size:.72rem; font-variant-numeric:tabular-nums}
+  .gr-t th{padding:0 4px 3px; font-size:.64rem; font-weight:700; color:var(--muted); text-align:right; border-bottom:1px solid #3a4553}
+  .gr-t th:nth-child(2){text-align:left}
+  .gr-t td{padding:3px 4px; border-bottom:1px dashed #2c333d; color:var(--muted); white-space:nowrap}
+  .gr-t td.g{width:2.6em; font-size:.9rem; font-weight:900; text-align:left}
+  .gr-t td.s{color:var(--muted); width:99%}
+  .gr-t td.m{text-align:right}
+  .gr-t tr.here td{background:rgba(255,207,90,.14); color:var(--text)}
+  .gr-t tr.here td.g{color:#ffcf5a}
+  .gr-t tr.here td.s{color:#ffd98c; font-weight:800}
+  .gr-t tr.here td.m{color:var(--text); font-weight:800}
+  .gr-next{margin-top:6px; font-size:.78rem; font-weight:800; color:#9fd8ff; text-align:center}
   .res-sec{background:#171a20; border:1px solid var(--line); border-radius:12px; padding:10px}
   .res-lbl{font-size:.8rem; font-weight:800; color:#ffd98c; margin-bottom:6px}
   .res-score{font-size:1.5rem; font-weight:900; color:#fff; text-align:center; margin:2px 0 8px}
@@ -1101,7 +1119,8 @@ const DEFAULTS = {
       /* Wave27：リザルトの演出を評価の段（F=0 … S=6）で強くする。新しい演出は作らず、
          celebrateComplete の部品（破片・閃光・揺れ・カメラ寄り・衝撃波・数字の弾み）を流用する。
          強さ = base × scale^段。F・E は出さない（力尽きたランに派手な祝いを出さない）。 */
-      resultFx:  { on:true, base:0.55, scale:1.32 },
+      //   Wave28：countUp＝最終所持金を回す秒数／gradeGap＝止まってから評価が出るまでの間（秒）。
+      resultFx:  { on:true, base:0.55, scale:1.32, countUp:1.1, gradeGap:0.35 },
       /* Wave19 倍率フェーズ：完成したあと、盤面の下から順に倍率カードを1枚ずつ光らせる。
          gap＝1枚ごとの間隔（秒・落下の間隔とは別に持つ）／cap＝強さが最大になる合計倍率
          （強さ t = min(1, log(合計倍率)/log(cap))）／shake・part＝揺れと破片の倍率。 */
@@ -1174,15 +1193,22 @@ const DEFAULTS = {
               家賃＝所持金÷(1+ratio)。払ったあとに残るのは所持金×ratio/(1+ratio)＝家賃の ratio 倍。
               買い物の予算が得点の幅に関係なく一定になるので、価格を得点の帯から逆算できる。
               お金は増えない（所持金を叩いて補填する形ではない）。家賃が所持金を超えないので閉店も前借りも起きない。 */
-           rentFromMoney: { on: false, ratio: 3 },
+           /* Wave28：既定ONにした。測定の道具として入れたが、ゲームのルールとして機能するほうが良いと分かった。
+              ①評価の閾値（grades）はモードONの14ラン測定に合わせて置いてある ②OFFだと7営業日目の家賃 ¥2,259 に対して
+              所持金 ¥1,531,047 で家賃が完全に無意味 ③「最終所持金＝吸われてなお残ったもの」という評価の前提が
+              OFFでは成立しない。**閉店が構造的に起きなくなるのは仕様である。** */
+           rentFromMoney: { on: true, ratio: 3 },
            /* Wave27：ラン終了時の**最終所持金**だけで評価する（得点でも家賃総額でもない）。
               家賃が毎営業日 所持金の1/4 を持っていくので余剰は自動的に吸われており、残った金は
               「吸われてなお残ったもの」＝そのランの成果をそのまま表す。閉店でも評価は出す。
               **閾値はすべて仮値。**7営業日のデータが無い状態で、6営業日の2ラン
               （和 ¥38,999／高級 ¥459,117）から1日 ×2〜3 で外挿して置いた。3倍刻み。 */
-           grades: [ { g:"S", min: 3000000 }, { g:"A", min: 1000000 }, { g:"B", min: 300000 },
-                     { g:"C", min: 100000 },  { g:"D", min: 30000 },   { g:"E", min: 10000 },
-                     { g:"F", min: 0 } ] },   // rentBase/rentMul は配列の外の日と、配列を作り直すときの雛形に残す
+           /* Wave28：各段に店の名前を持たせた。**記号だけでは「どんな立派な店を買えたか」が伝わらない。**
+              名前は仮値で、金額と同じく調整欄から変えられる。 */
+           grades: [ { g:"S", min: 3000000, shop:"三ツ星レストラン" }, { g:"A", min: 1000000, shop:"駅前の一等地" },
+                     { g:"B", min: 300000,  shop:"商店街の路面店" },   { g:"C", min: 100000,  shop:"郊外の小さな店" },
+                     { g:"D", min: 30000,   shop:"屋台" },             { g:"E", min: 10000,   shop:"リヤカー" },
+                     { g:"F", min: 0,       shop:"段ボール" } ] },   // rentBase/rentMul は配列の外の日と、配列を作り直すときの雛形に残す
     // 店（家賃支払い後に開く。残った所持金で買い物）。値段は調整可・購入回数でスケールするか切替。複製と店員は未実装。
     //   cardCost は「カード追加」の据え置き値。rarity.on=true のときはレアリティ別の基準価格（rarity.prices）を使う。
     shop: { cardCost: 100, removeCost: 75, ingredientSlotCost: 150, sauceSlotCost: 150, rerollCost: 50,
@@ -1626,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 27", base: "d843ad1", date: "2026-08-16" };
+const BUILD = { label: "Wave 28", base: "d8ad6e8", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -5162,15 +5188,19 @@ function endRun(outcome){
   // ① 見出し（到達 / 途中終了で文言と見た目を変える）
   const head = el("res-head");
   /* Wave27：評価（S〜F）を見出しの中に出す。**評価の文字が画面で一番大きい。**
-     このランが何だったのかを一目で伝えるのが目的なので、完走／閉店の別より前に読ませる。 */
+     Wave28：**数字を回してから評価を出す。**同時に出すと評価が「結果」として届かない。
+       ① 最終所持金がカウントアップする → ② 止まる → ③ 評価の文字と表が出る（resultFx はここ）
+     さらに、記号だけでは上に何段あるか・次まであといくらかが分からないので、**7段すべての表**を出す。 */
   const grade = gradeOf(money);
   head.innerHTML = cleared
     ? `<div class="res-badge win">🏁 完 走</div><div class="res-h1">${goal}営業日 達成！</div>`
     : `<div class="res-badge lose">🥀 閉 店</div><div class="res-h1">${daysSurvived}営業日で力尽きた（目標 ${goal}営業日）</div>`;
-  head.innerHTML += `<div class="res-grade g-${grade}"><span class="rg-letter">${grade}</span></div>`
-                  + `<div class="res-money">最終所持金 <b>¥${Math.round(money).toLocaleString("ja-JP")}</b></div>`   // ここは略さない（後から読む数字）
+  head.innerHTML += `<div class="res-money">最終所持金 <b id="resMoney">¥0</b></div>`   // ここは略さない（後から読む数字）
+                  + `<div class="res-grade g-${grade} pending"><span class="rg-letter">${grade}</span>`
+                  + `<span class="rg-shop">${gradeShopOf(grade)}</span></div>`
                   + `<div class="res-sub">${cleared ? "最後まで生き延びた" : "家賃を払えなかった"}</div>`;
   wrap.appendChild(head);
+  const gtable = gradeTableEl(grade, money); wrap.appendChild(gtable);
   // ② 最高得点のバーガー（画像＋レシピ＋得点）
   const bsec = el("res-sec"); bsec.appendChild(el("res-lbl", "🍔 最高得点のバーガー"));
   if (best && best.stack && best.stack.length){
@@ -5223,7 +5253,56 @@ function endRun(outcome){
   offerEl.appendChild(wrap);
   offerEl.classList.add("show"); updateProgress();
   Sound.coinChink(cleared ? 8 : 0, cleared ? 0.7 : 0.4);
-  celebrateResult(grade);                            // Wave27：評価に応じた演出（一度きり）
+  revealGrade(money, grade, gtable);                  // Wave28：数字を回す → 止まる → 評価と表が出る
+}
+/* Wave28：最終所持金を回してから評価を出す。演出（resultFx）もカウントアップの終わりに合わせる。
+   reduced-motion と演出OFFのときは回さず即出し（間だけ作っても意味がないため）。 */
+function revealGrade(v, grade, gtable){
+  const c = (CONFIG.params.fx || {}).resultFx || {};
+  const dur = Math.max(0, (c.countUp != null ? c.countUp : 1.1)) * 1000;
+  const gap = Math.max(0, (c.gradeGap != null ? c.gradeGap : 0.35)) * 1000;
+  const mEl = $("resMoney"), gEl = offerEl.querySelector(".res-grade");
+  const show = () => { if (gEl) gEl.classList.remove("pending"); if (gtable) gtable.classList.remove("pending");
+    celebrateResult(grade); };
+  const put = x => { if (mEl) mEl.textContent = "¥" + Math.round(x).toLocaleString("ja-JP"); };
+  if (reduced || dur <= 0 || c.on === false){ put(v); show(); return; }
+  const t0 = performance.now();
+  const step = now => {
+    // rAF の now はフレーム開始時刻なので、予約した t0 より前になることがある（負の t で数字がマイナスに見えた）。
+    const t = Math.max(0, Math.min(1, (now - t0) / dur));
+    put(v * (1 - Math.pow(1 - t, 3)));               // 終わりに向けて緩む（止まったことが分かる）
+    if (t < 1) requestAnimationFrame(step);
+    else { put(v); numBounce(mEl); animTimers.push(setTimeout(show, gap)); }
+  };
+  requestAnimationFrame(step);
+}
+// 評価の表（S〜F の全段・自分の位置・次の段まであといくら）。数値は run.grades から作る（画面側に書かない）。
+function gradeShopOf(g){ const r = gradeTable().find(x => x.g === g); return (r && r.shop) ? r.shop : ""; }
+function gradeTableEl(grade, money){
+  const t = gradeTable(), box = el("res-sec grades pending");
+  box.appendChild(el("res-lbl", "🏅 評価"));
+  /* 上下の行が続きなので、各段は**下限だけ**を出す（上限は次の段の下限で読める）。
+     範囲を両端とも出すと、スマホ幅で店の名前が2行に折れる。 */
+  const tb = document.createElement("table"); tb.className = "gr-t";
+  tb.innerHTML = `<thead><tr><th></th><th>店</th><th>この金額から</th></tr></thead>`;
+  const body = document.createElement("tbody");
+  const jp = x => "¥" + Math.round(x).toLocaleString("ja-JP");
+  for (let i = 0; i < t.length; i++){
+    const r = t[i], here = r.g === grade;
+    const tr = document.createElement("tr");
+    tr.className = "g-" + r.g + (here ? " here" : "");
+    tr.innerHTML = `<td class="g">${here ? "▶" : ""}<b>${r.g}</b></td>`
+                 + `<td class="s">${r.shop || ""}</td>`
+                 + `<td class="m">${jp(r.min)}</td>`;
+    body.appendChild(tr);
+  }
+  tb.appendChild(body); box.appendChild(tb);
+  const i = t.findIndex(x => x.g === grade);
+  if (i > 0){                                        // 最上段のときは出さない
+    const need = t[i-1].min - money;
+    box.appendChild(el("gr-next", `次は ${t[i-1].g}「${t[i-1].shop || ""}」　あと ¥${Math.round(Math.max(0, need)).toLocaleString("ja-JP")}`));
+  }
+  return box;
 }
 // ランを最初から（デッキ・段数・所持金・スピンを初期化。演出/音の調整は保持。メタ進行は無し）。
 function restoreDefaultDeck(){
@@ -5687,7 +5766,10 @@ function renderSettings(){
                  : [{g:"S",min:3000000},{g:"A",min:1000000},{g:"B",min:300000},{g:"C",min:100000},{g:"D",min:30000},{g:"E",min:10000},{g:"F",min:0}]);
     for (let i = 0; i < gr.length; i++){ const k = i;
       gridRow(g, "評価 " + gr[k].g + "：最終所持金がこれ以上",
-        numInput(()=>gr[k].min, v=>gr[k].min=Math.max(0,Math.round(v)), 10000)); }
+        numInput(()=>gr[k].min, v=>gr[k].min=Math.max(0,Math.round(v)), 10000));
+      const ti = document.createElement("input"); ti.type = "text"; ti.value = gr[k].shop || "";   // Wave28：店の名前
+      ti.addEventListener("input", () => { gr[k].shop = ti.value; });
+      gridRow(g, "評価 " + gr[k].g + "：店の名前", ti); }
     const nt = document.createElement("p"); nt.className = "barnote";
     nt.textContent = "※ 評価するのは最終所持金だけ（得点でも家賃総額でもない）。家賃が毎営業日 所持金の1/4 を吸うので、残った金は「吸われてなお残ったもの」＝そのランの成果。閉店でも評価は出す。";
     g.appendChild(nt); }
@@ -6052,11 +6134,13 @@ function renderSettings(){
   gridRow(g, "カーブ(linear/exp/log/S字)", selectInput(CURVES, ()=>Math.max(0,CURVES.indexOf(fx.scaling.curve)), v=>{ fx.scaling.curve=CURVES[v]; }));
   gridRow(g, "段階数(5〜。増やせる)", numInput(()=>fx.scaling.stages, v=>fx.scaling.stages=Math.max(1,Math.min(30,Math.round(v))), 1));
 
-  { const rf = (CONFIG.params.fx.resultFx = CONFIG.params.fx.resultFx || { on:true, base:0.55, scale:1.32 });
+  { const rf = (CONFIG.params.fx.resultFx = CONFIG.params.fx.resultFx || { on:true, base:0.55, scale:1.32, countUp:1.1, gradeGap:0.35 });
     g = group("演出：リザルトの評価（S〜F で強くする）", "fx");
     gridRow(g, "出す", boolInput(()=>rf.on !== false, v=>rf.on=v));
     gridRow(g, "いちばん下の評価のときの強さ(base)", numInput(()=>rf.base, v=>rf.base=Math.max(0,v), 0.05));
     gridRow(g, "評価1段ごとの倍率(scale)", numInput(()=>rf.scale, v=>rf.scale=Math.max(1,v), 0.02));
+    gridRow(g, "最終所持金を回す秒数(countUp)", numInput(()=>rf.countUp, v=>rf.countUp=Math.max(0,v), 0.1));   // Wave28
+    gridRow(g, "止まってから評価が出るまで(秒)", numInput(()=>rf.gradeGap, v=>rf.gradeGap=Math.max(0,v), 0.05));
     const nt2 = document.createElement("p"); nt2.className = "barnote";
     nt2.textContent = "※ F・E は出さない／D・C は破片と数字の弾みだけ／B・A で閃光・揺れ・カメラ寄り／S で衝撃波。一度きり・reduced-motion では出さない。";
     g.appendChild(nt2); }
