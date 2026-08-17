@@ -999,7 +999,7 @@ const DEFAULTS = {
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxPbMultX", step:50, per:1.3, maxMul:8}, ph:true },  // Wave22：盤面で最も高い永続点50ごとに 倍率×1.3（上限 ×8）。軸は問わない
-    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:100, maxMul:20}, ph:true },  // 上下の具材の永続点を0にし、吸収した100点ごとに 倍率×1.20（Wave21：step 100→200／Wave32：200→100。per と maxMul は据え置き）
+    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:50}, ph:true },  // 上下の具材の永続点を0にし、吸収した50点ごとに 倍率×1.20（Wave21：step 100→200／Wave32：200→100／Wave38：100→50・maxMul をキーごと削除＝上限なし）
     "オーロラソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の揚げ物1枚につき 倍率+0.3（自分も数える）
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "タルタルソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeAdjRareMult", minRar:"tokujou", cui:"agemono", mult:10}, ph:true },  // 上下に接する特上以上の揚げ物の具材を破棄し、破棄した枚数につき ×10（2枚なら ×20）
@@ -1012,7 +1012,7 @@ const DEFAULTS = {
     // ── Wave20：特上ソース5枚（各軸1枚）。すべて×型。数値は仮の初期値で、全部が調整欄から変えられる。──
     "オランデーズソース": { pile:"sauce", type:"sauce", cuisine:"kokyu", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeBelowMult", mult:6}, ph:true },  // 真下の具材を破棄して 倍率×6
     "XO醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"deckDupMultX", per:1.4, maxMul:8}, ph:true },  // デッキで最も多い同名の枚数1枚につき 倍率×1.4
-    "レモンバターソース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growMx", trigger:"draw", mx0:1.0, per:0.15, maxMul:8}, ph:true },  // 引かれるたび 倍率×0.15 ずつ育つ
+    "レモンバターソース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growMx", trigger:"draw", mx0:1.5, per:0.45, maxMul:8}, ph:true },  // 盤面に出るたび 倍率×0.45 ずつ育つ（Wave38：mx0 1.0→1.5・per 0.15→0.45。per 0.15 では上限×8 に47回要り、ラン35スピンでは構造的に届かなかった。trigger:"draw" は「引いたとき」ではなく「盤面に出たとき」＝TRIGGER_JA の表記が正しい）
     "ソースマヨ": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growMx", trigger:"discard", mx0:1.0, per:0.25, maxMul:8}, ph:true },  // 廃棄が起きるたび 倍率×0.25 ずつ育つ
     "みそ": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"runLenMultX", cui:"wa", per:1.3, maxMul:8}, ph:true },  // 和が連続して並ぶ最長の長さ1枚につき 倍率×1.3
     "テリヤキソース": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjTypeMultAdd", type:"meat", per:1.0}, ph:true },  // 上下に接する肉1枚につき 倍率+1.0
@@ -1450,6 +1450,20 @@ const cfgValJa = v => v === undefined ? "（無し）" : (typeof v === "object" 
 { let saved = null;                                  // 起動時：保存されていれば載せる
   try { const t = localStorage.getItem(K_CFG); if (t) saved = JSON.parse(t); } catch(e){}
   if (saved) cfgApply(CONFIG, saved);
+  /* Wave38：保存された差分が「既定にもう無いキー」を生やすのを止める。
+     cfgApply は src のキーを dst に書くだけなので、既定から消したキーが保存側に残っていると復活する。
+     ブイヤベースの maxMul を消したこの波で初めて問題になる：
+     以前 maxMul を触ったことのある端末は差分に maxMul を持っていて、
+     読み込んだ瞬間に上限が戻り、上限なしのはずのカードが黙って頭打ちになる。
+     効果の欄（items[*].effect）だけを対象にする。バンズ登録のように後から増える枝は触らない。 */
+  const ref0 = cfgRef();
+  let revived = 0;
+  for (const nm of Object.keys(CONFIG.items || {})){
+    const cur = (CONFIG.items[nm] || {}).effect, def = ((ref0.items || {})[nm] || {}).effect;
+    if (!cur || !def) continue;
+    for (const k of Object.keys(cur)) if (!Object.prototype.hasOwnProperty.call(def, k)){ delete cur[k]; revived++; }
+  }
+  if (revived) console.warn("Wave38：既定に無い効果のキーを保存設定から " + revived + " 件落とした");
 }
 // 250ms の待ちを抱えたままページを閉じられると、最後の1回が消える。閉じる前に書き切る。
 window.addEventListener("pagehide", () => { if (cfgSaveTimer) saveCfg(); });
@@ -1652,7 +1666,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 36", base: "43e8fa0", date: "2026-08-16" };
+const BUILD = { label: "Wave 38", base: "480b009", date: "2026-08-17" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -2302,7 +2316,8 @@ function trigJa(e){ const t = TRIGGER_JA[e.trigger];
   if (typeof t === "function") return t(e);
   return (t || e.trigger) + (e.cui ? "（"+(CUISINE_JA[e.cui]||e.cui)+"）" : ""); }
 /* Wave20：×型の共通部品。
-     capMul  … maxMul で頭を止める（指数で伸びる型には必ず付ける）
+     capMul  … maxMul で頭を止める（指数で伸びる型には原則として付ける。
+                 Wave38：ブイヤベースだけは maxMul をキーごと外した＝上限なし。例外はこの1枚のみ）
      deckSizeSteps … デッキ枚数から指数の回数を出す（フォンドヴォー＝薄いほど／花椒油＝厚いほど）
      deckMaxDup … デッキで最も多い同名の枚数（XO醤）
      runLenOf … 指定軸が連続して並ぶ最長の長さ（みそ・茶碗蒸しと同じ盤面条件） */
@@ -5941,7 +5956,9 @@ function renderSettings(){
   // 倍率の上限は2種類ある（Wave6 1-1）。pmMax＝永続の倍率(pm)の上限（倍率としては ×(1+pmMax)）／maxMul＝倍率そのものの上限。
   const effOf = nm => (CONFIG.items[nm] || {}).effect || {};
   /* Wave20：ソースの数値は全部ここから触れる。数値は決めきっていないので、遊びながら動かす前提。
-       +型（③）… per を足す／×型（④）… mult・per を掛ける。maxMul＝倍率そのものの上限（指数で伸びる型に必須）。 */
+       +型（③）… per を足す／×型（④）… mult・per を掛ける。maxMul＝倍率そのものの上限（指数で伸びる型に原則として付ける）。
+       Wave38：ブイヤベースだけは maxMul を持たない（上限なし）。持たないカードにこの入力行を作ると
+       Math.max(1, v) が走って上限が復活するので、下のループから外してある。 */
   g = group("ソース：+型（③ 倍率の加算）", "cards");
   gridRow(g, "【帯の代表】並ソースの per（醤油）", numInput(()=>effOf("醤油").per, v=>{ for (const n2 of ["醤油","デミグラスソース","甜麺醤","レモン","オーロラソース"]) effOf(n2).per = Math.max(0,v); }, 0.05));
   gridRow(g, "【帯の代表】上ソースの per（みりん）", numInput(()=>effOf("みりん").per, v=>{ for (const n2 of ["みりん","ペリグーソース","オイスターソース","アイオリ","とんかつソース"]) effOf(n2).per = Math.max(0,v); }, 0.1));
@@ -5965,10 +5982,20 @@ function renderSettings(){
   for (const nm of ["サウザンアイランド","タルタルソース","南蛮酢","マスタード","オランデーズソース"])
     gridRow(g, nm+"：倍率 ×", numInput(()=>effOf(nm).mult, v=>effOf(nm).mult=Math.max(0,v), 0.5));
   gridRow(g, "スペシャルソース：軸1種あたり", numInput(()=>effOf("スペシャルソース").per, v=>effOf("スペシャルソース").per=Math.max(0,v), 0.5));
-  // 指数で伸びる×型：per は「1段あたり掛ける値」。maxMul で必ず頭を止める。
+  /* 指数で伸びる×型：per は「1段あたり掛ける値」。maxMul は原則として付ける。
+     Wave38：ブイヤベースだけ maxMul を持たない（上限なし）。
+     上限の入力行を作ると、触った瞬間 Math.max(1, v) が走って上限が復活してしまうので、
+     この1枚は上限行を作らず、代わりに「上限なし」と読める行を出す。行を黙って消さない。 */
   for (const nm of ["フォンドヴォー","花椒油","ブイヤベース","XO醤","みそ","レモンバターソース","ソースマヨ","ナンプラー"]){
     gridRow(g, nm+"：1段あたり（倍率 ×）", numInput(()=>effOf(nm).per, v=>effOf(nm).per=Math.max(0,v), 0.05));
-    gridRow(g, nm+"：上限（倍率 ×）", numInput(()=>effOf(nm).maxMul, v=>effOf(nm).maxMul=Math.max(1,v), 1));
+    if (effOf(nm).maxMul == null){
+      const note = document.createElement("span");
+      note.textContent = "上限なし（Wave38 で意図的に外した）";
+      note.style.cssText = "opacity:.75; font-size:12px; align-self:center";
+      gridRow(g, nm+"：上限（倍率 ×）", note);
+    } else {
+      gridRow(g, nm+"：上限（倍率 ×）", numInput(()=>effOf(nm).maxMul, v=>effOf(nm).maxMul=Math.max(1,v), 1));
+    }
   }
   gridRow(g, "フォンドヴォー：基準のデッキ枚数", numInput(()=>effOf("フォンドヴォー").ref, v=>effOf("フォンドヴォー").ref=Math.max(1,Math.round(v)), 1));
   gridRow(g, "ブイヤベース：1段ぶん育つのに要る吸収量", numInput(()=>effOf("ブイヤベース").step, v=>effOf("ブイヤベース").step=Math.max(1,Math.round(v)), 10));
