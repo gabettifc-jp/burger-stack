@@ -924,14 +924,14 @@ const DEFAULTS = {
     "熟成肉": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"day", per:40}, ph:true },  // 営業日をまたぐごとに +40（永続・Wave22：60→40）
     "蟹カマ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"baseCopyMax"}, ph:true },  // 盤面で最も高い基礎点と同じ値になる
     "白トリュフ": { pile:"ingredient", type:"veg", cuisine:"kokyu", base:20, count:0, tier:null, rar:"tokujou", effect:{id:"removedCountAdd", per:60}, ph:true },  // このランで削除された1枚につき +60
-    "フォアグラ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"lastRemovedAdd", ratio:1.5}, ph:true },  // 直前に削除されたカードの基礎点の1.5倍を加算（自分では破棄しない）
+    "フォアグラ": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"removedCountAdd", per:30, max:300}, ph:true },  // このランで削除された1枚につき +30（上限 +300・Wave36：lastRemovedAdd から乗り換え。白トリュフは上限なしのまま）
     "伊勢海老": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:360, count:0, tier:null, rar:"tokujou", effect:{id:"boardCountAdd", count:{pile:"ingredient", notCui:"kokyu"}, per:-60}, ph:true },  // 盤面の高級以外の具材1枚につき −60
     "キャビア": { pile:"ingredient", type:"meat", cuisine:"kokyu", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"removedCountAdd", per:150}, ph:true },  // このランで削除された1枚につき +150
     "チャーシュー": { pile:"ingredient", type:"meat", cuisine:"chuka", base:60, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
     "もやし": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"nami", effect:{id:"deckCountAdd", count:{self:true}, per:50}, ph:true },  // デッキのもやし1枚につき +50
     "ザーサイ": { pile:"ingredient", type:"veg", cuisine:"chuka", base:30, count:0, tier:null, rar:"nami", effect:{id:"growOn", trigger:"buy", per:15, max:180}, ph:true },  // カードを購入するたび +15（永続・上限 +180・Wave22：30→15）
     "麻婆豆腐": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", effect:{id:"boardCountAdd", count:{tier:true}, per:20}, ph:true },  // 段数1段につき +20
-    "エビチリ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", effect:{id:"deckCountAdd", count:{all:true}, per:10}, ph:true },  // デッキ1枚につき +10
+    "エビチリ": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", effect:{id:"deckCountAdd", count:{cui:"chuka"}, per:30}, ph:true },  // デッキの中華カード1枚につき +30（Wave36：軸を問わない参照と per 10 をやめた）
     "八宝菜": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", effect:{id:"deckCountAdd", count:{kinds:true, cui:"chuka"}, per:40}, ph:true },  // デッキにある中華カードの種類1つにつき +40
     "北京ダック": { pile:"ingredient", type:"meat", cuisine:"chuka", base:10, count:0, tier:null, rar:"jou", effect:{id:"growOn", trigger:"draw", per:20}, ph:true },  // 盤面に出るたび +20点（永続）
     "中華まん": { pile:"ingredient", type:"veg", cuisine:"chuka", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"nextDrawCui", cui:"chuka", draw:1}, ph:true },  // 次のスピンだけ中華の具材枠 +1
@@ -948,7 +948,7 @@ const DEFAULTS = {
     "あわび": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"jou", effect:{id:"sacrificeBelowAdd", ratio:1.5, notCui:"kaisen"}, ph:true },  // 真下の海鮮以外1枚を消して、その基礎点の1.5倍を加算（永続・Wave33：0.5→1.5。notCui は据え置き）
     "いくら": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"adjCountAdd", count:{cui:"kaisen"}, per:200}, ph:true },  // 上下に接する海鮮1枚につき +200
     "ツナ": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"deckTopAdd"}, ph:true },  // デッキで最も点数が高いカードの点数を加算
-    "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"boardAddSum", max:1000}, ph:true },  // 盤面の具材に加算された点数の合計と同じだけ加算（上限 +1000）
+    "いか": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"tokujou", effect:{id:"boardAddSum"}, ph:true },  // 盤面の具材に加算された点数の合計と同じだけ加算（Wave36：上限 +1000 を外し、いか同士の相互参照を止めた）
     "しらす": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:160, count:0, tier:null, rar:"tokujou", effect:{id:"dayBaseMul", mult:2, max:1280}, ph:true },  // 営業日をまたぐごとに基礎点2倍（上限 1,280・Wave33 まで base:10 で、上限は dayGoal が10だった頃の値。Wave34：base 10→160）
     "うに": { pile:"ingredient", type:"meat", cuisine:"kaisen", base:10, count:0, tier:null, rar:"kiwami", effect:{id:"growOn", trigger:"spin", per:300, halveChance:0.2}, ph:true },  // スピンごとに +300点（永続・Wave33：200→300）。20% で永続点が半減
     "とんかつ": { pile:"ingredient", type:"meat", cuisine:"agemono", base:80, count:0, tier:null, rar:"nami", effect:{id:null}, ph:true },  // なし
@@ -995,7 +995,7 @@ const DEFAULTS = {
     "甜麺醤": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の中華1枚につき 倍率+0.3（自分も数える）
     "オイスターソース": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "黒酢": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"reroll", pm0:2.0, per:2.0}, ph:true },  // ×3。リロールするたび 倍率+2（永続）
-    "花椒油": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"over", per:1.20, maxMul:20}, ph:true },  // デッキ1枚につき 倍率×1.20（Wave35：1.10→1.20。maxMul は据え置き。上限×20 に要るデッキが 32枚→17枚になる）
+    "花椒油": { pile:"sauce", type:"sauce", cuisine:"chuka", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"deckSizeMultX", dir:"over", cui:"chuka", per:1.20, maxMul:20}, ph:true },  // デッキの中華カード1枚につき 倍率×1.20（Wave35：per 1.10→1.20／Wave36：軸を問わない参照をやめ、中華だけを数える）
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxPbMultX", step:50, per:1.3, maxMul:8}, ph:true },  // Wave22：盤面で最も高い永続点50ごとに 倍率×1.3（上限 ×8）。軸は問わない
@@ -1006,7 +1006,7 @@ const DEFAULTS = {
     "南蛮酢": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"dayRandomDiscard", mult:12, notCui:"agemono"}, ph:true },  // ×12。営業日ごとに、揚げ物以外を無作為1枚廃棄する
     "醤油": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の和1枚につき 倍率+0.3（自分も数える）
     "みりん": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
-    "ぽん酢": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"adjNamiJou", pm0:0.5, per:0.5, pmMax:5.0}, ph:true },  // 盤面で接する並または上1枚につき 倍率+0.5（永続）
+    "ぽん酢": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"growPm", trigger:"adjNamiJou", pm0:1.0, per:1.0, pmMax:10.0}, ph:true },  // 盤面で接する並または上1枚につき 倍率+1.0（永続・上限+10。Wave36：0.5/0.5/5.0 から引き上げ）
     "煎り酒": { pile:"sauce", type:"sauce", cuisine:"wa", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"adjTierMult", cui:"wa", one:6, both:28}, ph:true },  // 上下の片方が和なら ×6、両方なら ×28
     "ケチャップ": { pile:"sauce", type:"sauce", cuisine:"none", base:0, count:1, tier:null, rar:"nami", effect:{id:"flatMultAdd", per:0.2}, ph:true },  // 初期デッキ。Wave21：並は全部+型（常に 倍率 +0.2）
     // ── Wave20：特上ソース5枚（各軸1枚）。すべて×型。数値は仮の初期値で、全部が調整欄から変えられる。──
@@ -1652,7 +1652,7 @@ const GROW_PER = 15;      // 育ち1あたりの基礎点加算（仮値・SHOKU
    ファイルの中に自分自身のコミットハッシュは書けない。さらに main への取り込みは rebase なので、
    取り込みのたびに全コミットのハッシュが変わる。そこで **base＝この波を積んだ土台（main 側の既存コミット）** を書く。
    これは変わらないので必ず実在する。「base の次から label の波まで」で範囲が一意に決まる。波ごとに手で更新する。 */
-const BUILD = { label: "Wave 35", base: "b4a62bf", date: "2026-08-16" };
+const BUILD = { label: "Wave 36", base: "43e8fa0", date: "2026-08-16" };
 function syncCounts(){ const c = {}; for (const x of deck) c[x.name] = (c[x.name]||0) + 1;
   for (const nm of Object.keys(CONFIG.items)) CONFIG.items[nm].count = c[nm] || 0; }
 // 個体の永続欄（Wave4 で pb/pm/uses/charge を追加）。init は数値（育ちのみ・後方互換）でもオブジェクトでもよい。
@@ -2153,7 +2153,11 @@ function onDay(){
     } else if (e.id === "growOn" && e.trigger === "dayDiscard"){          // 大海老フライ：自分以外（揚げ物以外）を1枚廃棄し、そのぶん伸びる
       const pool = deck.filter(y => y.id !== x.id && CONFIG.items[y.name].pile !== "bun"
                                  && !(e.notCui && (CONFIG.items[y.name].cuisine || "none") === e.notCui));
-      if (pool.length && discardInstance(pool[Math.floor(grand() * pool.length)], "daiebi")) bumpPb(x, e, e.per || 0);
+      /* Wave36：廃棄対象がいなくても +per は入る。揚げ物に寄せると対象が尽きて伸びが止まっていた
+         （Wave31 §4 で名指しした「対象がいなければ何も起きない代償」）。代償が空振りしても打点は消さない。
+         南蛮酢（dayRandomDiscard）は代償が消えると倍率が無料になる形なので、そちらは触らない。 */
+      if (pool.length) discardInstance(pool[Math.floor(grand() * pool.length)], "daiebi");
+      bumpPb(x, e, e.per || 0);
     } else if (e.id === "dayRandomDiscard"){                              // 南蛮酢：自分以外（揚げ物以外）を無作為に1枚廃棄する（代償）
       const pool = deck.filter(y => y.id !== x.id && CONFIG.items[y.name].pile !== "bun"
                                  && !(e.notCui && (CONFIG.items[y.name].cuisine || "none") === e.notCui));
@@ -2304,7 +2308,9 @@ function trigJa(e){ const t = TRIGGER_JA[e.trigger];
      runLenOf … 指定軸が連続して並ぶ最長の長さ（みそ・茶碗蒸しと同じ盤面条件） */
 function capMul(m, e){ const c = (e && e.maxMul != null) ? e.maxMul : Infinity; return Math.min(c, m); }
 function deckSizeSteps(e, extra){
-  const dn = deck.length + (extra || 0);
+  // Wave36：e.cui があれば、デッキ全体ではなくその軸のカードだけを数える（花椒油）。
+  const dn = (e.cui ? deck.filter(x => ((CONFIG.items[x.name] || {}).cuisine || "none") === e.cui).length
+                    : deck.length) + (extra || 0);
   return (e.dir === "under") ? Math.max(0, (e.ref || 20) - dn) : dn;
 }
 function deckMaxDup(extraName){
@@ -2448,14 +2454,14 @@ const EFFECT_TEXT = {
   flatMultAdd:   e => `常に ${sgn(e.per)}倍（条件なし）`,
   adjDiffCuiMult:e => `上下2枚が互いに違う軸なら ×${e.mult}倍`,
   axisKindsMult: e => `×（${e.base!=null?e.base:1} + ${e.per} × 盤面の軸の種類数）倍`,
-  deckSizeMultX: e => (e.dir === "under" ? `デッキが${e.ref}枚を下回る1枚ごとに ×${e.per}倍` : `デッキ1枚につき ×${e.per}倍`) + mulCapJa(e),
+  deckSizeMultX: e => (e.dir === "under" ? `デッキが${e.ref}枚を下回る1枚ごとに ×${e.per}倍`
+                                         : `デッキの${e.cui ? (CUISINE_JA[e.cui]||e.cui) : ""}カード1枚につき ×${e.per}倍`) + mulCapJa(e),
   deckDupMultX:  e => `デッキで最も多い同名の枚数1枚につき ×${e.per}倍` + mulCapJa(e),
   runLenMultX:   e => `${CUISINE_JA[e.cui]||e.cui}が連続して並ぶ最長の長さ1枚につき ×${e.per}倍` + mulCapJa(e),
   maxPbMultX:    e => `盤面で最も高い永続点${e.step}ごとに ×${e.per}倍（軸は問わない）` + mulCapJa(e),
   sacrificeBelowMult: e => `真下の具材を破棄して ×${e.mult}倍`,
   growMx:        e => `${trigJa(e)} ×${e.per}倍 ずつ育つ` + mulCapJa(e),
-  removedCountAdd: e => `このランで削除された1枚につき ${sgn(e.per)}`,
-  lastRemovedAdd:  e => `直前に削除されたカードの基礎点の${e.ratio}倍を加算（自分では何も破棄しない）`,
+  removedCountAdd: e => `このランで削除された1枚につき ${sgn(e.per)}` + capJa(e.max),
   drawFewerMult: e => `×${e.mult}倍。次のスピンだけ引く枚数${e.draw}`,
   sauceMultAddUp: e => `盤面の倍率を足す型のソース各1枚の倍率に ${sgn(e.per)}倍`,
   sacrificeAdjRareMult: e => `上下に接する${RARITY_JA[e.minRar]||e.minRar}以上の${e.cui?(CUISINE_JA[e.cui]||e.cui)+"の":""}具材を破棄し、破棄した枚数につき ×${e.mult}倍（2枚なら ×${e.mult*2}倍）`,
@@ -2515,8 +2521,11 @@ function pickPreviewHTML(name){
       const v = Math.round(e.max != null ? Math.min(raw, e.max) : raw);
       return line((v >= 0 ? "+" : "") + v);
     }
-    case "removedCountAdd":                                   // 白トリュフ・キャビア（取っても累計は動かない）
-      return line("+" + Math.round((e.per || 0) * runRemovals));
+    case "removedCountAdd": {                                 // 白トリュフ・キャビア・フォアグラ（取っても累計は動かない）
+      let v = Math.round((e.per || 0) * runRemovals);
+      if (e.max != null) v = Math.min(v, e.max);
+      return line("+" + v);
+    }
     default: return "";
   }
 }
@@ -2701,6 +2710,10 @@ function applyBoardAddSum(stack, ctx, acc){
       if (h.disabled || h.kind !== "add" || !(h.add > 0)) continue;
       const s2 = h.src; if (s2 == null || s2 < 0 || s2 === i) continue;
       if (items[stack[s2]].pile !== "ingredient") continue;
+      /* Wave36：boardAddSum 由来の加算は数えない。自分だけを除いていたので、
+         先に処理された いか の加算を後の いか が読み、枚数に対して指数で伸びていた
+         （上限1000がそれを隠していた）。Wave30 で潰した写しの二乗と同じ型。 */
+      if (((items[stack[s2]].effect || {}).id) === "boardAddSum") continue;
       sum += h.add;
     }
     if (e.max != null) sum = Math.min(sum, e.max);   // Wave18：いかは上限 +1000
@@ -2861,7 +2874,7 @@ function resolveCard(i, ctx){
       pushMultAdd(nm+"：接する"+(TYPE_JA[e.type]||e.type)+r.c+"枚", (e.per || 0) * (r.c + nb), [i, ...r.idx]); break; }
     // Wave20：極ソースは④の×型（指数・上限つき）。
     case "deckSizeMultX": { const k = deckSizeSteps(e);
-      if (k > 0) pushMult(nm+"：デッキ"+deck.length+"枚", amMul(capMul(Math.pow(e.per || 1, k), e)), [i]); break; }
+      if (k > 0) pushMult(nm+"：デッキ"+(e.cui ? k : deck.length)+"枚", amMul(capMul(Math.pow(e.per || 1, k), e)), [i]); break; }
     case "deckDupMultX": { const k = deckMaxDup();                 // XO醤：デッキで最も多い同名の枚数
       if (k > 0) pushMult(nm+"：同名"+k+"枚", amMul(capMul(Math.pow(e.per || 1, k), e)), [i]); break; }
     case "runLenMultX": { const best = runLenOf(e.cui, i, ctx);     // みそ：指定軸が連続して並ぶ最長の長さ
@@ -2870,8 +2883,10 @@ function resolveCard(i, ctx){
       if (j >= 0 && items[stack[j]].pile === "ingredient")
         pushMult(nm+"：真下を破棄", amMul(e.mult || 6), [i, j]); break; }
     // Wave20：削除の累計を読む（白トリュフ・キャビア）／直前に削除されたカードを拾う（フォアグラ）。
-    case "removedCountAdd": pushAdd(nm+"：削除"+runRemovals+"枚", amAdd((e.per || 0) * runRemovals), [i]); break;
-    case "lastRemovedAdd":  pushAdd(nm+"：直前の削除"+lastRemovedBase, amAdd(Math.round(Math.max(0, lastRemovedBase) * (e.ratio || 1.5))), [i]); break;
+    // Wave36：max があれば頭打ちにする（フォアグラ）。白トリュフ・キャビアは max 無しで伸び続ける。
+    case "removedCountAdd": { let v = (e.per || 0) * runRemovals;
+      if (e.max != null) v = Math.min(v, e.max);
+      pushAdd(nm+"：削除"+runRemovals+"枚", amAdd(v), [i]); break; }
     case "flatMultAdd":  pushMultAdd(nm, (e.per || 0), [i]); break;   // Wave21：ケチャップ（③の+型・条件なし）
     case "adjTypeMult":  { const r = countAdj({ type: e.type }, i, ctx);   // Wave18：軸ではなく系統を見る one/both
       if (r.c >= 2) pushMult(nm+"：上下とも"+(TYPE_JA[e.type]||e.type), amMul(e.both), [i, ...r.idx]);
@@ -5357,7 +5372,12 @@ function resetRun(){
   pendingDraw = 0; pendingForced = []; pendingDrawCui = {};   // 引き枚数の持ち越しもリセット
   runRemovals = 0; lastRemovedBase = 0;                       // Wave20：削除の累計はランごと
   boardRerollCredit = 0;                                      // Wave22：オニオンの引き直し権もランごと（スピンごとの0戻しは onBoard 側）
-  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true; setInputEnabled(true);   // Wave29：「最初から」で入力を戻す shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
+  money = 0; moneyShown = 0; runSpins = 0; daysSurvived = 0; runActive = true;
+  setInputEnabled(true);                             // Wave29：「最初から」で入力を戻す
+  /* Wave36：この4つは Wave29 でコメントの後ろに押し込まれ、コメントに飲み込まれて実行されていなかった。
+     shopBuys はラン通算の購入回数（値段スケーリング用）なので、残ると「もう一度」で値段が上がったままになる。
+     コメントと文を同じ行に混ぜない。 */
+  shopBuys = {}; dayShopUses = {}; shopStock = null; artifactStock = null;
   history = []; recentProducts = []; completedCount = 0; forcedCard = null;
   artAxis = {}; artFirstAxis = null; artDayAxis = null; artOnceUsed = {}; artPendingFix = null;   // アーティファクトの状態（Wave7 Step5）
   artPickStreak = { cui:null, n:0 }; shopKeepStock = null; artShopDiscount = null; artRentMul = 1; artChipArmed = null;
