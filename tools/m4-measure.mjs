@@ -196,6 +196,10 @@ async function runOne(page, seed, policy) {
              buiMx（plan.inst 由来）と突き合わせて、同じ値になることを確認する。 */
           buiMxDeck: d.filter(x => x.name === 'ブイヤベース').map(x => Math.round((x.mx != null ? x.mx : 1)*1000)/1000),
           buiOn: plan ? plan.stack.filter(x => x === 'ブイヤベース').length : 0,
+          /* Wave38-2：mx と charge（端数）を個体ごとに対にして残す。別々の配列だと突き合わせを間違える。
+             線形になったので吸収累計は (mx - mx0)/per*step + charge で厳密に復元できる。 */
+          buiPair: d.filter(x => x.name === 'ブイヤベース')
+                    .map(x => ({ mx: Math.round((x.mx != null ? x.mx : 1)*1000)/1000, ch: Math.round(x.charge||0) })),
           /* Wave38：レモンバターソース（growMx・線形）の育ち。mx は RUN.deck() の射影に入っている（Wave33）。
              ブイヤベースと違い盤面に出ていなくても読めるので、デッキ側だけで足りる。 */
           lbs: d.filter(x => x.name === 'レモンバターソース').map(x => Math.round((x.mx != null ? x.mx : 1)*1000)/1000),

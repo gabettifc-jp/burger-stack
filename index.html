@@ -999,7 +999,7 @@ const DEFAULTS = {
     "レモン": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の海鮮1枚につき 倍率+0.3（自分も数える）
     "アイオリ": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "ナンプラー": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"maxPbMultX", step:50, per:1.3, maxMul:8}, ph:true },  // Wave22：盤面で最も高い永続点50ごとに 倍率×1.3（上限 ×8）。軸は問わない
-    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.20, step:50}, ph:true },  // 上下の具材の永続点を0にし、吸収した50点ごとに 倍率×1.20（Wave21：step 100→200／Wave32：200→100／Wave38：100→50・maxMul をキーごと削除＝上限なし）
+    "ブイヤベース": { pile:"sauce", type:"sauce", cuisine:"kaisen", base:0, count:0, tier:null, rar:"kiwami", effect:{id:"drainAdjGrowX", mx0:1.0, per:1.5, step:50}, ph:true },  // 上下の具材の永続点を0にし、吸収した50点ごとに 倍率+1.5（Wave21：step 100→200／Wave32：200→100／Wave38：100→50・maxMul をキーごと削除／Wave38-2：指数→線形・per は足す値になった。1.5 は初期値で未確定）
     "オーロラソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"nami", effect:{id:"boardCuiMultAdd", per:0.3}, ph:true },  // 盤面の揚げ物1枚につき 倍率+0.3（自分も数える）
     "とんかつソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"jou", effect:{id:"adjCuiMultAdd", per:1.0}, ph:true },  // 上下に接する同じ軸1枚につき 倍率+1.0
     "タルタルソース": { pile:"sauce", type:"sauce", cuisine:"agemono", base:0, count:0, tier:null, rar:"tokujou", effect:{id:"sacrificeAdjRareMult", minRar:"tokujou", cui:"agemono", mult:10}, ph:true },  // 上下に接する特上以上の揚げ物の具材を破棄し、破棄した枚数につき ×10（2枚なら ×20）
@@ -2032,7 +2032,7 @@ function onAnyDiscard(inst){
 /* Wave20：×型の育ち（mx）。pm（+型の育ち）とは別の欄に持つ。
      mx は「掛ける値そのもの」。1.0 が「何も出さない」。上限は maxMul。
      レモンバターソース・ソースマヨ … 餌1回につき per を足す（線形）
-     ブイヤベース                   … 吸収 step 点ごとに per を掛ける（指数） */
+     ブイヤベース                   … 吸収 step 点ごとに per を足す（線形。Wave38-2 で指数をやめた） */
 function mxCap(e){ return (e && e.maxMul != null) ? e.maxMul : Infinity; }
 function bumpMx(inst, e, amount){
   if (!inst || !amount) return 0;
@@ -2040,12 +2040,9 @@ function bumpMx(inst, e, amount){
   inst.mx = Math.max(before, Math.min(mxCap(e), before + amount));
   return inst.mx - before;
 }
-function powMx(inst, e, times){
-  if (!inst || times <= 0) return 0;
-  const before = (inst.mx != null) ? inst.mx : (e.mx0 != null ? e.mx0 : 1);
-  inst.mx = Math.max(before, Math.min(mxCap(e), before * Math.pow(e.per || 1, times)));
-  return inst.mx - before;
-}
+/* Wave38-2：powMx（mx を指数で伸ばす）は消した。使っていたのはブイヤベース1枚だけで、
+   それを線形に変えたので呼び出し元が無くなった。餌に上限の無い札が18枚中17枚ある状態では
+   指数の mx は成立しないので、足場を残さない。指数が要るなら、要る理由と一緒に書き直すこと。 */
 /* Wave20：このランで削除された枚数と、直前に削除されたカードの基礎点。
    廃棄・破棄・店での削除・アーティファクトによる削除を**区別せず全部数える**。
    ラン全体を数える（そのスピン内だと、削除カードが同席しないと 0 になる）。
@@ -2120,7 +2117,11 @@ function onBoard(inst, stack){
       }
       inst[i].charge = (inst[i].charge || 0) + got;              // 吸収した累計（端数は次に持ち越す）
       const steps = Math.floor(inst[i].charge / step);
-      if (steps > 0){ inst[i].charge -= steps * step; powMx(inst[i], e, steps); }
+      /* Wave38-2：指数から線形へ。per は「1段あたり足す値」になった（掛ける値ではない）。
+         指数のままだと、餌（pb）に上限が無い札が18枚中17枚ある以上、上限なしが成立しない
+         （吸収 4,900点＝98段で 1.20^98 ＝ ×5.8e+7 になった）。線形なら餌が3.5倍でも倍率は3.5倍で止まる。
+         端数の持ち越しは指数のときと同じ。1段に満たない charge は次のスピンへ繰り越す。 */
+      if (steps > 0){ inst[i].charge -= steps * step; bumpMx(inst[i], e, steps * (e.per || 0)); }
     } else if (e.id === "sacrificeBelowMult"){                   // オランデーズソース：真下の具材を破棄する（軸を問わない）
       const j = i - 1;
       if (isMid(j) && items[stack[j]].pile === "ingredient"){
@@ -2316,8 +2317,8 @@ function trigJa(e){ const t = TRIGGER_JA[e.trigger];
   if (typeof t === "function") return t(e);
   return (t || e.trigger) + (e.cui ? "（"+(CUISINE_JA[e.cui]||e.cui)+"）" : ""); }
 /* Wave20：×型の共通部品。
-     capMul  … maxMul で頭を止める（指数で伸びる型には原則として付ける。
-                 Wave38：ブイヤベースだけは maxMul をキーごと外した＝上限なし。例外はこの1枚のみ）
+     capMul  … maxMul で頭を止める（指数で伸びる型には必ず付ける）。
+                 ブイヤベースは Wave38-2 で線形に変えたので、この原則の対象外＝上限を持たない
      deckSizeSteps … デッキ枚数から指数の回数を出す（フォンドヴォー＝薄いほど／花椒油＝厚いほど）
      deckMaxDup … デッキで最も多い同名の枚数（XO醤）
      runLenOf … 指定軸が連続して並ぶ最長の長さ（みそ・茶碗蒸しと同じ盤面条件） */
@@ -2460,7 +2461,8 @@ const EFFECT_TEXT = {
   // Wave18：③の相（倍率の加算）。pm0 が開始値、per が1回ぶん、pmMax が上限（上限の是非は Wave19）。
   growPm:        e => (e.pm0 ? `+${r2(e.pm0)}倍 から始まり、` : "") + `${trigJa(e)} +${e.per}倍（永続）`
                       + (e.pmMax != null ? `（上限 +${r2(e.pmMax)}倍）` : ""),
-  drainAdjGrowX: e => `上下に接する具材の永続点を0にし、吸収した${e.step||100}点ごとに ×${e.per||1.2}倍` + mulCapJa(e),
+  // Wave38-2：線形になったので「×」ではなく「+」。掛けると読める書き方にしない。
+  drainAdjGrowX: e => `上下に接する具材の永続点を0にし、吸収した${e.step||100}点ごとに 倍率+${e.per||1.5}` + mulCapJa(e),
   // ソースの倍率。並＝盤面の同軸のカードだけ／上＝接する同軸のカードだけ（対象の広さと倍率のトレードオフ）
   // Wave18：並＝③の+型（盤面の同軸を数えて倍率に足す）／上＝④の×型（接し方で2段）。
   boardCuiMultAdd: e => `盤面の同じ軸1枚につき ${sgn(e.per)}倍（自分も数える）`,
@@ -5956,9 +5958,10 @@ function renderSettings(){
   // 倍率の上限は2種類ある（Wave6 1-1）。pmMax＝永続の倍率(pm)の上限（倍率としては ×(1+pmMax)）／maxMul＝倍率そのものの上限。
   const effOf = nm => (CONFIG.items[nm] || {}).effect || {};
   /* Wave20：ソースの数値は全部ここから触れる。数値は決めきっていないので、遊びながら動かす前提。
-       +型（③）… per を足す／×型（④）… mult・per を掛ける。maxMul＝倍率そのものの上限（指数で伸びる型に原則として付ける）。
-       Wave38：ブイヤベースだけは maxMul を持たない（上限なし）。持たないカードにこの入力行を作ると
-       Math.max(1, v) が走って上限が復活するので、下のループから外してある。 */
+       +型（③）… per を足す／×型（④）… mult・per を掛ける。maxMul＝倍率そのものの上限（指数で伸びる型には必ず付ける）。
+       ブイヤベースは Wave38-2 で線形に変えたので、指数のループの対象外＝上限を持たない。
+       上限を持たないカードに maxMul の入力行を作ると Math.max(1, v) が走って上限が復活するので、
+       そういうカードには入力行を作らず「上限なし」と読める行を出す（下の noCapRow）。 */
   g = group("ソース：+型（③ 倍率の加算）", "cards");
   gridRow(g, "【帯の代表】並ソースの per（醤油）", numInput(()=>effOf("醤油").per, v=>{ for (const n2 of ["醤油","デミグラスソース","甜麺醤","レモン","オーロラソース"]) effOf(n2).per = Math.max(0,v); }, 0.05));
   gridRow(g, "【帯の代表】上ソースの per（みりん）", numInput(()=>effOf("みりん").per, v=>{ for (const n2 of ["みりん","ペリグーソース","オイスターソース","アイオリ","とんかつソース"]) effOf(n2).per = Math.max(0,v); }, 0.1));
@@ -5982,21 +5985,24 @@ function renderSettings(){
   for (const nm of ["サウザンアイランド","タルタルソース","南蛮酢","マスタード","オランデーズソース"])
     gridRow(g, nm+"：倍率 ×", numInput(()=>effOf(nm).mult, v=>effOf(nm).mult=Math.max(0,v), 0.5));
   gridRow(g, "スペシャルソース：軸1種あたり", numInput(()=>effOf("スペシャルソース").per, v=>effOf("スペシャルソース").per=Math.max(0,v), 0.5));
-  /* 指数で伸びる×型：per は「1段あたり掛ける値」。maxMul は原則として付ける。
-     Wave38：ブイヤベースだけ maxMul を持たない（上限なし）。
-     上限の入力行を作ると、触った瞬間 Math.max(1, v) が走って上限が復活してしまうので、
-     この1枚は上限行を作らず、代わりに「上限なし」と読める行を出す。行を黙って消さない。 */
-  for (const nm of ["フォンドヴォー","花椒油","ブイヤベース","XO醤","みそ","レモンバターソース","ソースマヨ","ナンプラー"]){
+  /* 上限を持たないカードの行。数値入力にすると触った瞬間 Math.max(1, v) が走って
+     上限が復活してしまうので、入力ではなく読める文を出す。行を黙って消さない。 */
+  const noCapRow = (host, nm, why) => {
+    const note = document.createElement("span");
+    note.textContent = "上限なし（" + why + "）";
+    note.style.cssText = "opacity:.75; font-size:12px; align-self:center";
+    gridRow(host, nm+"：上限（倍率 ×）", note);
+  };
+  /* 指数で伸びる×型：per は「1段あたり掛ける値」。maxMul で必ず頭を止める。
+     ブイヤベースはここに入らない。Wave38-2 で線形に変えたので、指数の原則の対象外。 */
+  for (const nm of ["フォンドヴォー","花椒油","XO醤","みそ","レモンバターソース","ソースマヨ","ナンプラー"]){
     gridRow(g, nm+"：1段あたり（倍率 ×）", numInput(()=>effOf(nm).per, v=>effOf(nm).per=Math.max(0,v), 0.05));
-    if (effOf(nm).maxMul == null){
-      const note = document.createElement("span");
-      note.textContent = "上限なし（Wave38 で意図的に外した）";
-      note.style.cssText = "opacity:.75; font-size:12px; align-self:center";
-      gridRow(g, nm+"：上限（倍率 ×）", note);
-    } else {
-      gridRow(g, nm+"：上限（倍率 ×）", numInput(()=>effOf(nm).maxMul, v=>effOf(nm).maxMul=Math.max(1,v), 1));
-    }
+    if (effOf(nm).maxMul == null) noCapRow(g, nm, "指数ではないので上限を持たない");
+    else gridRow(g, nm+"：上限（倍率 ×）", numInput(()=>effOf(nm).maxMul, v=>effOf(nm).maxMul=Math.max(1,v), 1));
   }
+  /* 線形で伸びる×型：per は「1段あたり足す値」。掛ける値ではないので刻みも桁も別（0.05 → 0.1）。 */
+  gridRow(g, "ブイヤベース：1段あたり（倍率 +）", numInput(()=>effOf("ブイヤベース").per, v=>effOf("ブイヤベース").per=Math.max(0,v), 0.1));
+  noCapRow(g, "ブイヤベース", "Wave38-2 で線形にしたので不要");
   gridRow(g, "フォンドヴォー：基準のデッキ枚数", numInput(()=>effOf("フォンドヴォー").ref, v=>effOf("フォンドヴォー").ref=Math.max(1,Math.round(v)), 1));
   gridRow(g, "ブイヤベース：1段ぶん育つのに要る吸収量", numInput(()=>effOf("ブイヤベース").step, v=>effOf("ブイヤベース").step=Math.max(1,Math.round(v)), 10));
   gridRow(g, "ナンプラー：1段ぶんに要る最大永続点", numInput(()=>effOf("ナンプラー").step, v=>effOf("ナンプラー").step=Math.max(1,Math.round(v)), 10));   // Wave22
