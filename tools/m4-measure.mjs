@@ -43,6 +43,13 @@ const AXIS = arg('axis', '');   // Wave29：この軸に寄せる（kokyu/wa/chu
 const AXISMODE = arg('axismode', 'strong');
 const AXISW = AXISMODE === 'weak' ? { on: 2.0, off: 1.0 } : { on: 3.0, off: 0.4 };
 const DEEP = arg('deep', '') === '1';   // Wave29-2：スピンごとの盤面と hits、最終デッキの中身まで残す（解剖用・JSON が大きくなる）
+/* Wave40：iframe の中で回す（itch.io は別オリジンの iframe で配信する）。
+   --frame=1 のとき、TARGET は iframe を1つ持つラッパーページを指す。
+   評価の相手をその子フレームに切り替えるだけで、操作は今までどおり実UI経由。 */
+const FRAME = arg('frame', '') === '1';
+/* Wave40：localStorage の読み書きを全部例外にして走らせる（Safari のプライベートモード等の再現）。
+   「書かない」と「触ると落ちる」は別なので、実際に投げさせて通しで遊べるかを見る。 */
+const KILLLS = arg('killls', '') === '1';
 const WORKERS = +arg('workers', 4);
 const DAYS = +arg('days', 10);
 const TARGET = HTML;   // Wave25：--html= で差し替え可能（変更前後を同じ方策で比べるため）
@@ -127,8 +134,15 @@ async function runOne(page, seed, policy) {
   page.on('pageerror', e => errs.push('PE ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errs.push('CE ' + m.text()); });
   await page.goto(TARGET);
-  await page.waitForFunction(() => typeof window.RUN !== 'undefined');
-  await page.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis, deep, axisW]) => {
+  // Wave40：--frame=1 なら子フレームを評価の相手にする。以降の ev.* はすべてゲーム側で走る。
+  let ev = page;
+  if (FRAME){
+    for (let i = 0; i < 100 && page.frames().length < 2; i++) await page.waitForTimeout(50);
+    ev = page.frames().find(f => f !== page.mainFrame());
+    if (!ev) throw new Error('iframe が見つからない');
+  }
+  await ev.waitForFunction(() => typeof window.RUN !== 'undefined');
+  await ev.evaluate(([seed, days, policy, proxySrc, perCardSrc, rentRatio, axis, deep, axisW]) => {
     window.__M4 = { policy, spins: [], days: [], buys: [], removes: {}, skips: {}, takes: {}, slots: {},
       sauSlots: [], artBuys: [], artSwaps: 0, fills: null, day: 0, credit: 0, shop: [], noneOffer: 0, noneTake: 0, noneShop: 0, noneShopBuy: 0 };
     eval(proxySrc); eval(perCardSrc);
@@ -149,13 +163,13 @@ async function runOne(page, seed, policy) {
     }
   }, [seed, DAYS, policy, PROXY, PERCARD, RENTRATIO, AXIS, DEEP, AXISW]);
 
-  const st = () => page.evaluate(() => ({
+  const st = () => ev.evaluate(() => ({
     show: document.getElementById('offer').classList.contains('show'),
     title: (document.querySelector('#offer .offer-title') || {}).textContent || '',
     done: /完成/.test(document.getElementById('progress').textContent),
     active: RUN.state().runActive, days: RUN.state().daysSurvived, money: RUN.state().money,
     cls: document.getElementById('offer').className }));
-  const tap = () => page.evaluate(() => { const el = document.getElementById('tap');
+  const tap = () => ev.evaluate(() => { const el = document.getElementById('tap');
     el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 })); window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); });
 
   let guard = 0, ended = null, lastKey = '', rep = 0;
@@ -166,8 +180,8 @@ async function runOne(page, seed, policy) {
     if (key === lastKey) rep++; else { rep = 0; lastKey = key; }
     if (rep > 40) { ended = 'stuck'; break; }
     if (!s.show) {
-      for (let k = 0; k < 14; k++) { if ((await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
-      await page.evaluate(() => {   // 完成した時点のカード別打点と得点を控える
+      for (let k = 0; k < 14; k++) { if ((await ev.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
+      await ev.evaluate(() => {   // 完成した時点のカード別打点と得点を控える
         const day = RUN.state().daysSurvived + 1;
         const d = RUN.deck();
         window.__M4.spins.push({ d: day, t: plan ? plan.sc.total : 0, n: plan ? plan.stack.length : 0,
@@ -221,10 +235,10 @@ async function runOne(page, seed, policy) {
                         .map(h => ({ n: h.label.split('：')[0], m: Math.round((h.mult||1)*1000)/1000,
                                      dk: +(h.label.match(/デッキ(\d+)枚/) || [0,0])[1] })) : [] });
       });
-      for (let k = 0; k < 14; k++) { if (!(await page.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
+      for (let k = 0; k < 14; k++) { if (!(await ev.evaluate(() => /完成/.test(document.getElementById('progress').textContent)))) break; await tap(); await page.waitForTimeout(20); }
       continue;
     }
-    const handled = await page.evaluate((policy) => {
+    const handled = await ev.evaluate((policy) => {
       const M = window.__M4, title = (document.querySelector('#offer .offer-title') || {}).textContent || '';
       const day = RUN.state().daysSurvived + 1;
       const useAxis = policy !== 'noaxis';
@@ -395,7 +409,7 @@ async function runOne(page, seed, policy) {
     await page.waitForTimeout(handled === 'shop' ? 40 : 25);
   }
 
-  const out = await page.evaluate(() => {
+  const out = await ev.evaluate(() => {
     const M = window.__M4;
     return { spins: M.spins, days: M.days, shop: M.shop, buys: M.buys, removes: M.removes, skips: M.skips, takes: M.takes, slots: M.slots, sauSlots: M.sauSlots,
       artBuys: M.artBuys, artSwaps: M.artSwaps, fills: M.fills, noneOffer: M.noneOffer, noneTake: M.noneTake, noneShop: M.noneShop, noneShopBuy: M.noneShopBuy,
@@ -421,6 +435,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 let idx = 0, done = 0;
 async function worker() {
   const page = await browser.newPage();
+  if (KILLLS) await page.addInitScript(() => {
+    const boom = { getItem(){ throw new Error('LS blocked'); }, setItem(){ throw new Error('LS blocked'); },
+                   removeItem(){ throw new Error('LS blocked'); }, clear(){ throw new Error('LS blocked'); },
+                   key(){ throw new Error('LS blocked'); }, get length(){ throw new Error('LS blocked'); } };
+    try { Object.defineProperty(window, 'localStorage', { get(){ return boom; }, configurable: true }); } catch(e){}
+  });
   while (true) {
     const my = idx++; if (my >= seeds.length) break;
     try {
